@@ -1,0 +1,38 @@
+# Unity generated (per-machine, never commit)
+game/[Ll]ibrary/
+game/[Tt]emp/
+game/[Oo]bj/
+game/[Bb]uild/
+game/[Bb]uilds/
+game/[Ll]ogs/
+game/[Uu]ser[Ss]ettings/
+game/[Mm]emoryCaptures/
+game/[Rr]ecordings/
+game/.utmp/
+
+# Unity crash/profiler artifacts
+game/*.pidb.meta
+game/sysinfo.txt
+game/*.stackdump
+
+# IDE
+.vs/
+.idea/
+*.csproj
+*.sln
+*.user
+
+# Build outputs at repo root
+builds/
+*.apk
+*.aab
+*.unitypackage
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Secrets — never commit store keys or SDK credentials
+*.keystore
+*.jks
+secrets/

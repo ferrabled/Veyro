@@ -1,0 +1,38 @@
+# Prerequisites — human-only checklist
+
+Agents cannot do these. Items marked **[BLOCKING]** gate the schedule. Update the Status column as you go; agents read this file.
+
+## Accounts & money
+
+| # | Item | Why | Lead time | Status |
+|---|---|---|---|---|
+| P1 | **[BLOCKING]** Register a NEW personal Google Play developer account TODAY ($25 one-time, play.google.com/console/signup). Confirmed 20 Aug: owner has an old Google account but **no Play developer account** — the Nov-2023 cutoff is about the *developer* account, so the **12 testers × 14 days closed-testing rule applies**, plus identity verification for new accounts (can take days) | Register → verify → closed test from ~Sep 1 → apply for production ~Sep 15 → release ~Sep 22. Any slip kills the Play release | Every day counts | ☐ registered ☐ verified |
+| P2 | Apple side — friend's existing Apple Developer account (confirmed as an option 20 Aug). Workflow: Unity on Windows exports the Xcode project → friend archives/signs/uploads on their Mac (runbook: T-032). App will be listed under the friend's developer name — acceptable for Devpost (submission needs the store URL; RevenueCat verification is by bundle ID) | iOS release path without owning a Mac | Friend needs Xcode + ~1–2h per release | ☐ friend confirmed ☐ runbook tested |
+| P3 | Samsung Galaxy Store commercial seller account | Samsung category requires Galaxy Store publication | Days; approval is manual | ☐ |
+| P4 | RevenueCat account + project | Eligibility requirement | Minutes | ☐ |
+| P5 | OneSignal account | $25k category | Minutes | ☐ |
+| P6 | Layers account + App ID | $15k category | Minutes | ☐ |
+| P7 | Noise account | $15k category | Minutes | ☐ |
+| P8 | Devpost registration for Shipaton 2026 (also unlocks Ship Kit freebies) | Required to submit | Minutes | ☐ |
+| P9 | Social account(s) for #BuildInPublic (X and/or LinkedIn/TikTok) — first post | $30k category; judged on journey, not audience size | Minutes | ☐ |
+| P10 | Store payout/tax profiles (Play, App Store, Galaxy) | IAP cannot go live without them | Can take days | ☐ |
+
+## Hardware & tooling
+
+| # | Item | Why | Status |
+|---|---|---|---|
+| H1 | One Android phone with USB debugging enabled (Settings → Developer options) | Primary dev/test device; perf target | ✅ available (20 Aug) — enable USB debugging |
+| H2 | One iPhone | iOS validation + AirPlay latency test | ☐ |
+| H3 | macOS for iOS builds — resolved via friend's Mac (see P2). Unity on Windows CAN export the Xcode project; only compile/sign/upload needs the Mac. Fallback: Unity Build Automation (cloud) | iOS builds cannot be finished on Windows | ☐ friend's Mac confirmed |
+| H4 | TV with Chromecast/AirPlay | Mirroring latency spike (T-004) | ☐ |
+| H5 | Galaxy Fold (or any recent Galaxy) | Samsung category testing; Fold flex-mode demo | ☐ |
+| H6 | **[BLOCKING]** 12 testers recruited (friends / Shipaton Discord mutual-testing channels) — must be opted in and have installed the closed-test build by ~Sep 1 | Closed testing DOES apply (see P1) | ☐ |
+
+## Dev machine (Windows, agents can help)
+
+| # | Item | Status |
+|---|---|---|
+| D1 | Unity Hub + Unity 6 LTS (6000.x) with Android Build Support (SDK/NDK/OpenJDK bundled) | ☐ |
+| D2 | Git installed; repo initialized with Unity .gitignore (+ Git LFS for binary assets) | ☐ |
+| D3 | adb working with H1 connected | ☐ |
+| D4 | Blender (asset work, later) | ☐ |

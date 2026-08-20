@@ -1,0 +1,5 @@
+<linker>
+  <!-- GameObject.CreatePrimitive adds colliders reflectively; without this,
+       IL2CPP strips them in code-only projects and primitives lose collision. -->
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+</linker>
