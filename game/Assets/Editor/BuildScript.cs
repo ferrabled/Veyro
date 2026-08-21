@@ -27,6 +27,13 @@ namespace MotionRunner.EditorTools
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
 
+            // No "Made with Unity" splash. Unity 6 Personal is allowed to turn it off
+            // (docs/LICENSING_REVENUE.md §2.12) — the attribution line only becomes
+            // required if the game ever shows a credits screen. Set here rather than left
+            // to the editor UI so a headless build can never quietly ship it again.
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.SplashScreen.showUnityLogo = false;
+
             string outPath = Path.Combine(RepoRoot, "builds", "MotionRunner.apk");
             Directory.CreateDirectory(Path.GetDirectoryName(outPath));
 

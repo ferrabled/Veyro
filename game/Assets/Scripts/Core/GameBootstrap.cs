@@ -1,10 +1,11 @@
 using MotionRunner.Gameplay;
 using MotionRunner.Inputs;
+using MotionRunner.Track;
 using UnityEngine;
 
 namespace MotionRunner.Core
 {
-    /// Builds the entire prototype scene from code — no authored scene content,
+    /// Builds the entire scene from code - no authored scene content,
     /// so any empty scene boots the game (CLAUDE.md rule 1).
     public static class GameBootstrap
     {
@@ -28,24 +29,35 @@ namespace MotionRunner.Core
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.09f, 0.10f, 0.16f);
             cam.fieldOfView = 65f;
+            cam.farClipPlane = 220f;
             camGo.transform.position = new Vector3(0f, 4.2f, -6.2f);
             camGo.transform.rotation = Quaternion.Euler(24f, 0f, 0f);
 
-            // Road
-            new GameObject("Road").AddComponent<RoadScroller>();
+            // Track (T-003): owns generation, spawning and recycling.
+            var director = new GameObject("Track").AddComponent<TrackDirector>();
 
             // Runner
             var runner = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             runner.name = "Runner";
-            runner.transform.position = new Vector3(0f, 0.5f, 0f);
+            runner.transform.position = new Vector3(0f, TrackMetrics.RunnerRestY, 0f);
             runner.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
             runner.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Lit(new Color(1f, 0.55f, 0.15f));
-
+            // Collisions are resolved against deterministic AABBs, not PhysX (CLAUDE.md rule 4).
+            var runnerCollider = runner.GetComponent<Collider>();
+            if (runnerCollider != null) Object.Destroy(runnerCollider);
             var controller = runner.AddComponent<RunnerController>();
-            controller.Input = new CompositeInput(
+
+            var hud = RunHud.Create();
+
+            // Session last: it drives everything above in a fixed order.
+            var session = new GameObject("RunSession").AddComponent<RunSession>();
+            session.Input = new CompositeInput(
                 new GyroTiltInput(),
                 new TouchTapInput(),
                 new KeyboardInput());
+            session.Runner = controller;
+            session.Director = director;
+            session.Hud = hud;
         }
     }
 }

@@ -25,7 +25,7 @@ Motion-controlled 3D endless runner for RevenueCat Shipaton 2026. Phone tilt (la
 3. **CV never blocks release.** Camera mode is a parallel track (handoff §8); v1.0 ships with gyro+touch regardless of CV status. Primary CV path: BlazePose via Unity Inference Engine (`com.unity.ai.inference`), models from Hugging Face `unity/inference-engine-blaze-pose`. On-device only — no servers.
 4. **Determinism.** Track generation must be reproducible from (seed, version, worldId). No `System.Random` without an injected seed; no time-based randomness in generation.
 5. **Third-party SDKs**: RevenueCat `purchases-unity` ≥ 8.4.0 (Paywalls supported), OneSignal Unity SDK, Layers `com.layers.analytics` (UPM). Keep each behind a thin wrapper so tests run without them.
-6. **Verification.** Prefer Unity batchmode for headless checks: `Unity -batchmode -projectPath game -runTests -testPlatform EditMode` (PlayMode where needed). Anything requiring a physical device (gyro feel, camera, IAP, mirroring latency) → mark the task "needs human device test" in STATUS.md with exact steps to run.
+6. **Verification.** Prefer Unity batchmode for headless checks: `Unity -batchmode -projectPath game -runTests -testPlatform EditMode` (PlayMode where needed). Anything requiring a physical device (gyro feel, camera, IAP, mirroring latency) → mark the task "needs human device test" in STATUS.md with exact steps to run. Batchmode **fails outright while the owner has `game/` open in the editor** — copy the project to a scratch dir and run there, then verify the copy really got your edits (see STATUS 21 Aug, gotcha 4).
 7. **Performance budget**: 60 FPS on mid-tier Android; CV inference ≤ every 2nd–3rd frame, lite model, 640×480 camera feed.
 
 ## Running the game

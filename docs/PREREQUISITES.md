@@ -32,7 +32,7 @@ Agents cannot do these. Items marked **[BLOCKING]** gate the schedule. Update th
 
 | # | Item | Status |
 |---|---|---|
-| D1 | Unity Hub + Unity 6 LTS (6000.x) with Android Build Support (SDK/NDK/OpenJDK bundled) | ☐ |
-| D2 | Git installed; repo initialized with Unity .gitignore (+ Git LFS for binary assets) | ☐ |
-| D3 | adb working with H1 connected | ☐ |
+| D1 | Unity Hub + Unity 6 LTS (6000.x) with Android Build Support (SDK/NDK/OpenJDK bundled) | ✅ 6000.5.9f1; headless Android builds proven (21 Aug) |
+| D2 | Git installed; repo initialized with Unity .gitignore (+ Git LFS for binary assets) | ⚠️ repo + .gitignore + `origin` → github.com/ferrabled/Veyro. **Git LFS not set up** — do it before T-006 lands binary art |
+| D3 | adb working with H1 connected | ✅ verified 21 Aug (DN2103, install/launch/screencap/logcat loop) |
 | D4 | Blender (asset work, later) | ☐ |
