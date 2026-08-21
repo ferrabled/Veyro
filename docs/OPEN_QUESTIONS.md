@@ -1,18 +1,34 @@
 # Open questions for the human owner
 
-Agents: append questions here (context + recommended default). Owner: answer inline; move settled scope/architecture answers into DECISIONS.md.
+Agents: append questions here — context, plus a recommended default so nothing stalls waiting for an
+answer. Owner: answer inline; move settled scope/architecture calls into DECISIONS.md, then delete
+the question. Keep this file short; it is read every session.
 
-## Blocking the schedule
+## Answered
 
-1. ~~**Google Play account?**~~ **ANSWERED 20 Aug:** owner's Google account is old but has never had a Play *developer* account → a new personal developer account must be registered now and the **12-testers × 14-days rule applies**. Consequence recorded as D11; P1/H6 in PREREQUISITES are the action items.
-2. ~~**macOS access?**~~ **ANSWERED 20 Aug:** no Mac available; a friend with an existing Apple Developer account may publish. Plan: Windows Unity exports the Xcode project, friend compiles/signs/uploads (runbook in T-032). **Follow-up for owner: confirm the friend is actually willing, and whether they can also lend ~1–2h per release.**
-3. **Team size:** is this a solo build otherwise (art, video, testing)? Affects how many agent tracks run in parallel and who approves store submissions.
+- **Play developer account** (20 Aug): none existed → new personal account needed, and the
+  **12-testers × 14-days closed-testing rule applies**. See D11; P1 + H6 are the action items.
+- **macOS** (20 Aug): no Mac. A friend's Apple Developer account is the iOS path — Windows exports
+  the Xcode project, they sign and upload (T-032). *Follow-up: confirm they are actually willing,
+  and can spare ~1–2 h per release.*
+- **App name** (21 Aug): **"Veyro Run"**. Package **`com.ferrabled.veyro.run`**. *Owner: move to
+  DECISIONS.md.* One live constraint survives the research: **VEYRON is a Bugatti/VW mark one letter
+  away**, so keep the art direction clear of anything automotive or racing-branded — that is where a
+  confusion argument would get traction. (Not legal advice; a clearance search is cheap pre-upload.)
 
-## Important, not yet blocking
+## Open
 
-4. **Devices:** which Android phone and iPhone are available for testing? Is there access to any Galaxy device / Fold (owned, borrowed, or Samsung Remote Test Lab)?
-5. **Game orientation:** portrait (one-hand tilt, subway-style) or landscape (TV-like, better for mirroring)? *Recommended default: portrait for v1.0 — bigger mobile audience, simpler UI — with landscape support revisited for the TV story.*
-6. **App name:** "Motion Runner" is a working title. Store listings need the real name early (T-030); trademark-check whatever we choose.
-7. **Budget ceiling** for the ~$150–250 of unavoidable costs (Apple $99, Play $25 if new, cloud Mac time, test devices?) — confirm this is fine.
-8. **Art direction taste:** any strong preference (low-poly flat-color vs. toon-shaded vs. neon)? Agents will otherwise propose 2–3 style frames for you to pick from in T-006.
-9. **Lock the score formula before the first public build?** T-005 ships `score = whole metres + coin points`, a coin worth 10 × a combo multiplier that steps up every 3 coins and caps at ×5 (`ScoreState`). Once Daily Run leaderboards (T-008) and shared challenges (T-024) are live, changing this makes old scores incomparable. *Recommended default: leave the formula as is, play it once, and treat it as frozen from the first closed-testing upload; balance the game through chunk difficulty and speed instead of through the scoring.*
+1. **Team size:** solo otherwise (art, video, testing)? Affects how many agent tracks run in
+   parallel, and who approves store submissions.
+2. **Devices:** which Android phone and iPhone are available? Any Galaxy / Fold access (owned,
+   borrowed, or Samsung Remote Test Lab)?
+3. **Orientation:** portrait or landscape? *Default: portrait for v1.0 — bigger mobile audience,
+   simpler UI — revisit landscape for the TV story.*
+4. **Art direction:** low-poly flat-colour, toon-shaded, neon? *Default: agents propose 2–3 style
+   frames in T-006 for you to pick from.* Must respect the Veyron note above.
+5. **Budget ceiling** for the ~$150–250 of unavoidable costs (Apple $99, Play $25, test devices)?
+6. **Freeze the score formula before the first public build?** Currently `whole metres + coin points`,
+   a coin worth 10 × a multiplier that steps every 3 coins and caps at ×5 (`ScoreState`). Once Daily
+   Run (T-008) and challenges (T-024) are live, changing it makes old scores incomparable.
+   *Default: leave it, play it once, treat it as frozen from the first closed-testing upload; balance
+   via chunk difficulty and speed instead.*

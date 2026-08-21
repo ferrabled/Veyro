@@ -11,8 +11,11 @@ namespace MotionRunner.EditorTools
     public static class BuildScript
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
-        // PLACEHOLDER — must be finalized before the first Play Console upload (immutable after).
-        const string PackageName = "com.motionrunner.game";
+        // Immutable once the first Play Console upload happens, changeable freely until then.
+        // Reverse-DNS of ferrabled.com, a domain the owner holds, so the namespace cannot
+        // collide with another developer's. Keep the iOS bundle ID identical (T-032):
+        // RevenueCat verifies Shipaton eligibility by bundle ID.
+        const string PackageName = "com.ferrabled.veyro.run";
 
         static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         static string RepoRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
@@ -22,7 +25,7 @@ namespace MotionRunner.EditorTools
             EnsureScene();
 
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, PackageName);
-            PlayerSettings.productName = "Motion Runner";
+            PlayerSettings.productName = "Veyro Run";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;

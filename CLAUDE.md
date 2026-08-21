@@ -25,13 +25,25 @@ Motion-controlled 3D endless runner for RevenueCat Shipaton 2026. Phone tilt (la
 3. **CV never blocks release.** Camera mode is a parallel track (handoff §8); v1.0 ships with gyro+touch regardless of CV status. Primary CV path: BlazePose via Unity Inference Engine (`com.unity.ai.inference`), models from Hugging Face `unity/inference-engine-blaze-pose`. On-device only — no servers.
 4. **Determinism.** Track generation must be reproducible from (seed, version, worldId). No `System.Random` without an injected seed; no time-based randomness in generation.
 5. **Third-party SDKs**: RevenueCat `purchases-unity` ≥ 8.4.0 (Paywalls supported), OneSignal Unity SDK, Layers `com.layers.analytics` (UPM). Keep each behind a thin wrapper so tests run without them.
-6. **Verification.** Prefer Unity batchmode for headless checks: `Unity -batchmode -projectPath game -runTests -testPlatform EditMode` (PlayMode where needed). Anything requiring a physical device (gyro feel, camera, IAP, mirroring latency) → mark the task "needs human device test" in STATUS.md with exact steps to run. Batchmode **fails outright while the owner has `game/` open in the editor** — copy the project to a scratch dir and run there, then verify the copy really got your edits (see STATUS 21 Aug, gotcha 4).
+6. **Verification.** Prefer Unity batchmode for headless checks: `Unity -batchmode -projectPath game -runTests -testPlatform EditMode` (PlayMode where needed). Anything requiring a physical device (gyro feel, camera, IAP, mirroring latency) → mark the task "needs human device test" in STATUS.md with exact steps to run.
 7. **Performance budget**: 60 FPS on mid-tier Android; CV inference ≤ every 2nd–3rd frame, lite model, 640×480 camera feed.
 
 ## Running the game
 
 - **In editor:** open `game/Assets/Scenes/Main.unity` (intentionally empty) and press Play — `GameBootstrap` builds everything at runtime. Keyboard: A/D or arrows steer, Space jumps. Never hand-edit scene content.
 - **On device:** `Unity -batchmode -quit -projectPath game -buildTarget Android -executeMethod MotionRunner.EditorTools.BuildScript.BuildAndroid` → `builds/MotionRunner.apk` → adb install/launch/screencap (see STATUS 20 Aug for the proven loop). Materials: always `RuntimeMaterials.Lit(color)` — never primitive default materials (URP + stripping, see STATUS).
+
+## Known gotchas (each one cost real time — do not rediscover them)
+
+1. **Shader stripping:** nothing referencing the default shader ⇒ magenta. Materials must ship as assets.
+2. **URP Global Settings:** assigning a pipeline by script does *not* create the global settings asset the editor UI creates implicitly ⇒ black screen. `ProjectSetup.EnsureUrpGlobalSettings()` handles it.
+3. **Never use primitive default materials.** Player builds give `CreatePrimitive` objects the built-in Standard material (URP-incompatible). Always `RuntimeMaterials.Lit/Shared(color)`. `Assets/link.xml` must keep preserving the physics module, because `CreatePrimitive` itself needs it.
+4. **Batchmode fails while the owner has `game/` open in the editor.** Copy the project to a scratch dir and run there — then *verify the copy actually got your edits* before trusting a result. A silently-failed sync once produced a build containing none of the changes.
+5. **Android activity is `com.unity3d.player.UnityPlayerGameActivity`** (Unity 6 GameActivity), not `UnityPlayerActivity`. Launch with `adb shell monkey -p com.ferrabled.veyro.run -c android.intent.category.LAUNCHER 1`.
+6. **Git Bash rewrites unix-looking args into Windows paths**, breaking `adb shell screencap /sdcard/x.png`. Prefix device-path commands with `MSYS_NO_PATHCONV=1` — but keep plain Windows paths for local `adb install`/`adb pull` destinations, which the same flag breaks. Never `adb pull /sdcard/` (pulls the whole phone).
+7. **UGUI is not in a fresh Unity 6 manifest.** `com.unity.modules.ui` gives only `UnityEngine.UIModule` (Canvas, RectTransform); `Text`/`Image`/`Button`/`CanvasScaler` need `com.unity.ugui`, which ships inside the editor install and resolves offline.
+8. `Debug.Log` reaches logcat under tag `Unity` in release builds — `adb logcat -d -s Unity` is a usable diagnostic channel.
+9. **`RunSeedTests` pins the seed hash and PRNG stream.** A failure there is a content break needing a `WorldId` bump — never "just update the expected value", or every already-played Daily Run seed changes.
 
 ## Working protocol for agents
 
