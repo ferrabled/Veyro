@@ -1,0 +1,78 @@
+// Image sampling for the BlazePose pipeline.
+//
+// ImageSample is Unity's own kernel from the official BlazeDetectionSample/Pose (Apache-2.0,
+// github.com/Unity-Technologies/inference-engine-samples), reused verbatim: it samples a texture
+// through an affine transform straight into an Inference Engine tensor buffer.
+//
+// ImageUpright is ours (T-010). It applies the same kind of affine but writes to a RenderTexture
+// instead of a tensor, so the camera frame is straightened exactly once and every stage after it
+// — detector, landmarker crop, on-screen preview, gesture geometry — shares one coordinate space.
+// The affine comes from MotionRunner.Pose.FrameOrientation, which is unit-tested; this file just
+// applies it.
+
+#pragma kernel ImageSample
+#pragma kernel ImageUpright
+
+Texture2D X_tex2D;
+SamplerState LinearClampSampler;
+RWStructuredBuffer<float> Optr;
+
+uint O_width;
+uint O_height;
+uint O_channels;
+uint X_width;
+uint X_height;
+float4x4 affineMatrix;
+// The one edit to Unity's kernel: the sRGB encode below is now conditional. BlazePose wants
+// sRGB-encoded values, and a sampler only hands back linear ones in a Linear-colour-space
+// project. Veyro Run renders in Gamma, where the sampler already returns sRGB and the original
+// unconditional conversion would encode a second time and feed the model a washed-out body.
+uint O_srgbEncode;
+
+[numthreads(8, 8, 1)]
+void ImageSample(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    uint2 O_pos = dispatchThreadID.yx;
+
+    if (O_pos.x >= O_width || O_pos.y >= O_height)
+        return;
+
+    float4 uv = mul(affineMatrix, float4(O_pos.x, O_pos.y, 1, 1)) / float4(X_width, X_height, 1, 1);
+
+    bool mask = uv.x >= 0 && uv.x <= 1 && uv.y >= 0 && uv.y <= 1;
+    float4 c = mask * X_tex2D.SampleLevel(LinearClampSampler, uv.xy, 0);
+    // SRGB conversion
+    if (O_srgbEncode != 0)
+    {
+        bool3 maskRGB = c.rgb > 0.0031308f;
+        c.rgb = lerp(12.92f * c.rgb, 1.055f * (pow(abs(c.rgb), 0.41666666666f) - 0.055f), maskRGB);
+    }
+
+    Optr[(O_pos.y * O_width + O_pos.x) * O_channels + 0] = c.x;
+    Optr[(O_pos.y * O_width + O_pos.x) * O_channels + 1] = c.y;
+    Optr[(O_pos.y * O_width + O_pos.x) * O_channels + 2] = c.z;
+}
+
+RWTexture2D<float4> U_out;
+uint U_width;
+uint U_height;
+// Rows of the 2x3 affine mapping a normalised upright coordinate to a normalised source uv.
+float4 U_row0;
+float4 U_row1;
+
+[numthreads(8, 8, 1)]
+void ImageUpright(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+    uint2 pos = dispatchThreadID.xy;
+
+    if (pos.x >= U_width || pos.y >= U_height)
+        return;
+
+    // Pixel centres, so a 90 degree turn does not shift the image by half a pixel.
+    float2 p = float2((pos.x + 0.5f) / U_width, (pos.y + 0.5f) / U_height);
+    float2 uv = float2(
+        U_row0.x * p.x + U_row0.y * p.y + U_row0.z,
+        U_row1.x * p.x + U_row1.y * p.y + U_row1.z);
+
+    U_out[pos] = X_tex2D.SampleLevel(LinearClampSampler, uv, 0);
+}

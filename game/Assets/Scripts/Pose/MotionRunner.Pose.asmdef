@@ -1,0 +1,14 @@
+{
+    "name": "MotionRunner.Pose",
+    "rootNamespace": "MotionRunner.Pose",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

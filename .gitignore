@@ -36,3 +36,14 @@ Thumbs.db
 *.keystore
 *.jks
 secrets/
+
+# BlazePose/BlazeFace weights (T-010/T-010b). Apache-2.0 ONNX from Hugging Face
+# unity/inference-engine-blaze-pose and -blaze-face. Not committed until Git LFS exists
+# (D2 / T-006); enable with docs/cv-spike.sh on.
+game/CvModels/
+# The whole Resources tree under Assets/CV is transient build-time staging (models plus the
+# committed files from Assets/CV/Data). Unity ships anything under a Resources/ folder in EVERY
+# build (T-010b found the release APK silently carrying the anchor table), so nothing may live
+# here permanently — CvSpikeBuild stages it per spike build and deletes it in a finally.
+game/Assets/CV/Resources/
+game/Assets/CV/Resources.meta

@@ -1,0 +1,21 @@
+{
+    "name": "MotionRunner.Cv",
+    "rootNamespace": "MotionRunner.Cv",
+    "references": [
+        "MotionRunner.Pose",
+        "Unity.InferenceEngine",
+        "Unity.Mathematics",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "VEYRO_CV_SPIKE"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -3,6 +3,7 @@
     "rootNamespace": "MotionRunner.Tests",
     "references": [
         "MotionRunner.Track",
+        "MotionRunner.Pose",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
