@@ -44,8 +44,10 @@ namespace MotionRunner.EditorTools
         // than a Resources/ folder because Unity ships Resources content in EVERY build, gated
         // assembly or not — measured 22 Aug (T-010b): the release APK silently carried the anchor
         // table and the affine compute shader. Staged alongside the models, unstaged in finally.
+        // (ImageTransform.compute moved to MotionRunner.CameraInput's Resources when camera mode
+        // became a shipping feature — the game itself needs it now, so it is no longer staged.)
         const string DataDir = "Assets/CV/Data";
-        static readonly string[] DataFiles = { "anchors.csv", "ImageTransform.compute" };
+        static readonly string[] DataFiles = { "anchors.csv" };
 
         static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         static string RepoRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));

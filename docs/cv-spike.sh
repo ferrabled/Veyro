@@ -98,9 +98,14 @@ case "$mode" in
     echo "  MotionRunner.EditorTools.CvSpikeBuild.BuildAndroid"
     ;;
   off)
-    remove_package
+    # camera-feature branch: com.unity.ai.inference is a hard dependency of the shipping
+    # MotionRunner.CameraInput assembly now, not a spike toggle — removing it breaks the compile.
+    # "off" only ever mattered for keeping the package out of the v1.0 release manifest, which is
+    # exactly what main still does.
+    echo "keep   $package — MotionRunner.CameraInput (camera mode) requires it on this branch."
+    echo "       On main (v1.0), the package stays out of the manifest as before."
     echo
-    echo "CV spike disabled. game/CvModels is left alone (gitignored); delete it to reclaim ~33 MB."
+    echo "game/CvModels is left alone (gitignored); delete it to reclaim ~33 MB of pose weights."
     ;;
   *)
     echo "usage: $(basename "$0") on|off" >&2

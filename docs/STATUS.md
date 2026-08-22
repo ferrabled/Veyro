@@ -4,6 +4,63 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-23 — T-011/T-012/T-013: camera mode is in the game, on the `camera-feature` branch (camera-feature session)
+
+**Headline: the game now boots to a mode menu, and camera mode drives it end-to-end on the
+device.** Owner chose OPEN_QUESTIONS 7(d) on 22 Aug; this implements it. On the Nord 2 the full
+chain ran unattended: speed gate **3.7 ms blocking median → PASS**, camera permission, orientation
+probe settled at score 0.89 (again overruling the device's wrong rotation report, 270 → 90+flip),
+face acquired, run started hands-free. `main` still holds v1.0 untouched; this branch's APK
+installs as **`com.ferrabled.veyro.camdev`** ("Veyro Cam Dev", `builds/VeyroCamDev.apk`, 44.8 MB)
+so it can never replace the working game on a phone.
+
+**How it fits together** (all new code except the adapter lives outside Assembly-CSharp):
+- `MotionRunner.Pose.FaceSteering` (engine-free, clock-free): face position → LEFT/RIGHT (neutral
+  band + dead zone + low-pass), JUMP (upward velocity + refractory), SLIDE (sustained crouch +
+  hold time), loss decay, slow neutral drift. 13 EditMode tests drive synthetic 30 Hz
+  trajectories; writing them caught a real design bug — standing up from a crouch is a jump's
+  exact velocity signature, so ending a slide now arms the jump refractory.
+- `MotionRunner.CameraInput` (new ungated asmdef): `CameraFeed` + `BlazeAffine` moved here from
+  the spike (spike asmdef now references this one), plus `FaceAnchors` (the 896 BlazeFace anchors
+  generated in code), `FaceDetector` (BlazeFace short-range, CPU backend, argmax folded into the
+  graph, startup self-check on the box tensor width), `FaceTrackingRig` (state machine:
+  gate → permission → camera → probe → track; the gate runs *before* the permission ask so a
+  too-slow device never gets prompted).
+- `CameraFaceInput : IGameInput` (in Assembly-CSharp with the other adapters — asmdefs cannot
+  reference Assembly-CSharp, so the adapter lives beside GyroTiltInput). Stale observations
+  (>0.35 s) read as loss.
+- `ModeSelectMenu` (code-first UGUI): TILT & TOUCH vs CAMERA (BETA), rig states narrated
+  on-screen, every camera failure falls back to the menu with the reason. Camera mode keeps
+  touch+keyboard in the composite as backup. Last choice remembered (`veyro.input_mode`), menu
+  shown every launch.
+- **No downloads, ever**: the 418 KB BlazeFace ONNX is committed at
+  `Assets/Scripts/CameraInput/Resources/CameraInput/` and ships in the APK. `docs/cv-spike.sh off`
+  no longer removes `com.unity.ai.inference` — on this branch it is a shipping dependency
+  (committed in the manifest; the APK carries its ~8.8 MB and CAMERA by design).
+- `BuildScript.BuildAndroidCamDev` builds the dev-flavoured APK; `BuildAndroid` is untouched and
+  still produces the real package name for the eventual post-release update (D2).
+
+**Verified:** 140 EditMode tests green (127 + 13 new). On device: menu renders; TILT & TOUCH
+starts a normal run (screenshot); CAMERA (BETA) ran the full pipeline unattended — `[CAM]` logcat
+lines show gate PASS at 3.7 ms, orientation settled, and the run started from a face sighting.
+No runtime exceptions; memory 332 MB PSS with camera+inference live (game alone was ~231 MB).
+One build-loop trap hit: launching an APK build seconds after a `-runTests` run on the same
+scratch copy deadlocks Unity ("More than one copy of bee_backend running" → build waits forever
+at Compiling Scripts). Leave a gap or check for lingering `bee_backend` before batchmode builds.
+
+**Needs a human (the fun part)**
+- **Play it.** `builds/VeyroCamDev.apk` is installed. Prop the phone up, pick CAMERA (BETA), step
+  back 1.5–2.5 m: lean to steer, hop to jump, crouch to slide. The verdict this needs: does
+  steering feel 1:1, do jumps fire when you hop (and only then), does the short-range model still
+  see you at play distance in your room's light?
+- Tuning knobs live in `FaceSteering` (all public fields, defaults are first guesses):
+  `HalfRangeX` (lean sensitivity), `JumpVelocity`, `SlideDrop`. Report what feels wrong.
+- T-012's false-positive AC (<1/min standing still) needs a few timed minutes in frame.
+
+**Next:** owner playtest → tune → then T-020 RevenueCat (unstarted, still the critical path;
+Play Console account requested and pending). Do not merge to `main` until v1.0 has shipped —
+this branch deliberately trades the clean 29.6 MB/INTERNET-only baseline for camera mode.
+
 ## 2026-08-22 — T-010b feasibility sweep: **the 30 ms gate is beatable — 4.2 ms, but not with BlazePose** (track-b/cv-feasibility)
 
 **Headline: YES, camera control clears 30 ms on the Nord 2 — by switching models, not backends.**

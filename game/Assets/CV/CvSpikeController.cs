@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using MotionRunner.CameraInput;
 using MotionRunner.Pose;
 using Unity.InferenceEngine;
 using UnityEngine;

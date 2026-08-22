@@ -3,7 +3,7 @@ using Unity.InferenceEngine;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace MotionRunner.Cv
+namespace MotionRunner.CameraInput
 {
     /// Affine sampling and detector post-processing for BlazePose.
     ///
@@ -82,7 +82,7 @@ namespace MotionRunner.Cv
             return (bestScoreIndex, selectedScores, selectedBoxes);
         }
 
-        const string ShaderPath = "Cv/ImageTransform";
+        const string ShaderPath = "CameraInput/ImageTransform";
 
         static ComputeShader s_Shader;
         static int s_ImageSample;

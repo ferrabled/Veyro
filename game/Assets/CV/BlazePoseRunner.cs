@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using MotionRunner.CameraInput;
 using MotionRunner.Pose;
 using Unity.InferenceEngine;
 using Unity.Mathematics;

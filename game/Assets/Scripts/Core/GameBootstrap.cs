@@ -49,15 +49,31 @@ namespace MotionRunner.Core
 
             var hud = RunHud.Create();
 
-            // Session last: it drives everything above in a fixed order.
+            // Session last: it drives everything above in a fixed order. Disabled until the
+            // player has picked a control scheme — enabling it is what starts the first run.
             var session = new GameObject("RunSession").AddComponent<RunSession>();
-            session.Input = new CompositeInput(
-                new GyroTiltInput(),
-                new TouchTapInput(),
-                new KeyboardInput());
+            session.enabled = false;
             session.Runner = controller;
             session.Director = director;
             session.Hud = hud;
+
+            var menu = ModeSelectMenu.Create();
+            menu.Chosen += (cameraMode, rig) =>
+            {
+                // Touch and keyboard stay in the mix in camera mode: they cost nothing, keep the
+                // result screen restartable if tracking drops, and are how a bystander pauses the
+                // hands-free demo without standing in frame.
+                session.Input = cameraMode
+                    ? new CompositeInput(
+                        new CameraFaceInput(rig),
+                        new TouchTapInput(),
+                        new KeyboardInput())
+                    : new CompositeInput(
+                        new GyroTiltInput(),
+                        new TouchTapInput(),
+                        new KeyboardInput());
+                session.enabled = true;
+            };
         }
     }
 }

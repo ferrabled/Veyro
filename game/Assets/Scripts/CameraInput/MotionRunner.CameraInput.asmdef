@@ -1,12 +1,10 @@
 {
-    "name": "MotionRunner.Cv",
-    "rootNamespace": "MotionRunner.Cv",
+    "name": "MotionRunner.CameraInput",
+    "rootNamespace": "MotionRunner.CameraInput",
     "references": [
         "MotionRunner.Pose",
-        "MotionRunner.CameraInput",
         "Unity.InferenceEngine",
-        "Unity.Mathematics",
-        "UnityEngine.UI"
+        "Unity.Mathematics"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -14,9 +12,7 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [
-        "VEYRO_CV_SPIKE"
-    ],
+    "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
 }

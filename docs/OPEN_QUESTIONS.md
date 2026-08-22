@@ -33,32 +33,19 @@ the question. Keep this file short; it is read every session.
    *Default: leave it, play it once, treat it as frozen from the first closed-testing upload; balance
    via chunk difficulty and speed instead.*
 
-7. **Camera mode: the T-010b sweep changed the options** (STATUS 22 Aug, T-010b entry — numbers
-   there). BlazePose still misses the gate, but **BlazeFace short-range on the CPU backend medians
-   4.2 ms** (9.1 ms inside a live 60 FPS loop at ~59 Hz, zero dropped frames) on the Nord 2 — the
-   30 ms gate is cleared several times over by a 418 KB model that gives face-x (LEFT/RIGHT),
-   face-y velocity (JUMP) and face-y drop (SLIDE). Updated ways forward:
-   (a) **park camera mode as a demo** — still valid, now underselling what's measured;
-   (b) **Path B, MediaPipeUnityPlugin — obsolete**: it existed as the performance escape hatch,
-   and the performance problem is solved without it;
-   (c) **drop camera mode** and reclaim the Track B time;
-   (d) **build camera mode on BlazeFace-on-CPU** — T-011 becomes a face-tracking loop (no pose
-   detector, which also can't run on CPU without OOM-killing the app — see STATUS), T-012's gesture
-   layer works on face centre instead of torso centre (same PoseGeometry seam), T-013 gates on the
-   *blocking* CPU latency (the async number is frame-quantized and misleading). Roughly 2–4 days,
-   after T-020, still behind D2 so v1.0 is unaffected.
-   *Default if you say nothing: (d), started only once T-020 is done.* **One risk before committing:
-   the short-range face model is trained for arm's-length faces, and detection at 1.5–3 m play
-   distance is untested — needs you in frame for ~10 minutes (steps in STATUS).* If that fails, the
-   fallbacks are converting the full-range BlazeFace to ONNX, or (a).
-   **T-011–T-013 stay unstarted until you answer.**
-8. **Where should the BlazePose weights live?** ~20 MB of Apache-2.0 ONNX. Right now they are
-   gitignored and fetched by `docs/cv-spike.sh on`; `CvSpikeBuild` stages them into `Resources`
-   for the spike APK only, so the release APK is unaffected. That works while this is a spike, but
-   if camera mode ever ships the weights must be in the APK and therefore on every build machine.
-   *Default: leave it as-is now, and move them into Git LFS at the same time as T-006 sets LFS up
-   (D2) — but only if question 7 resolves to (a) or (b).*
+7. ~~Camera mode: park, invest, or drop?~~ **Answered by the owner, 22 Aug: build it** (option d,
+   BlazeFace-on-CPU — 4.2 ms blocking median on the Nord 2, numbers in STATUS T-010b). Implemented
+   on the `camera-feature` branch the owner created; v1.0 on `main` is untouched and still ships
+   gyro+touch first (D2 holds; T-020 remains the critical path — the owner has requested the Play
+   Console account). *Owner: move the decision to DECISIONS.md.* The 1.5–3 m range risk still
+   needs the 10-minute human test — steps in STATUS.
+8. **Where should the BlazePose weights live?** Partially settled by 7: camera *control* ships on
+   BlazeFace, whose 418 KB ONNX is now simply **committed** at
+   `game/Assets/Scripts/CameraInput/Resources/CameraInput/` (small enough to not need LFS). The
+   ~20 MB BlazePose weights are needed only by the benchmark spike and stay gitignored /
+   fetched by `docs/cv-spike.sh`. Remaining question: if a pose-skeleton *overlay demo* is ever
+   wanted for the pitch video, do those 20 MB move to Git LFS with T-006? *Default: yes, then.*
 
-   Not a question, just so you know it was checked: the release APK is back to its 29.6 MB baseline
-   with no CAMERA permission. Getting there took gating the CV assembly *and* keeping
-   `com.unity.ai.inference` out of the committed manifest — see STATUS 22 Aug for the numbers.
+   Note for the camera-feature branch: `com.unity.ai.inference` is now IN the committed manifest
+   there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
+   and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.

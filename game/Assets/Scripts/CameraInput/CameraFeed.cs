@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.Android;
 #endif
 
-namespace MotionRunner.Cv
+namespace MotionRunner.CameraInput
 {
     /// The front camera, straightened.
     ///
