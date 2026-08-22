@@ -1,16 +1,21 @@
+using System;
 using MotionRunner.Core;
 using MotionRunner.Track;
 using UnityEngine;
 
 namespace MotionRunner.Gameplay
 {
-    /// The run loop (T-005): start -> run -> crash -> result -> restart.
+    /// The run loop (T-005): start -> run -> crash -> result -> restart, plus the Daily Run
+    /// (T-008): in RunMode.Daily the seed comes from the UTC date, so every device playing today
+    /// runs the identical track with no server involved (D10).
     ///
     /// Owns frame order on purpose - input, then the runner, then the world, then collisions,
     /// then the HUD - so what the player sees is what was tested against.
     public sealed class RunSession : MonoBehaviour
     {
-        const string BestScoreKey = "motionrunner.best_score";
+        const string AllTimeBestKey = "veyro.best.alltime";
+        const string DailyBestKey = "veyro.best.daily";
+        const string DailyBestDateKey = "veyro.best.daily.date";
 
         /// Ignore restart input for a moment after a crash, so the tap that killed the player
         /// does not also skip the result screen.
@@ -25,14 +30,23 @@ namespace MotionRunner.Gameplay
         public TrackDirector Director;
         public RunHud Hud;
 
-        /// Which content set the seed refers to (handoff 3.3). T-008 replaces the per-session
-        /// seed with one derived from the UTC date; the world id stays part of the tuple.
+        public RunMode Mode = RunMode.Daily;
+
+        /// Which content set the seed refers to (handoff 3.3).
         public string WorldId = RunSeed.DefaultWorldId;
 
         public ScoreState Score { get; } = new ScoreState();
         public bool IsRunning { get; private set; }
-        public int BestScore { get; private set; }
         public RunSeed CurrentSeed { get; private set; }
+
+        /// All-time best across every mode.
+        public int AllTimeBest { get; private set; }
+
+        /// Best on the current UTC date's Daily Run. Resets by itself when the date rolls over.
+        public int DailyBest { get; private set; }
+
+        /// "2026-08-21" — the UTC date the current run belongs to.
+        public string DailyLabel { get; private set; } = string.Empty;
 
         int _runIndex;
         int _sessionSalt;
@@ -41,12 +55,12 @@ namespace MotionRunner.Gameplay
 
         void Start()
         {
-            BestScore = PlayerPrefs.GetInt(BestScoreKey, 0);
+            AllTimeBest = PlayerPrefs.GetInt(AllTimeBestKey, 0);
 
-            // A run is a seed. The seed source may be arbitrary; the generation it drives may
-            // not be (CLAUDE.md rule 4), which is why the tick count is sampled exactly once,
-            // here, and never inside the generator.
-            _sessionSalt = System.Environment.TickCount;
+            // Free mode needs a run-to-run seed source. The seed source may be arbitrary; the
+            // generation it drives may not be (CLAUDE.md rule 4), which is why the tick count is
+            // sampled exactly once, here, and never inside the generator.
+            _sessionSalt = Environment.TickCount;
 
             if (Hud != null) Hud.RestartRequested += RequestRestart;
             StartRun();
@@ -62,7 +76,16 @@ namespace MotionRunner.Gameplay
             _runIndex++;
             _elapsed = 0f;
             Score.Reset();
-            CurrentSeed = new RunSeed(_sessionSalt + _runIndex * 7919, Application.version, WorldId);
+
+            // Sampled per run, not once at startup: a session left open across UTC midnight rolls
+            // onto the new day's track and the new day's best-score bucket.
+            var utcNow = DateTime.UtcNow;
+            DailyLabel = DailySeed.LabelForDate(utcNow);
+            DailyBest = LoadDailyBest(DailyLabel);
+
+            CurrentSeed = Mode == RunMode.Daily
+                ? DailySeed.ForUtcDate(utcNow, WorldId)
+                : new RunSeed(_sessionSalt + _runIndex * 7919, ChunkLibrary.ContentVersion, WorldId);
 
             Runner.ResetState();
             Director.BeginRun(CurrentSeed);
@@ -70,6 +93,7 @@ namespace MotionRunner.Gameplay
             if (Hud != null)
             {
                 Hud.HideResult();
+                Hud.SetMode(Mode, DailyLabel);
                 Hud.SetLive(Score, Director.Difficulty);
             }
 
@@ -137,18 +161,41 @@ namespace MotionRunner.Gameplay
             IsRunning = false;
             _restartLockout = RestartLockoutSeconds;
 
-            if (Score.Score > BestScore)
+            int score = Score.Score;
+            bool dirty = false;
+
+            if (score > AllTimeBest)
             {
-                BestScore = Score.Score;
-                PlayerPrefs.SetInt(BestScoreKey, BestScore);
-                PlayerPrefs.Save();
+                AllTimeBest = score;
+                PlayerPrefs.SetInt(AllTimeBestKey, AllTimeBest);
+                dirty = true;
             }
 
-            Debug.Log("Run over. seed=" + CurrentSeed + " score=" + Score.Score +
+            if (Mode == RunMode.Daily && score > DailyBest)
+            {
+                DailyBest = score;
+                PlayerPrefs.SetInt(DailyBestKey, DailyBest);
+                PlayerPrefs.SetString(DailyBestDateKey, DailyLabel);
+                dirty = true;
+            }
+
+            if (dirty) PlayerPrefs.Save();
+
+            Debug.Log("Run over. mode=" + Mode + " seed=" + CurrentSeed + " score=" + score +
                       " coins=" + Score.Coins + " distance=" + (int)Score.Distance +
                       "m chunks=" + Director.ChunksSpawned);
 
-            if (Hud != null) Hud.ShowResult(Score.Score, BestScore, Score.Coins, Score.BestCombo);
+            if (Hud != null)
+                Hud.ShowResult(new RunSummary(Mode, score, Score.Coins, Score.BestCombo,
+                    (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel));
+        }
+
+        /// Today's daily best, or zero if what is stored belongs to an earlier date. Keeps exactly
+        /// one daily bucket on disk instead of one key per day, for ever.
+        static int LoadDailyBest(string todayLabel)
+        {
+            if (PlayerPrefs.GetString(DailyBestDateKey, string.Empty) != todayLabel) return 0;
+            return PlayerPrefs.GetInt(DailyBestKey, 0);
         }
 
         void RequestRestart()

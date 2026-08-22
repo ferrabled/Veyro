@@ -27,7 +27,7 @@ namespace MotionRunner.Tests
         }
 
         [Test]
-        public void RngState_DependsOnGameVersion()
+        public void RngState_DependsOnContentVersion()
         {
             Assert.AreEqual(3474704280u, new RunSeed(12345, "0.2.0", "greybox").RngState());
         }

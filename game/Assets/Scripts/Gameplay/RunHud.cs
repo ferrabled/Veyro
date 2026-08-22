@@ -15,6 +15,7 @@ namespace MotionRunner.Gameplay
         static readonly Color PanelColor = new Color(0.11f, 0.13f, 0.20f, 0.96f);
         static readonly Color ButtonColor = new Color(1f, 0.55f, 0.15f);
         static readonly Color ComboColor = new Color(1f, 0.86f, 0.22f);
+        static readonly Color ModeColor = new Color(0.62f, 0.68f, 0.80f);
 
         /// Raised by the restart button. RunSession also accepts a tap anywhere, because a
         /// button is a nicety and being able to start the next run is not.
@@ -23,6 +24,7 @@ namespace MotionRunner.Gameplay
         Text _score;
         Text _coins;
         Text _combo;
+        Text _mode;
         Text _resultScore;
         Text _resultBest;
         GameObject _resultPanel;
@@ -63,11 +65,24 @@ namespace MotionRunner.Gameplay
             }
         }
 
-        public void ShowResult(int score, int best, int coins, int bestCombo)
+        /// Which mode and which UTC day this run belongs to. Shown live, because "the same run on
+        /// two devices" is exactly T-008's acceptance test and it should be visible in a screenshot.
+        public void SetMode(RunMode mode, string dailyLabel)
         {
-            _resultScore.text = score.ToString();
-            _resultBest.text = best > 0 ? "best " + best + "\ncoins " + coins + "   best combo " + bestCombo
-                                       : "coins " + coins + "   best combo " + bestCombo;
+            _mode.text = mode == RunMode.Daily ? "DAILY · " + dailyLabel : "FREE RUN";
+        }
+
+        public void ShowResult(in RunSummary summary)
+        {
+            _resultScore.text = summary.Score.ToString();
+
+            string bestLine = summary.IsDaily
+                ? "DAILY · " + summary.DailyLabel + "\nbest today " + summary.DailyBest +
+                  "   all-time " + summary.AllTimeBest
+                : "all-time best " + summary.AllTimeBest;
+
+            _resultBest.text = bestLine + "\n" + summary.Distance + "m   coins " + summary.Coins +
+                               "   best combo " + summary.BestCombo;
             _resultPanel.SetActive(true);
         }
 
@@ -107,6 +122,11 @@ namespace MotionRunner.Gameplay
                 new Vector2(0f, -156f), new Vector2(-32f, -104f),
                 40, TextAnchor.UpperRight, ComboColor);
 
+            _mode = CreateText("Mode", transform,
+                new Vector2(0f, 1f), new Vector2(0.6f, 1f),
+                new Vector2(36f, -198f), new Vector2(0f, -148f),
+                34, TextAnchor.UpperLeft, ModeColor);
+
             BuildResultPanel();
             _resultPanel.SetActive(false);
         }
@@ -125,7 +145,7 @@ namespace MotionRunner.Gameplay
             var cardRect = card.AddComponent<RectTransform>();
             card.transform.SetParent(_resultPanel.transform, false);
             Stretch(cardRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            cardRect.sizeDelta = new Vector2(760f, 720f);
+            cardRect.sizeDelta = new Vector2(760f, 780f);
             card.AddComponent<Image>().color = PanelColor;
 
             CreateText("Title", card.transform,
@@ -140,8 +160,8 @@ namespace MotionRunner.Gameplay
 
             _resultBest = CreateText("ResultBest", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(24f, -480f), new Vector2(-24f, -360f),
-                40, TextAnchor.UpperCenter, TextColor);
+                new Vector2(24f, -570f), new Vector2(-24f, -355f),
+                38, TextAnchor.UpperCenter, TextColor);
 
             BuildRestartButton(card.transform);
 

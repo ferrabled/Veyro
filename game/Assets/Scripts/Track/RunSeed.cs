@@ -1,6 +1,11 @@
 namespace MotionRunner.Track
 {
-    /// A run *is* a seed (handoff 3.3): Seed + GameVersion + WorldId fixes the whole track.
+    /// A run *is* a seed (handoff 3.3): Seed + ContentVersion + WorldId fixes the whole track.
+    ///
+    /// The middle field is the *content* version (ChunkLibrary.ContentVersion), not the application
+    /// version. The spec calls for a "content manifest" here, and the distinction is load-bearing
+    /// for the Daily Run: two builds shipping the same chunk library must generate the same track,
+    /// or a bugfix release splits the day's players onto different tracks.
     /// The hash is hand-written FNV-1a rather than string.GetHashCode(), which is stable
     /// neither across runtimes nor across process runs. RunSeedTests pins its output so a
     /// refactor cannot silently change every Daily Run seed that has already been played.
@@ -14,13 +19,13 @@ namespace MotionRunner.Track
         const uint FallbackState = 0x9E3779B9u;
 
         public readonly int Seed;
-        public readonly string GameVersion;
+        public readonly string ContentVersion;
         public readonly string WorldId;
 
-        public RunSeed(int seed, string gameVersion, string worldId)
+        public RunSeed(int seed, string contentVersion, string worldId)
         {
             Seed = seed;
-            GameVersion = gameVersion ?? string.Empty;
+            ContentVersion = contentVersion ?? string.Empty;
             WorldId = worldId ?? string.Empty;
         }
 
@@ -31,7 +36,7 @@ namespace MotionRunner.Track
             {
                 uint h = FnvOffsetBasis;
                 h = HashUInt(h, (uint)Seed);
-                h = HashString(h, GameVersion);
+                h = HashString(h, ContentVersion);
                 h = HashString(h, WorldId);
                 return h == 0u ? FallbackState : h;
             }
@@ -72,6 +77,6 @@ namespace MotionRunner.Track
             }
         }
 
-        public override string ToString() => Seed + "/" + GameVersion + "/" + WorldId;
+        public override string ToString() => Seed + "/" + ContentVersion + "/" + WorldId;
     }
 }

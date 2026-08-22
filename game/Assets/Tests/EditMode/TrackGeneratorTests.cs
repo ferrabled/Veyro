@@ -13,12 +13,12 @@ namespace MotionRunner.Tests
         /// Difficulty as it would rise over a real run: one chunk is roughly two seconds.
         static int DifficultyForIndex(int index) => DifficultyCurve.At(index * 2f);
 
-        static TrackGenerator GeneratorFor(int seed, string worldId = RunSeed.DefaultWorldId, string version = "0.1.0") =>
-            new TrackGenerator(ChunkLibrary.Greybox(), new RunSeed(seed, version, worldId).CreateRandom());
+        static TrackGenerator GeneratorFor(int seed, string worldId = RunSeed.DefaultWorldId, string contentVersion = "0.1.0") =>
+            new TrackGenerator(ChunkLibrary.Greybox(), new RunSeed(seed, contentVersion, worldId).CreateRandom());
 
-        static List<ChunkDefinition> Run(int seed, int count, string worldId = RunSeed.DefaultWorldId, string version = "0.1.0")
+        static List<ChunkDefinition> Run(int seed, int count, string worldId = RunSeed.DefaultWorldId, string contentVersion = "0.1.0")
         {
-            var generator = GeneratorFor(seed, worldId, version);
+            var generator = GeneratorFor(seed, worldId, contentVersion);
             var chunks = new List<ChunkDefinition>(count);
             for (int i = 0; i < count; i++) chunks.Add(generator.Next(DifficultyForIndex(i)));
             return chunks;
@@ -68,10 +68,10 @@ namespace MotionRunner.Tests
         }
 
         [Test]
-        public void DifferentGameVersion_ProducesADifferentSequence()
+        public void DifferentContentVersion_ProducesADifferentSequence()
         {
-            AssertSequencesDiffer(Run(1, 200), Run(1, 200, version: "9.9.9"),
-                "two different game versions produced the same 200 chunks");
+            AssertSequencesDiffer(Run(1, 200), Run(1, 200, contentVersion: "9.9.9"),
+                "two different content versions produced the same 200 chunks");
         }
 
         [Test]

@@ -4,7 +4,7 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
-## 2026-08-21 — T-003 + T-005 done; named "Veyro Run" (track-a/chunks-session)
+## 2026-08-21 — T-003, T-005, T-008 done; named "Veyro Run" (track-a/chunks-session)
 
 **T-003 chunk system + T-005 obstacles/scoring/result screen.**
 - New engine-free assembly `MotionRunner.Track` (`Assets/Scripts/Track/`, `noEngineReferences: true`):
@@ -31,6 +31,20 @@ LICENSING_REVENUE §2.12 — the attribution line is required only if a credits 
 Name settled as **Veyro Run**, package **`com.ferrabled.veyro.run`** (reverse-DNS of ferrabled.com,
 which the owner holds); verified via `aapt2 dump badging`. Old `com.motionrunner.game` uninstalled.
 
+**T-008 Daily Run (same day).** `RunMode.Daily` is now the default: the seed is the UTC date
+(`DailySeed`, clock-free — the caller passes the date in, so generation stays deterministic).
+Best scores split into all-time and today-only under `veyro.*` PlayerPrefs keys; the daily bucket
+self-resets on date rollover, so it stays one key rather than one per day for ever.
+
+Found and fixed while doing it: the seed mixed in `Application.version`, so **a bugfix release would
+have forked the day's players onto different tracks**. The seed now carries
+`ChunkLibrary.ContentVersion` instead — bump that, and only that, when the chunk library changes.
+`RunSeed.GameVersion` was renamed `ContentVersion` so nobody wires the app version back in.
+
+**Verified:** 81 EditMode tests green (12 new, incl. pinned RNG states for known dates). On device,
+two cold launches produced byte-identical runs — same seed `20260821/greybox-1/greybox`, score,
+distance and chunk count — the AC demonstrated on real hardware. HUD shows `DAILY · <date>`.
+
 **Needs a human**
 - A continuous 10-minute *played* run. The soak taps rather than steers, so its runs are short.
   Install `builds/MotionRunner.apk`, play 10 min watching for hitches at chunk boundaries, then
@@ -40,12 +54,12 @@ which the owner holds); verified via `aapt2 dump badging`. Old `com.motionrunner
 - Move the settled app name into DECISIONS.md (owner-only). Answer OPEN_QUESTIONS 6 (score freeze).
 - Whether to rename the `MotionRunner.*` C# namespace to match the product. Cosmetic and invisible
   to players; safe while everything is code-first; cheapest before T-006/T-020 grow the surface.
-  Leave the `motionrunner.best_score` PlayerPrefs key alone regardless — changing it after release
-  silently resets every player's best score.
+  (The old `motionrunner.best_score` key is gone — T-008 restructured best-score storage while there
+  are still no players, which was the free moment to do it.)
 
-**Next:** T-007 (curve + difficulty bands; scaffolding and constraint tests already exist), T-006
-(art pass, and where chunk data becomes ScriptableObjects), T-008 (Daily Run — `RunSession.StartRun`
-is the single place a seed is chosen).
+**Next:** T-020 RevenueCat as soon as P4 exists (it is the contest eligibility gate), then T-007
+(curve + difficulty bands — scaffolding and constraint tests exist, needs the owner's played-run
+feedback) and T-006 (art pass, and where chunk data becomes ScriptableObjects).
 
 ## 2026-08-20 — T-001 + T-002 done; prototype live on device (orchestrator session)
 

@@ -15,6 +15,15 @@ namespace MotionRunner.Track
     ///    generator never has to repeat a chunk back to back.
     public static class ChunkLibrary
     {
+        /// Identifies *this* set of chunks, and is part of every run's seed.
+        ///
+        /// **Bump this whenever the library below changes** — adding, removing or re-tuning a chunk
+        /// changes what a given seed generates, so a stale version would mean two players on the
+        /// same Daily Run seed running different tracks. Bumping it is also the deliberate act of
+        /// invalidating comparability with previously published daily runs, so do it knowingly.
+        /// The application version is *not* part of the seed: a bugfix release must not fork the day.
+        public const string ContentVersion = "greybox-1";
+
         static readonly ChunkDefinition[] Chunks = Build();
 
         /// Shared, immutable, allocated once: BeginRun must not churn the heap.

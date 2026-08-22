@@ -10,6 +10,7 @@ Motion-controlled 3D endless runner for RevenueCat Shipaton 2026. Phone tilt (la
 - `docs/OPEN_QUESTIONS.md` — questions only the human owner can answer. If blocked, write your question there, mark the task blocked in the backlog, and move to another task. Never guess on store accounts, payments, hardware, or scope.
 - `docs/STATUS.md` — append a dated entry when you finish or block a task.
 - `docs/PREREQUISITES.md` — human-only setup checklist (accounts, hardware).
+- `docs/TRACK_GENERATION.md` — how the track, chunks, obstacles, difficulty and assets fit together, and which knob does what. Read it *only* when changing track content or the art on top of it; skip it otherwise.
 - `docs/LICENSING_REVENUE.md` — Unity Personal / RevenueCat / store-economics compliance analysis. Constraints there are binding (e.g., attribution line if a credits screen exists; no artificial revenue).
 
 ## Repo layout
