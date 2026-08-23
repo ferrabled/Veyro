@@ -49,3 +49,38 @@ the question. Keep this file short; it is read every session.
    Note for the camera-feature branch: `com.unity.ai.inference` is now IN the committed manifest
    there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
    and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
+
+9. **RevenueCat catalog: SKU ids, entitlement name, prices.** Owner decides — product ids are
+   immutable once created in Play Console, and pricing is a business call. Full reasoning in
+   `docs/REVENUECAT_PLAN.md` §4. *Recommended default:*
+   - entitlement: **`cosmetics`** (one entitlement, so a second SKU later touches no gameplay code)
+   - offering: **`default`**
+   - SKU 1: `veyro.cosmetic.runner_pack` — "Runner Colours" — **€2.99 / $2.99**
+   - SKU 2: `veyro.cosmetic.supporter` — "Supporter Bundle" (all colours + a visual trail) —
+     **€5.99 / $5.99**
+   - both **one-time, NON-CONSUMABLE** — this one is not a preference. A one-time product
+     misconfigured as consumable is consumed by RevenueCat and can never be restored (SDK ≥ 9.0.0),
+     which breaks T-020's "entitlement survives reinstall" criterion permanently.
+   Two SKUs rather than one because HAMM is judged on the monetization *strategy*, and a single
+   price point shows no thinking. D6 binds either way: cosmetics only, no pay-to-win.
+
+10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
+    (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
+    user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.
+    Proposal: a code-entry on the title screen that calls `LogIn("shipaton-judge-<n>")`, so that ID
+    can be granted the entitlement from the RevenueCat dashboard as a manual override.
+    *Recommended default: **yes** — roughly 20 lines, no APK cost, and the alternative failure mode
+    is an unscoreable submission.*
+
+11. **Demo video: voiceover, and who is on camera?** (`docs/submission/VIDEO_SCRIPT.md` §"Owner
+    decisions"). *Recommended default: voiceover — #BuildInPublic and Grand Prize reward a person
+    with a story, and a silent captioned video reads as an ad. The hook shot needs a body but not a
+    face; from behind or in silhouette works.* Music: owner picks and confirms the licence, or use
+    game audio only — a copyright claim can make the video private mid-judging.
+
+12. **Privacy-policy URL.** Google Play requires a hosted privacy policy for every app, including
+    ones that collect nothing. Blocks the store listing, not just the submission.
+    *Recommended default: a single GitHub Pages page under the existing `ferrabled/Veyro` repo —
+    minutes of work, no hosting cost.* Content is genuinely short: no accounts, no analytics in
+    v1.0, scores stored locally; once the camera update ships, add the on-device-only camera clause
+    and mirror it in the Play Data safety form.

@@ -4,6 +4,172 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-23 — T-020 prep: RevenueCat integration plan written, ready to execute in one session (no-unity-prep session)
+
+No Unity opened, no code written, no build made — by instruction. Produced
+**`docs/REVENUECAT_PLAN.md`**: version pin + rationale, install method, Unity/Android gotchas, the
+wrapper design, the catalog proposal, Paywall-Builder server-vs-app split, the judge path, and an
+ordered checklist. Every external claim carries a link, checked live today.
+
+**The three findings that change the plan:**
+
+1. **Pin `9.8.1`, not `≥ 8.4.0`.** 9.8.1 shipped **20 Aug 2026** — three days ago. 8.4.x is four
+   minors behind. 9.x brings Play Billing 8.3.0 (vs 8.0.0), min SDK 23 (ours is 26), multipage
+   paywalls, and the ad primitives T-023 needed to evaluate. Pin exactly — RevenueCat ships ~weekly
+   and an unpinned bump between the closed-testing build and the production build would move the
+   store's Billing dependency underneath us. Backlog AC updated.
+2. **One dashboard toggle can permanently break T-020's acceptance criterion.** From SDK 9.0.0
+   RevenueCat removed the workaround that allowed restoring consumed one-time products: a one-time
+   product misconfigured as **consumable** is consumed and can never be restored. We have no login
+   system and our AC is literally *"entitlement survives reinstall"*. **Every SKU must be
+   non-consumable**, set before the first purchase.
+3. **The Paywall Builder is the best schedule lever in the project.** The entire paywall — layout,
+   copy, colours, packages — is server-configured; the app contributes one `PaywallsPresenter`
+   call. So the paywall can be redesigned throughout the judging window with no store review. Get
+   the *call* into v1.0; do not spend September polishing pixels in Unity.
+
+**Wrapper seam** (CLAUDE.md rule 5), mirroring the existing `MotionRunner.Track`/`.Pose` shape:
+`MotionRunner.Commerce` (engine-free, `noEngineReferences: true`) holds `IStore`, `Entitlements`,
+`CosmeticCatalog` and a `FakeStore`; `MotionRunner.Commerce.RevenueCat` holds the adapter and is the
+only assembly that sees the SDK. The SDK ships its own asmdefs, so — unlike `CameraFaceInput` — the
+adapter does **not** have to live in Assembly-CSharp. EditMode tests reference only the engine-free
+assembly, so `-runTests` keeps working with or without the package (and the SDK cannot run in the
+Editor at all, so this is a requirement, not a nicety).
+
+**Owner must review/decide:** OPEN_QUESTIONS **9** (SKU ids, entitlement name, prices — product ids
+are immutable once created) and **10** (ship a hidden judge-mode login as a promo-code fallback;
+recommended yes).
+
+**Two things found while reading the repo, both cheap, both embarrassing if missed:** Player Settings
+still say `productName: Motion Runner` / `companyName: DefaultCompany` (that string is the launcher
+label), and adding the SDK will pull Play Billing + Jetpack Compose into the APK — per gotcha 10 the
+release APK must be size- and permission-diffed immediately after the package lands, before any
+paywall work, so the UGUI fallback is still an option if Compose blows the budget.
+
+**Blocked on:** P1 (Play Console — requested, pending) and P4. Nothing else.
+
+## 2026-08-23 — T-023 RevenueCat Ads spike: **works from Unity, still a NO for v1.0** (no-unity-prep session)
+
+Desk research only, no integration, ~2 h of a 1-day timebox. Verdict as required by the AC:
+
+**Technically YES.** Unity is a supported platform for RevenueCat ad monetization —
+`purchases-unity` **9.1.0+** for the `AdTracker` API (the docs carry a Unity C# sample), and
+**9.8.0+** for reward verification. Confirmed in the source, not just the docs:
+`GenerateRewardVerificationToken` and `PollRewardVerification` are public on `Purchases` at
+`RevenueCat/Scripts/Purchases.cs:729` and `:746` @ 9.8.1.
+
+**Strategically NO for v1.0**, four reasons:
+
+1. **RevenueCat Ads does not serve ads.** It is impression/revenue *tracking* that sits alongside an
+   existing ad stack via ILRD callbacks — "we aren't replacing your mediation platform". Shipping it
+   means first shipping a real ad SDK: AdMob, AppLovin MAX, ironSource/LevelPlay or Unity Ads.
+2. **Rewards need AdMob SSV, and Unity has no adapter.** Server-verified rewards are verified
+   through AdMob Server-Side Verification. RevenueCat's `loadAndTrack` helper exists for Swift and
+   Kotlin only — the AdMob integration page has no Unity samples. Unity is the manual path: Google
+   Mobile Ads Unity plugin + hand-plumbed `AdTracker` calls + reward tokens threaded through AdMob
+   SSV custom data.
+3. **Cost against the calendar.** An AdMob/AdSense account (approval takes days), a second ad SDK in
+   the APK, an advertising-ID permission, a Data-safety redeclaration, and a UMP consent flow — all
+   before ~12 Sep, with the Play Console not yet in existence. The feature is also in **beta** (ad
+   revenue does not count toward MTR yet).
+4. **It would read as box-checking.** The category rewards "RevenueCat Ads as a monetization
+   method"; screeners explicitly penalise category overreach. One rewarded revive bolted on in the
+   final week is the canonical example.
+
+**Consequence:** Catvertising is **not** entered (D7 already said "only if the spike passes").
+Removed from the target list in `docs/submission/DEVPOST_ANSWERS.md`. The v1.0 listing declares
+**no ads**, which is also a positioning asset — "no ads interrupting a run" is in the store copy.
+
+**If it is ever revisited (Update 2, only if T-020 shipped and production is live by ~20 Sep):**
+one rewarded placement, on the result screen, offering a single revive per run — never mid-run, never
+auto-playing. Behind `IStore`-style seam + a remote feature flag, defaulting off. A revive is the one
+ad in a runner that players ask for rather than tolerate; it must never be purchasable, or the
+cosmetics-only promise (D6) breaks and the Daily Run stops being comparable between players.
+
+Evidence: RevenueCat ad monetization overview and rewards docs
+(https://www.revenuecat.com/docs/ad-monetization, /rewards, /manual-integration, /admob), Unity SDK
+9.1.0 and 9.8.0 changelog entries, and `Purchases.cs` @ 9.8.1.
+
+## 2026-08-23 — T-030 store listing kit: copy, shot list, art brief, tester pack (no-unity-prep session)
+
+Copy only, no binary assets — by instruction. New `docs/store-kit/`:
+
+- **`LISTING.md`** — app title, short and full descriptions, plus alternates, Console field values
+  (category, content rating, ads=no, target audience) and a camera-mode delta block to paste **only**
+  once that update is live. Written around "motion-controlled endless runner" search terms.
+- **`check-lengths.sh`** — asserts the copy against Google's 30/80/4000 limits. Currently
+  24 / 78 / 2077. Run it before pasting anything into the Console.
+- **`SCREENSHOTS.md`** — 7-shot list with the exact game state per shot, the capture commands
+  (including the `MSYS_NO_PATHCONV=1` trap), and the arithmetic for the Devpost **1179 × 2556
+  frameless** shot: from 1080 × 2400, scale to width 1179 → height 2620, crop 64 px off the *top*.
+- **`ART_DIRECTION.md`** — icon (512/1024) and feature-graphic (1024 × 500) brief, three icon
+  concepts, the in-game palette as hex (`#FF8C26` runner orange, `#171A29` background — taken from
+  the code so the icon and the first screenshot match for free), and three style frames for
+  OPEN_QUESTIONS 4. Leads with the non-automotive constraint from the VEYRON note, including the
+  subtle version: the three-lane strip must read as a *path*, not a road.
+- **`CLOSED_TESTING.md`** — the 12×14 rule re-verified, dates worked backwards from 30 Sep,
+  recruitment message, opt-in instructions written for someone who has never done it, and the five
+  questions to ask testers. **Recruit 16–18, not 12**, and upload before the kit is finished — the
+  clock is the scarce resource, not polish.
+
+**Two overpromises caught by checking the copy against the code, both removed:**
+
+- **Free Run is not reachable.** `RunMode.Free` exists and `RunHud` would render "FREE RUN", but
+  `RunSession.Mode` is hard-coded to `Daily` (`RunSession.cs:33`) and nothing sets it. Worth a few
+  lines in the T-020 session to expose; until then it is out of the listing.
+- **Sliding does not exist.** `IsSlidePressed()` is plumbed through `CompositeInput`,
+  `TouchTapInput`, `KeyboardInput` and `FaceSteering` — and `RunnerController.Step()` reads only
+  `GetMoveAxis()` and `IsJumpPressed()`, so the input arrives and is dropped. Both "crouch to slide"
+  claims are gone from the listing and the camera copy.
+
+**Owner must review** all copy before it is pasted anywhere. **Still open:** the binary assets (icon,
+feature graphic, captures) need a device and a designer. **New blocker surfaced:** Play requires a
+hosted **privacy-policy URL** even for an app that collects nothing → OPEN_QUESTIONS 12.
+
+## 2026-08-23 — T-035 submission prep: video script, Devpost answers, artefact checklist (no-unity-prep session)
+
+New `docs/submission/`:
+
+- **`VIDEO_SCRIPT.md`** — timecoded to 1:50 against a hard 2:00 cap, opening 0:00–0:18 on the
+  hands-free shot in **one continuous take** (a cut in the lean-swerve beat reads as a fake, and this
+  is the only 18 seconds a screener is guaranteed to watch). Includes a contingency if camera mode
+  misses production: open on the tilt shot and demote the camera footage to a labelled BETA segment,
+  rather than headlining an unreleased feature.
+- **`DEVPOST_ANSWERS.md`** — a category audit first (four solid entries; five conditional on SDKs
+  that are not integrated yet; Catvertising dropped per T-023), then the description draft. It leads
+  with the CV failure and the pivot, because that is the most interesting true thing about the
+  project and every number in it is traceable to this journal. Placeholders are marked `[N]`.
+- **`CHECKLIST.md`** — every artefact the form needs, with producer, status and blocker, plus a
+  dated timeline. **Slack in the whole chain is about 8 days, all of it in Play's production
+  review.**
+
+**Rule found in the rules text and worth flagging loudly:** *"A Project may have existed before the
+Submission Period, but it must not have been publicly released on any eligible store before the
+Submission Period. Updates to previously released apps are not eligible."* We are clear — Veyro Run
+has never been released — but this is why nothing gets pushed to **production** to "test the
+pipeline". Closed testing is not a public release; a production rollout is, and it would consume the
+one first-release event the submission depends on.
+
+**Blocked on P1** for everything downstream (store URL, promo codes, real numbers).
+
+## 2026-08-23 — T-040: first three #BuildInPublic posts drafted (no-unity-prep session)
+
+`docs/posts/2026-08-camera-mode.md` — three posts, X and LinkedIn variants each, covering the CV
+pivot, the hands-free demo, and the input-seam engineering story. **Nothing posted; nothing will be
+by an agent.**
+
+Every number is traced to a STATUS entry in a table at the bottom of the file, along with an explicit
+do-not-claim-yet list (monetization, install numbers, leaderboards, sliding, Free Run). One
+discrepancy resolved there so it never leaks into two different posts: the 22 Aug feasibility sweep
+measured **4.2 ms**, the shipping in-game gate reads **3.7 ms** — posts use 3.7 and say what it is.
+
+The lead post is the failure: BlazePose at 118 ms against a 30 ms gate, the surprise that CPU beat
+GPUCompute by 2.5×, and the pivot to a 3.7 ms face detector — "a much worse model of a human and a
+much better input device". The negative result is the strongest content this project has.
+
+**Blocked on P9** — the social account does not exist yet. That is minutes of work and it is the
+actual constraint on a category worth $30k that costs no engineering time.
+
 ## 2026-08-23 — T-011/T-012/T-013: camera mode is in the game, on the `camera-feature` branch (camera-feature session)
 
 **Headline: the game now boots to a mode menu, and camera mode drives it end-to-end on the
