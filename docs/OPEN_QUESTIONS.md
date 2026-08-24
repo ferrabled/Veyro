@@ -49,3 +49,20 @@ the question. Keep this file short; it is read every session.
    Note for the camera-feature branch: `com.unity.ai.inference` is now IN the committed manifest
    there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
    and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
+
+9. **Privacy policy hosting + public contact email.** Play requires a live privacy-policy URL on
+   the store listing *and* reachable in-app — hard-required here because CAMERA is a sensitive
+   permission. The policy text is drafted at `docs/PRIVACY_POLICY.md` and the app links to
+   `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). *Recommended default: enable
+   GitHub Pages on github.com/ferrabled/Veyro (Settings → Pages → deploy from branch → `main`,
+   `/docs` folder) — requires the repo to be public; any other host works if
+   `GameLinks.PrivacyPolicyUrl` is updated to match.* Also needed from the owner: a public contact
+   email for the policy's two `[TODO]` slots and the Play listing (the day-job address is probably
+   not the one to publish).
+
+10. **Record the 24 Aug owner call in DECISIONS.md (owner-only):** closed testing and v1.0 ship
+    the `camera-feature` branch — camera mode included — under the real package name. This amends
+    D2's "camera merges post-release". Consequences already handled in this repo: CAMERA permission
+    + ~8.8 MB inference package are in the Play build from day one; `docs/PRIVACY_POLICY.md` and
+    the T-031 Data safety answers describe the camera as on-device-only; store description must
+    mention camera mode (T-030).

@@ -4,6 +4,42 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-24 — Play submission prep: AAB build path, upload signing, privacy policy (compliance session)
+
+**Headline: the repo can now produce a Play-uploadable artifact, and the policy paperwork the
+Console will demand is drafted.** Owner decided in-session: **closed testing ships the
+`camera-feature` branch** (camera in v1.0 — amends D2; recorded as OPEN_QUESTIONS 10 for the
+owner to move into DECISIONS.md). Researched against the live Play policies (24 Aug 2026):
+
+- **`BuildScript.BuildAndroidBundle`** (new): `builds/MotionRunner.aab` — Play only accepts App
+  Bundles for new apps. Signs with the upload keystore from `VEYRO_KEYSTORE*` env vars (creation
+  runbook: PREREQUISITES **D5**, human-only), optional `VEYRO_VERSION_CODE` override; keystore
+  settings wiped in `finally` so no local path/secret lands in ProjectSettings.asset.
+- **Target SDK pinned to 36** in `Build()` — Play's floor for new apps from **31 Aug 2026** (was
+  "highest installed", which happened to resolve to 36; now it can't drift).
+- **Privacy policy**: drafted at `docs/PRIVACY_POLICY.md` (truthful for current state: zero
+  collection, camera on-device-only, no network calls). Required because CAMERA is a *sensitive
+  permission*. Linked in-app (Play requires in-app reachability): new `GameLinks.cs` +
+  "privacy policy" link on `ModeSelectMenu`. Hosting + contact email = **OPEN_QUESTIONS 9**.
+- **T-030/T-031 acceptance criteria extended** with the Console App content forms (Data safety
+  "no collection" — must change with T-020/T-021; content rating; target audience **13+**; ads
+  "no"), and T-031 now says AAB, not APK.
+- Checked and fine as-is: camera `uses-feature` entries are all `required=false` in the built APK
+  (aapt2 on `VeyroCamDev.apk`) so camera-less devices keep store access; runtime permission is
+  requested in-context; the three Console declarations (program policies / Play App Signing ToS /
+  US export laws) are all safe to accept — no proprietary crypto, engine-standard TLS only.
+
+**Verified:** EditMode suite in a fresh batchmode scratch copy (owner's editor held the repo
+project): **140/140 passed**, sync of edited files into the scratch cmp-verified first. Robocopy
+note for the gotcha file: exclude `game/Temp` (`/XD`) — the open editor's `UnityLockfile` lives
+there and, if copied, makes the scratch look locked too.
+
+**Needs a human (all gate T-031):** P1 Play account (register + verify — the 12×14 closed-test
+clock can't start before it), D5 upload keystore, OPEN_QUESTIONS 9 (privacy hosting + contact
+email — fill the two `[TODO]`s in `docs/PRIVACY_POLICY.md`), OPEN_QUESTIONS 10 (owner moves the
+camera-in-v1.0 decision into DECISIONS.md). First Console upload: accept Play App Signing ToS,
+let Google generate the app signing key, upload `builds/MotionRunner.aab`.
+
 ## 2026-08-23 — T-011/T-012/T-013: camera mode is in the game, on the `camera-feature` branch (camera-feature session)
 
 **Headline: the game now boots to a mode menu, and camera mode drives it end-to-end on the
