@@ -103,13 +103,18 @@ namespace MotionRunner.EditorTools
                 PlayerSettings.productName = previousProduct;
                 EditorUserBuildSettings.buildAppBundle = previousBundle;
                 PlayerSettings.Android.bundleVersionCode = previousVersionCode;
-                // keystoreName/keyaliasName serialize into ProjectSettings.asset (the passwords
-                // don't) — wipe them so no local keystore path outlives the build in a committed file.
-                PlayerSettings.Android.useCustomKeystore = false;
-                PlayerSettings.Android.keystoreName = "";
-                PlayerSettings.Android.keystorePass = "";
-                PlayerSettings.Android.keyaliasName = "";
-                PlayerSettings.Android.keyaliasPass = "";
+                if (bundle)
+                {
+                    // keystoreName/keyaliasName serialize into ProjectSettings.asset (the passwords
+                    // don't) — wipe them so no local keystore path outlives the build in a committed
+                    // file. Unity serializes the wiped name as "{inproject}: " — that string is the
+                    // expected post-build state, not a stray keystore reference.
+                    PlayerSettings.Android.useCustomKeystore = false;
+                    PlayerSettings.Android.keystoreName = "";
+                    PlayerSettings.Android.keystorePass = "";
+                    PlayerSettings.Android.keyaliasName = "";
+                    PlayerSettings.Android.keyaliasPass = "";
+                }
             }
         }
 
