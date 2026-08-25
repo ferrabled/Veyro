@@ -4,6 +4,81 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-24 (later) — RevenueCat dashboard COMPLETE for both apps; Play Console checklist written; Unity handoff issued (owner dashboard session)
+
+- Owner finished the RevenueCat side: entitlements, Test Store *and* Play Store products, offering
+  `default`, paywall — the dashboard half of T-020 is done. What remains dashboard-side is only
+  §D of the new checklist (Play products, service credentials, attach).
+- **`docs/PLAY_CONSOLE_SETUP.md` written** (claims verified against live Google/RevenueCat docs
+  today): ordered owner checklist — §A (payments profile, app creation, listing + declarations +
+  privacy policy, 12 testers) can all happen **now, before any build**; §B is the agent-built
+  signed AAB; §C uploads (internal track to unlock product creation instantly, closed track for
+  the 12×14 clock); §D products + service-account JSON (~36 h propagation) + attach in RevenueCat.
+- Doc sync: PREREQUISITES P1 ✅ / P4 mostly-✅ / P10 urgent; OPEN_QUESTIONS 9 moved to Answered
+  (catalog is owner-confirmed; ids now committed in the RevenueCat dashboard); OPEN_QUESTIONS 12
+  (privacy policy) marked urgent — it gates the clock; T-030 asset deadline moved up (rough
+  512×512 icon + 1024×500 feature graphic + 2 screenshots gate the track publish); T-031 points at
+  the checklist; CLAUDE.md canonical-docs list gained COSMETICS_CATALOG + PLAY_CONSOLE_SETUP.
+- **A copy-pasteable T-020 Unity-session handoff was given to the owner in chat** (scope: SDK
+  9.8.1 via OpenUPM, APK diff, Commerce asmdefs + tests, RevenueCatStore, store UI + Restore,
+  entitlement-applied skins, resume re-read, product/company name fix, AAB build path, Test-Store
+  device test). T-025 explicitly out of its scope.
+
+**Needs the owner:** run PLAY_CONSOLE_SETUP §A today (privacy policy first — it gates everything);
+recruit the 12 testers; create the upload keystore when the agent posts the command; paste the two
+RevenueCat public API keys into the Unity session handoff.
+
+## 2026-08-24 — P1 cleared; RevenueCat project live with Test Store; T-020 Unity half unblocked (owner dashboard session)
+
+- **Owner reports the Play developer account identity verification passed** → P1 no longer blocks.
+  The 12-testers × 14-days clock is now the schedule's critical path: it only runs while a closed
+  test is live, so T-031 (first closed-testing upload — private, invite-only) should happen as soon
+  as a build exists, with polish landing as track updates. Backlog T-031 updated with the three
+  ordering traps (AAB required; billing-enabled build must be uploaded before Play products can be
+  created; app-content declarations incl. privacy policy needed to publish the track).
+- **RevenueCat project "Veyro Run" exists** with the Play Store app + a **Test Store** app. Owner
+  created a test product (`test.season1.pass`, wired to an entitlement), an offering with a
+  `$rc_lifetime` package, and a paywall. Test Store means the whole Unity integration can be
+  device-tested (purchase → entitlement → unlock, paywall render) before Play credentials exist —
+  T-020's Unity half is unblocked today; only real-purchase verification still waits on the Play
+  side. Convention recorded in `COSMETICS_CATALOG.md` §6 (`test.*` mirror products, same
+  entitlements, same packages).
+- **Dashboard fix-ups flagged to the owner:** the offering was created with identifier
+  `default.current` (immutable; looks like a misreading of "mark it as current") — recreate as
+  `default`, mark Current, re-attach the paywall, delete the odd one, while nothing depends on it.
+  Also still missing: the two skin entitlements/test products/packages.
+
+**Needs the owner:** offering fix; add `skin_ember`/`skin_frost` entitlements + test products +
+packages; then the Play Console sequence (app creation, payments profile, privacy-policy URL,
+upload keystore, 12 testers).
+
+**Next:** Unity session for T-020 (SDK 9.8.1 + wrapper + paywall call, tested via Test Store) and
+first AAB → closed testing (T-031). T-025/T-006/T-007 are the "improve the app" work that lands as
+track updates without touching the clock.
+
+## 2026-08-23 — Catalog redesigned with the owner: 2 skins + Season 1 pass; dashboard setup unblocked (owner dashboard session)
+
+Owner direction during RevenueCat dashboard setup: the two-SKU colour-pack catalog is replaced by
+**2 premium skins sold individually + a Season 1 pass (free + paid cosmetic reward tracks, XP from
+run score)**. Still cosmetics-only — D6 unchanged; retention was the gap the pass fills. Written up
+in **`docs/COSMETICS_CATALOG.md`**: product/entitlement/offering tables (3 products, 3 entitlements,
+all NON-CONSUMABLE), the 10-level Season 1 ladder, item feasibility notes (everything composes from
+`RuntimeMaterials` + TrailRenderer + ParticleSystem + primitives — no new art tech), and the owner
+sign-off checklist (§7). OPEN_QUESTIONS 9 rewritten to point there; REVENUECAT_PLAN §4 marked
+superseded (rest of the plan stands); T-020 backlog line updated; **T-025 added** (XP + pass +
+locker — pure C#/UGUI, deliberately *not* blocked on P1, the right work while Play Console approval
+is pending). Also fixed an accidental paste that had corrupted source [S22] in REVENUECAT_PLAN.md.
+
+Verified: docs only, no Unity, no build. Cross-references checked by hand.
+
+**Needs the owner:** tick `COSMETICS_CATALOG.md` §7 (ids/prices/names are the one-way doors — ids
+must match Play Console character-for-character later); then the RevenueCat dashboard can be filled
+today without the Play Console (project, Play Store app by package name, API key, 3 entitlements,
+3 products *manually by id, non-consumable*, offering `default`, paywall). Service-account JSON,
+Play-side products, license testers and promo codes still wait on P1.
+
+**Next:** T-025 can start immediately in Unity; T-020 the day P1 + P4 exist.
+
 ## 2026-08-23 — T-020 prep: RevenueCat integration plan written, ready to execute in one session (no-unity-prep session)
 
 No Unity opened, no code written, no build made — by instruction. Produced

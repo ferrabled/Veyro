@@ -15,6 +15,12 @@ the question. Keep this file short; it is read every session.
   DECISIONS.md.* One live constraint survives the research: **VEYRON is a Bugatti/VW mark one letter
   away**, so keep the art direction clear of anything automotive or racing-branded — that is where a
   confusion argument would get traction. (Not legal advice; a clearance search is cheap pre-upload.)
+- **RevenueCat catalog** (was item 9; answered 24 Aug): owner confirmed by creating the full
+  catalog in the RevenueCat dashboard for both the Test Store and the Play Store app — 2 skins
+  (`veyro.skin.ember`/`.frost`, €2.99) + Season 1 pass (`veyro.season1.pass`, €4.99), entitlements
+  `skin_ember`/`skin_frost`/`season1`, offering `default`, paywall attached. Spec:
+  `docs/COSMETICS_CATALOG.md`. *Owner: move to DECISIONS.md.* The same ids must now be created
+  character-for-character in Play Console (`docs/PLAY_CONSOLE_SETUP.md` §D1).
 
 ## Open
 
@@ -50,20 +56,6 @@ the question. Keep this file short; it is read every session.
    there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
    and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
 
-9. **RevenueCat catalog: SKU ids, entitlement name, prices.** Owner decides — product ids are
-   immutable once created in Play Console, and pricing is a business call. Full reasoning in
-   `docs/REVENUECAT_PLAN.md` §4. *Recommended default:*
-   - entitlement: **`cosmetics`** (one entitlement, so a second SKU later touches no gameplay code)
-   - offering: **`default`**
-   - SKU 1: `veyro.cosmetic.runner_pack` — "Runner Colours" — **€2.99 / $2.99**
-   - SKU 2: `veyro.cosmetic.supporter` — "Supporter Bundle" (all colours + a visual trail) —
-     **€5.99 / $5.99**
-   - both **one-time, NON-CONSUMABLE** — this one is not a preference. A one-time product
-     misconfigured as consumable is consumed by RevenueCat and can never be restored (SDK ≥ 9.0.0),
-     which breaks T-020's "entitlement survives reinstall" criterion permanently.
-   Two SKUs rather than one because HAMM is judged on the monetization *strategy*, and a single
-   price point shows no thinking. D6 binds either way: cosmetics only, no pay-to-win.
-
 10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
     (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
     user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.
@@ -79,7 +71,8 @@ the question. Keep this file short; it is read every session.
     game audio only — a copyright claim can make the video private mid-judging.
 
 12. **Privacy-policy URL.** Google Play requires a hosted privacy policy for every app, including
-    ones that collect nothing. Blocks the store listing, not just the submission.
+    ones that collect nothing. **Now urgent (24 Aug): it gates publishing the closed-testing
+    track, i.e. the 12×14 clock** (`PLAY_CONSOLE_SETUP.md` §A4).
     *Recommended default: a single GitHub Pages page under the existing `ferrabled/Veyro` repo —
     minutes of work, no hosting cost.* Content is genuinely short: no accounts, no analytics in
     v1.0, scores stored locally; once the camera update ships, add the on-device-only camera clause

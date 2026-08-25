@@ -280,6 +280,11 @@ The device-only half (a real sandbox purchase, entitlement surviving reinstall) 
 
 ## 4. Catalog proposal
 
+> **Superseded 23 Aug 2026 (owner session):** the catalog is now **2 premium skins + a Season 1
+> pass** — 3 products, 3 entitlements — specified in **`docs/COSMETICS_CATALOG.md`**. That file
+> wins on any conflict with this section; §§1–3 and 5–7 of this plan stand (read "two products"
+> as "three" in the §7 checklist). Kept below for the original reasoning.
+
 Pricing and final SKU naming are the owner's call — **written up as a proposal in
 `docs/OPEN_QUESTIONS.md` (item 9), not decided here.** The engineering-relevant shape:
 
