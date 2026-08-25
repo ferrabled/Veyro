@@ -1,5 +1,6 @@
 using System;
 using MotionRunner.CameraInput;
+using MotionRunner.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -84,6 +85,25 @@ namespace MotionRunner.Gameplay
                 new Vector2(24f, 120f), new Vector2(-24f, 260f),
                 36, TextAnchor.UpperCenter, new Color(0.72f, 0.76f, 0.85f));
             _status.text = "camera mode plays hands-free:\nlean to steer, hop to jump, crouch to slide";
+
+            BuildPrivacyLink();
+        }
+
+        /// Play policy requires the privacy policy to be reachable inside the app, not only on
+        /// the store listing. Smallest honest surface: one dim link on the screen every player
+        /// passes through, always tappable (deliberately not part of SetButtonsInteractable).
+        void BuildPrivacyLink()
+        {
+            var text = CreateText("Privacy", _panel.transform,
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(24f, 24f), new Vector2(-24f, 84f),
+                30, TextAnchor.MiddleCenter, new Color(0.45f, 0.50f, 0.62f));
+            text.text = "privacy policy";
+            text.raycastTarget = true;
+
+            var button = text.gameObject.AddComponent<Button>();
+            button.targetGraphic = text;
+            button.onClick.AddListener(() => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
         }
 
         Button BuildButton(string name, float bottomOffset, string label, Color color, Action onTap)

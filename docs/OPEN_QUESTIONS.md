@@ -56,6 +56,17 @@ the question. Keep this file short; it is read every session.
    there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
    and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
 
+9. **Privacy policy hosting + public contact email.** Play requires a live privacy-policy URL on
+   the store listing *and* reachable in-app — hard-required here because CAMERA is a sensitive
+   permission, and **it gates publishing the closed-testing track, i.e. the 12×14 clock**
+   (`PLAY_CONSOLE_SETUP.md` §A4). The policy text is drafted at `docs/PRIVACY_POLICY.md` and the
+   app links to `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). *Recommended
+   default: enable GitHub Pages on github.com/ferrabled/Veyro (Settings → Pages → deploy from
+   branch → `main`, `/docs` folder) — requires the repo to be public; any other host works if
+   `GameLinks.PrivacyPolicyUrl` is updated to match.* Also needed from the owner: a public contact
+   email for the policy's two `[TODO]` slots and the Play listing (the day-job address is probably
+   not the one to publish).
+
 10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
     (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
     user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.
@@ -70,10 +81,10 @@ the question. Keep this file short; it is read every session.
     face; from behind or in silhouette works.* Music: owner picks and confirms the licence, or use
     game audio only — a copyright claim can make the video private mid-judging.
 
-12. **Privacy-policy URL.** Google Play requires a hosted privacy policy for every app, including
-    ones that collect nothing. **Now urgent (24 Aug): it gates publishing the closed-testing
-    track, i.e. the 12×14 clock** (`PLAY_CONSOLE_SETUP.md` §A4).
-    *Recommended default: a single GitHub Pages page under the existing `ferrabled/Veyro` repo —
-    minutes of work, no hosting cost.* Content is genuinely short: no accounts, no analytics in
-    v1.0, scores stored locally; once the camera update ships, add the on-device-only camera clause
-    and mirror it in the Play Data safety form.
+12. **Record the 24 Aug owner call in DECISIONS.md (owner-only):** closed testing and v1.0 ship
+    the `camera-feature` branch — camera mode included — under the real package name. This amends
+    D2's "camera merges post-release". Consequences already handled in this repo: CAMERA permission
+    + ~8.8 MB inference package are in the Play build from day one; `docs/PRIVACY_POLICY.md` and
+    the T-031 Data safety answers describe the camera as on-device-only; store description must
+    mention camera mode (T-030). *(Was numbered 10 on `main`; renumbered 12 in the 24 Aug merge —
+    judge mode keeps 10, which REVENUECAT_PLAN §6.4 references.)*

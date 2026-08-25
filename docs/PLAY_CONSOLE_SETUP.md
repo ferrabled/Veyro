@@ -13,11 +13,13 @@ RevenueCat-side state: project fully configured for both the Test Store and the 
 ## 0. The two ordering constraints
 
 1. **In-app products can only be created after a build carrying `com.android.vending.BILLING` has
-   been uploaded** to some track. The RevenueCat SDK adds that permission automatically — so the
-   T-020 Unity session must produce the signed AAB *before* the Monetize section unlocks.
-   Tactic: upload that AAB to **Internal testing** first (instant, no review) to unlock product
-   creation the same day, and to **Closed testing** for the 12×14 clock (new-account closed
-   releases go through review, which can take days).
+   been uploaded** to some track. The RevenueCat SDK adds that permission automatically — so §D1
+   unlocks only once a T-020 build is uploaded. **Don't hold the clock for it** (since 24 Aug an
+   AAB already exists — `BuildScript.BuildAndroidBundle`, STATUS 24 Aug compliance entry): upload
+   the *current* AAB to **Closed testing** now to start the 12×14 clock (new-account closed
+   releases go through review, which can take days); when the T-020 build lands, push it to
+   **Internal testing** (instant, no review) to unlock product creation the same day, and to the
+   closed track as a normal update.
 2. **The closed-testing track cannot publish until the store listing and App content declarations
    are complete** — including the privacy policy URL, content rating, icon, feature graphic and
    screenshots. Everything in §A can and should be done *now*, before any build exists.
@@ -37,39 +39,49 @@ production date slips.
    declarations. The **package name is not asked here** — it binds permanently from the first
    uploaded build, which must be `com.ferrabled.veyro.run`.
 3. **Store listing.** Grow → Store presence → *Main store listing*. Copy from
-   `docs/store-kit/LISTING.md` (verified under the length limits). Binary assets required before
-   the track can publish — rough versions are fine, finals replace them later:
+   `docs/store-kit/LISTING.md` (verified under the length limits) — **give it the camera-mode
+   pass first**: camera ships in v1.0 (OPEN_QUESTIONS 12), and an unexplained CAMERA permission
+   invites review questions. Binary assets required before the track can publish — rough versions
+   are fine, finals replace them later:
    - app icon **512×512** PNG
    - feature graphic **1024×500**
    - **≥ 2 phone screenshots** (briefs in `store-kit/SCREENSHOTS.md`, `ART_DIRECTION.md`)
 4. **App content declarations** (Policy → App content) — the closed-track gate:
-   - **Privacy policy URL** — OPEN_QUESTIONS 12; the GitHub Pages page is ~30 min of work. Do it
-     first, everything else here waits on it.
+   - **Privacy policy URL** — the text is already drafted at `docs/PRIVACY_POLICY.md` and the app
+     links to `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). Remaining
+     (OPEN_QUESTIONS 9): enable GitHub Pages + fill the two `[TODO]` contact-email slots. Do it
+     first, everything else here waits on it. Hard-required: CAMERA is a sensitive permission and
+     ships in v1.0.
    - App access: *all functionality available without special access* (no login exists).
    - Ads: **No** (v1.0 has none).
    - Content rating questionnaire (IARC): category Game; honest answers should land Everyone /
      PEGI 3.
    - Target audience: **13+** — do **not** tick any under-13 age band, that opts into the Families
      policy and its extra requirements.
-   - Data safety: for the first closed build (RevenueCat only, no analytics): purchases/purchase
-     history are collected; follow RevenueCat's "Google Play data safety" guide when filling the
-     form, and revisit when OneSignal/Layers land (T-021/T-022) and when camera mode ships.
+   - Data safety: for the first closed build (camera in v1.0, on-device-only, no RevenueCat yet):
+     **no data collected**, camera frames never leave the device. From the T-020 build onward:
+     purchases/purchase history are collected — follow RevenueCat's "Google Play data safety"
+     guide when updating the form; revisit again when OneSignal/Layers land (T-021/T-022).
    - News / government / financial / health: No.
 5. **Recruit the 12 testers (H6).** Email list or Google Group in Testing → Closed testing →
    Testers tab. The recruiting pack is `docs/store-kit/CLOSED_TESTING.md`. They must be real
    devices + real Google accounts; emulators and duplicates don't count.
 
-## B. Build — agent work (T-020 Unity session, see the handoff in STATUS 24 Aug)
+## B. Build
 
-Deliverable: a **signed AAB** (Play requires AAB, not APK, for new apps) containing the RevenueCat
-SDK (which brings the BILLING permission), built with the upload keystore. The keystore itself is
-owner-created and its passwords owner-held; the agent writes the exact commands into STATUS.
+The AAB path **already exists** (24 Aug compliance session): `BuildScript.BuildAndroidBundle` →
+`builds/MotionRunner.aab`, signed from the `VEYRO_KEYSTORE*` env vars; the upload keystore itself
+is owner-created (runbook: PREREQUISITES **D5**), passwords owner-held. The first upload (§C) uses
+this build as-is. The T-020 Unity session then adds the RevenueCat SDK — *that* build carries the
+BILLING permission §D1 waits for, and ships as a track update.
 
 ## C. Upload and start the clock
 
-1. Testing → **Internal testing** → create release → upload the AAB → publish. Instant; unlocks §D1.
-2. Testing → **Closed testing** → default track → create release → same AAB → accept **Play App
-   Signing** → release notes → select countries → *Save and publish* → submit for review.
+1. Testing → **Closed testing** → default track → create release → upload the **current** AAB →
+   accept **Play App Signing** → release notes → select countries → *Save and publish* → submit
+   for review. Don't wait for the T-020 build — the clock outranks it.
+2. When the T-020 (RevenueCat) build exists: upload it to **Internal testing** (instant, no
+   review — this is what unlocks §D1) and push it to the closed track as a normal update.
 3. Once live: share the **opt-in URL** with the testers; they opt in *and install*. The clock
    counts opted-in testers continuously — check the tester panel stays ≥ 12. Pushing updated
    builds to the track is fine and expected; it does not reset the clock.

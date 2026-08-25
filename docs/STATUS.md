@@ -4,6 +4,24 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-24 (merge) — `main` reconciled into `revenueCat-prep`: AAB path + privacy policy + camera-in-v1.0 meet the RevenueCat prep
+
+Merging `main` (camera-feature + the compliance session below) changed facts the RevenueCat-side
+docs of this branch assumed; reconciled in this merge, not just spliced:
+
+- **The AAB path already exists** (`BuildScript.BuildAndroidBundle`, keystore runbook
+  PREREQUISITES D5) → `PLAY_CONSOLE_SETUP.md` §B updated (the T-020 session only adds the SDK, not
+  the build path; item 8 of the T-020 handoff is mostly done already).
+- **Camera mode ships in v1.0** (owner call; record in DECISIONS = OPEN_QUESTIONS **12**) →
+  PLAY_CONSOLE_SETUP §A updated: Data safety declares camera on-device-only from build one; the
+  listing description must mention camera mode (T-030).
+- **The privacy policy is drafted** (`docs/PRIVACY_POLICY.md`, linked in-app via `GameLinks`) —
+  remaining is hosting + contact email, merged into OPEN_QUESTIONS **9** (was 12 on this branch;
+  judge mode keeps 10).
+- **T-031 sequencing improved:** an AAB exists *now*, so the 12×14 clock starts with the current
+  build; the RevenueCat build follows as a track update — which is also what unlocks Play in-app
+  product creation. Backlog T-030/T-031 rewritten as the union of both branches.
+
 ## 2026-08-24 (later) — RevenueCat dashboard COMPLETE for both apps; Play Console checklist written; Unity handoff issued (owner dashboard session)
 
 - Owner finished the RevenueCat side: entitlements, Test Store *and* Play Store products, offering
@@ -15,8 +33,8 @@ knowledge does **not** belong here — invariants go in code comments, recurring
   signed AAB; §C uploads (internal track to unlock product creation instantly, closed track for
   the 12×14 clock); §D products + service-account JSON (~36 h propagation) + attach in RevenueCat.
 - Doc sync: PREREQUISITES P1 ✅ / P4 mostly-✅ / P10 urgent; OPEN_QUESTIONS 9 moved to Answered
-  (catalog is owner-confirmed; ids now committed in the RevenueCat dashboard); OPEN_QUESTIONS 12
-  (privacy policy) marked urgent — it gates the clock; T-030 asset deadline moved up (rough
+  (catalog is owner-confirmed; ids now committed in the RevenueCat dashboard); the privacy-policy
+  question (now OPEN_QUESTIONS 9) marked urgent — it gates the clock; T-030 asset deadline moved up (rough
   512×512 icon + 1024×500 feature graphic + 2 screenshots gate the track publish); T-031 points at
   the checklist; CLAUDE.md canonical-docs list gained COSMETICS_CATALOG + PLAY_CONSOLE_SETUP.
 - **A copy-pasteable T-020 Unity-session handoff was given to the owner in chat** (scope: SDK
@@ -55,6 +73,44 @@ upload keystore, 12 testers).
 **Next:** Unity session for T-020 (SDK 9.8.1 + wrapper + paywall call, tested via Test Store) and
 first AAB → closed testing (T-031). T-025/T-006/T-007 are the "improve the app" work that lands as
 track updates without touching the clock.
+
+## 2026-08-24 — Play submission prep: AAB build path, upload signing, privacy policy (compliance session)
+
+**Headline: the repo can now produce a Play-uploadable artifact, and the policy paperwork the
+Console will demand is drafted.** Owner decided in-session: **closed testing ships the
+`camera-feature` branch** (camera in v1.0 — amends D2; recorded as OPEN_QUESTIONS 12 after the
+merge renumbering, for the owner to move into DECISIONS.md). Researched against the live Play
+policies (24 Aug 2026):
+
+- **`BuildScript.BuildAndroidBundle`** (new): `builds/MotionRunner.aab` — Play only accepts App
+  Bundles for new apps. Signs with the upload keystore from `VEYRO_KEYSTORE*` env vars (creation
+  runbook: PREREQUISITES **D5**, human-only), optional `VEYRO_VERSION_CODE` override; keystore
+  settings wiped in `finally` so no local path/secret lands in ProjectSettings.asset.
+- **Target SDK pinned to 36** in `Build()` — Play's floor for new apps from **31 Aug 2026** (was
+  "highest installed", which happened to resolve to 36; now it can't drift).
+- **Privacy policy**: drafted at `docs/PRIVACY_POLICY.md` (truthful for current state: zero
+  collection, camera on-device-only, no network calls). Required because CAMERA is a *sensitive
+  permission*. Linked in-app (Play requires in-app reachability): new `GameLinks.cs` +
+  "privacy policy" link on `ModeSelectMenu`. Hosting + contact email = **OPEN_QUESTIONS 9**.
+- **T-030/T-031 acceptance criteria extended** with the Console App content forms (Data safety
+  "no collection" — must change with T-020/T-021; content rating; target audience **13+**; ads
+  "no"), and T-031 now says AAB, not APK.
+- Checked and fine as-is: camera `uses-feature` entries are all `required=false` in the built APK
+  (aapt2 on `VeyroCamDev.apk`) so camera-less devices keep store access; runtime permission is
+  requested in-context; the three Console declarations (program policies / Play App Signing ToS /
+  US export laws) are all safe to accept — no proprietary crypto, engine-standard TLS only.
+
+**Verified:** EditMode suite in a fresh batchmode scratch copy (owner's editor held the repo
+project): **140/140 passed**, sync of edited files into the scratch cmp-verified first. Robocopy
+note for the gotcha file: exclude `game/Temp` (`/XD`) — the open editor's `UnityLockfile` lives
+there and, if copied, makes the scratch look locked too.
+
+**Needs a human (all gate T-031):** P1 Play account (register + verify — the 12×14 closed-test
+clock can't start before it; **done per the entries above, owner-reported same day**), D5 upload
+keystore, OPEN_QUESTIONS 9 (privacy hosting + contact email — fill the two `[TODO]`s in
+`docs/PRIVACY_POLICY.md`), OPEN_QUESTIONS 12 (owner moves the camera-in-v1.0 decision into
+DECISIONS.md). First Console upload: accept Play App Signing ToS, let Google generate the app
+signing key, upload `builds/MotionRunner.aab`.
 
 ## 2026-08-23 — Catalog redesigned with the owner: 2 skins + Season 1 pass; dashboard setup unblocked (owner dashboard session)
 
@@ -199,7 +255,8 @@ Copy only, no binary assets — by instruction. New `docs/store-kit/`:
 
 **Owner must review** all copy before it is pasted anywhere. **Still open:** the binary assets (icon,
 feature graphic, captures) need a device and a designer. **New blocker surfaced:** Play requires a
-hosted **privacy-policy URL** even for an app that collects nothing → OPEN_QUESTIONS 12.
+hosted **privacy-policy URL** even for an app that collects nothing → OPEN_QUESTIONS 9 (renumbered
+in the 24 Aug merge).
 
 ## 2026-08-23 — T-035 submission prep: video script, Devpost answers, artefact checklist (no-unity-prep session)
 

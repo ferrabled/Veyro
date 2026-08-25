@@ -407,8 +407,9 @@ Prerequisites RevenueCat calls out and that people routinely miss [S35]:
 
 Prerequisites (human, before the session starts): **P1** Play Console registered *and identity-verified*,
 **P4** RevenueCat account + project + Play Store app linked with a service-account credential,
-**P10** payments profile (products cannot go live without it), and OPEN_QUESTIONS 9 answered so SKU
-ids and prices are fixed.
+**P10** payments profile (products cannot go live without it), and the catalog confirmed so SKU
+ids and prices are fixed (done 24 Aug — `docs/COSMETICS_CATALOG.md`; the old OPEN_QUESTIONS 9
+catalog item is answered, and that number now refers to privacy-policy hosting).
 
 **A — Dashboard / console (no Unity, can be done while waiting):**
 
