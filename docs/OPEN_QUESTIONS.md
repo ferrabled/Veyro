@@ -32,3 +32,37 @@ the question. Keep this file short; it is read every session.
    Run (T-008) and challenges (T-024) are live, changing it makes old scores incomparable.
    *Default: leave it, play it once, treat it as frozen from the first closed-testing upload; balance
    via chunk difficulty and speed instead.*
+
+7. ~~Camera mode: park, invest, or drop?~~ **Answered by the owner, 22 Aug: build it** (option d,
+   BlazeFace-on-CPU — 4.2 ms blocking median on the Nord 2, numbers in STATUS T-010b). Implemented
+   on the `camera-feature` branch the owner created; v1.0 on `main` is untouched and still ships
+   gyro+touch first (D2 holds; T-020 remains the critical path — the owner has requested the Play
+   Console account). *Owner: move the decision to DECISIONS.md.* The 1.5–3 m range risk still
+   needs the 10-minute human test — steps in STATUS.
+8. **Where should the BlazePose weights live?** Partially settled by 7: camera *control* ships on
+   BlazeFace, whose 418 KB ONNX is now simply **committed** at
+   `game/Assets/Scripts/CameraInput/Resources/CameraInput/` (small enough to not need LFS). The
+   ~20 MB BlazePose weights are needed only by the benchmark spike and stay gitignored /
+   fetched by `docs/cv-spike.sh`. Remaining question: if a pose-skeleton *overlay demo* is ever
+   wanted for the pitch video, do those 20 MB move to Git LFS with T-006? *Default: yes, then.*
+
+   Note for the camera-feature branch: `com.unity.ai.inference` is now IN the committed manifest
+   there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
+   and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
+
+9. **Privacy policy hosting + public contact email.** Play requires a live privacy-policy URL on
+   the store listing *and* reachable in-app — hard-required here because CAMERA is a sensitive
+   permission. The policy text is drafted at `docs/PRIVACY_POLICY.md` and the app links to
+   `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). *Recommended default: enable
+   GitHub Pages on github.com/ferrabled/Veyro (Settings → Pages → deploy from branch → `main`,
+   `/docs` folder) — requires the repo to be public; any other host works if
+   `GameLinks.PrivacyPolicyUrl` is updated to match.* Also needed from the owner: a public contact
+   email for the policy's two `[TODO]` slots and the Play listing (the day-job address is probably
+   not the one to publish).
+
+10. **Record the 24 Aug owner call in DECISIONS.md (owner-only):** closed testing and v1.0 ship
+    the `camera-feature` branch — camera mode included — under the real package name. This amends
+    D2's "camera merges post-release". Consequences already handled in this repo: CAMERA permission
+    + ~8.8 MB inference package are in the Play build from day one; `docs/PRIVACY_POLICY.md` and
+    the T-031 Data safety answers describe the camera as on-device-only; store description must
+    mention camera mode (T-030).
