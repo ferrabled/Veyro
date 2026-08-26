@@ -1,5 +1,28 @@
 {
   "dependencies": {
+    "com.google.external-dependency-manager": {
+      "version": "1.2.188",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://package.openupm.com"
+    },
+    "com.revenuecat.purchases-ui-unity": {
+      "version": "9.8.1",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.revenuecat.purchases-unity": "file:../RevenueCat"
+      },
+      "url": "https://package.openupm.com"
+    },
+    "com.revenuecat.purchases-unity": {
+      "version": "9.8.1",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {},
+      "url": "https://package.openupm.com"
+    },
     "com.unity.ai.inference": {
       "version": "2.6.1",
       "depth": 0,
