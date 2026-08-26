@@ -1,3 +1,5 @@
+using MotionRunner.Commerce;
+using MotionRunner.Commerce.RevenueCat;
 using MotionRunner.Gameplay;
 using MotionRunner.Inputs;
 using MotionRunner.Track;
@@ -49,6 +51,12 @@ namespace MotionRunner.Core
 
             var hud = RunHud.Create();
 
+            // Commerce (T-020): configured at boot, fail-open - a store that never answers
+            // leaves every entitlement locked and the game fully playable (rule 3's shape).
+            var store = CreateStore();
+            var skins = new SkinService(store, runner.GetComponent<Renderer>());
+            hud.StoreRequested += () => StorePanel.Show(store, skins);
+
             // Session last: it drives everything above in a fixed order. Disabled until the
             // player has picked a control scheme — enabling it is what starts the first run.
             var session = new GameObject("RunSession").AddComponent<RunSession>();
@@ -74,6 +82,27 @@ namespace MotionRunner.Core
                         new KeyboardInput());
                 session.enabled = true;
             };
+        }
+
+        /// The RevenueCat SDK cannot run in the Editor (it NREs - REVENUECAT_PLAN §2.5), so
+        /// Play mode gets a ready FakeStore: the store UI is exercisable, purchases grant
+        /// in-memory and reset on exit. On device, a missing API key degrades to a locked,
+        /// silent store rather than an error - the key arrives per build flavour via
+        /// RevenueCatKeys (test key in APKs, Play key in .aab store builds, enforced at build).
+        static IStore CreateStore()
+        {
+#if UNITY_EDITOR
+            var fake = FakeStore.WithDefaultCatalog();
+            fake.IsReady = true;
+            return fake;
+#else
+            if (string.IsNullOrEmpty(RevenueCatKeys.ActiveKey))
+            {
+                Debug.LogWarning("[Store] No RevenueCat API key in this build flavour - store disabled, game fully playable.");
+                return FakeStore.WithDefaultCatalog(); // never ready: everything locked, nothing throws
+            }
+            return RevenueCatStore.Create(RevenueCatKeys.ActiveKey);
+#endif
         }
     }
 }

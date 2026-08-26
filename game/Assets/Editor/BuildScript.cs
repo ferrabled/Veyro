@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using MotionRunner.Commerce.RevenueCat;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
@@ -12,6 +14,11 @@ namespace MotionRunner.EditorTools
     public static class BuildScript
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
+
+        /// Compile-time switch for RevenueCat key selection (RevenueCatKeys.ActiveKey):
+        /// present only while building the Play upload artifact. StoreBuildGuard enforces
+        /// the pairing on every Android build, whoever started it.
+        public const string StoreBuildDefine = "VEYRO_STORE_BUILD";
         // Immutable once the first Play Console upload happens, changeable freely until then.
         // Reverse-DNS of ferrabled.com, a domain the owner holds, so the namespace cannot
         // collide with another developer's. Keep the iOS bundle ID identical (T-032):
@@ -49,6 +56,7 @@ namespace MotionRunner.EditorTools
             string previousProduct = PlayerSettings.productName;
             bool previousBundle = EditorUserBuildSettings.buildAppBundle;
             int previousVersionCode = PlayerSettings.Android.bundleVersionCode;
+            string previousDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
 
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, packageName);
             PlayerSettings.productName = productName;
@@ -67,6 +75,7 @@ namespace MotionRunner.EditorTools
             PlayerSettings.SplashScreen.showUnityLogo = false;
 
             EditorUserBuildSettings.buildAppBundle = bundle;
+            ApplyStoreKeyPairing(bundle, previousDefines);
             if (bundle)
             {
                 ApplyUploadKeystoreFromEnv();
@@ -103,6 +112,7 @@ namespace MotionRunner.EditorTools
                 PlayerSettings.productName = previousProduct;
                 EditorUserBuildSettings.buildAppBundle = previousBundle;
                 PlayerSettings.Android.bundleVersionCode = previousVersionCode;
+                PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, previousDefines);
                 if (bundle)
                 {
                     // keystoreName/keyaliasName serialize into ProjectSettings.asset (the passwords
@@ -116,6 +126,42 @@ namespace MotionRunner.EditorTools
                     PlayerSettings.Android.keyaliasPass = "";
                 }
             }
+        }
+
+        /// The pairing rule that must never break: APKs (dev/sideload) compile with the Test
+        /// Store key, .aab store builds compile with the Play key (COSMETICS_CATALOG §6).
+        /// Selection is the VEYRO_STORE_BUILD define; this validates the keys and sets the
+        /// define for exactly the duration of the build (restored in the finally above).
+        /// StoreBuildGuard re-checks inside BuildPlayer, so an editor-GUI build cannot slip by.
+        static void ApplyStoreKeyPairing(bool storeBuild, string currentDefines)
+        {
+            var defines = currentDefines
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(d => d != StoreBuildDefine)
+                .ToList();
+
+            if (storeBuild)
+            {
+                string key = RevenueCatKeys.PlayStoreKey;
+                if (string.IsNullOrEmpty(key) || !key.StartsWith("goog_"))
+                    throw new BuildFailedException(
+                        "Store builds ship the PLAY public SDK key: set RevenueCatKeys.PlayStoreKey " +
+                        "(RevenueCat -> Veyro Run -> API keys -> Play Store app, starts with 'goog_'). " +
+                        "An .aab must never carry the Test Store key.");
+                defines.Add(StoreBuildDefine);
+            }
+            else
+            {
+                string key = RevenueCatKeys.TestStoreKey;
+                if (!string.IsNullOrEmpty(key) && !key.StartsWith("test_"))
+                    throw new BuildFailedException(
+                        "Dev builds ship the Test Store key ('test_...'). RevenueCatKeys.TestStoreKey " +
+                        "holds something else - a Play key here would hit the real backend from sideloads.");
+                if (string.IsNullOrEmpty(key))
+                    Debug.LogWarning("[Store] RevenueCatKeys.TestStoreKey is empty - this dev build's store is disabled (fail-open).");
+            }
+
+            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
         }
 
         static void ApplyUploadKeystoreFromEnv()
