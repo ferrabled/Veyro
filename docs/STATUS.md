@@ -4,6 +4,47 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-27 — T-020 on device: keys in, store live against the Test Store; three bugs found and fixed in the install loop (t020-unity session)
+
+**Headline: the owner pasted both public API keys and the store now runs on the phone — SDK
+configured, customer info received, offerings fetched, the store panel shows live Test Store
+prices ($2.99 / $2.99 / $4.99) with equip/lock state and Restore.** The chain configure →
+entitlements → offerings → UI is device-verified; what remains human is the purchase itself
+(paywall render, buy, restore) — steps below still apply, with one command change.
+
+Three real findings from the first installs, all fixed and re-verified on device:
+
+1. **`Purchases.IsConfigured()` NREs before the SDK's `Start()`** binds its platform wrapper —
+   and Unity delivers the first `OnApplicationPause(false)` earlier than that, so the resume
+   re-read crashed at boot. `RevenueCatStore` now tracks its own `_configured` flag and never
+   asks the SDK.
+2. **A Test Store key closes a release build.** RevenueCat shows "Wrong API Key … the app will
+   close now to protect the security of test purchases" on any **non-debuggable** build using a
+   `test_` key. So the key scheme changed: **`BuildAndroidDev`** (new, `BuildOptions.Development`,
+   output `builds/MotionRunnerDev.apk`) is the Test-Store flavour; plain `BuildAndroid` release
+   APKs now ship **no key** (store disabled, fail-open) instead of a test key that force-closes.
+   `StoreBuildGuard` enforces all of it: VEYRO_DEV_STORE requires a Development build + `test_`
+   key; .aab still requires VEYRO_STORE_BUILD + `goog_` key and refuses the dev define.
+   **Device-test command is therefore `BuildAndroidDev`, not `BuildAndroid`** — the 26 Aug entry's
+   step 2 is superseded by this.
+3. **Opening the store restarted the run behind it.** `TouchTapInput` reports jump on the same
+   `TouchPhase.Ended` that fires a UI button's click, so the tap on SKINS & STORE also hit the
+   result screen's "tap anywhere to restart". Restart is now deferred one frame and cancelled if
+   that tap opened the store (`StorePanel.IsOpen`); keyboard space and the camera-mode hop
+   restart still work.
+
+**Verified on the Nord 2:** dev build installs over the Play-track copy (uninstall needed once —
+different signing key, expected), boots with no dialog and no exceptions, `Development Build`
+watermark present, logcat shows `_receiveCustomerInfo`/`_getCustomerInfo`, result screen shows
+SKINS & STORE, panel opens with live prices and the run stays frozen on the result behind it.
+Screenshots in the session log. Keys: OPEN_QUESTIONS 9b marked answered.
+
+**Still needs the owner (~10 min, phone in hand):** in the open store panel — tap EMBER → the
+dashboard paywall must render → complete the fake Test Store purchase → row turns owned → equip
+→ runner turns ember; relaunch → still owned; RESTORE PURCHASES returns it; background the app,
+grant/revoke an entitlement in the dashboard, foreground → updates without restart. (Reinstall →
+Restore stays a Play-sandbox-only test — Test Store receipts don't survive a new anonymous id.)
+
 ## 2026-08-26 — T-020 code complete: RevenueCat 9.8.1 in, Commerce seam + store UI + key guard; needs keys + device test (t020-unity session)
 
 **Headline: the whole Unity half of T-020 is built and green — SDK 9.8.1 via OpenUPM, the
