@@ -80,6 +80,16 @@ the question. Keep this file short; it is read every session.
    The "URL coupling" rule in `docs/STORE_COMPLIANCE.md` is the standing version of this trap.
 
 
+9b. **Paste the two RevenueCat public API keys** (t020-unity, 26 Aug). The T-020 build is code
+    complete but ships with **empty keys**: the handoff's key placeholders were never filled in.
+    Open `game/Assets/Scripts/Commerce/RevenueCat/RevenueCatKeys.cs` and fill both constants from
+    RevenueCat → Veyro Run → API keys: `TestStoreKey` (Test Store app, starts `test_`) and
+    `PlayStoreKey` (Play Store app, starts `goog_`). These are **public** SDK keys — they ship
+    inside the binary by design and are safe to commit; never paste an `sk_` secret key anywhere
+    in the repo. Until then: dev APKs build with the store disabled (fail-open, warning in the
+    build log) and **`BuildAndroidBundle` refuses to build** — deliberate, an .aab without a valid
+    `goog_` key would be a dead store build. Device-test steps are in STATUS 26 Aug (t020-unity).
+
 10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
     (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
     user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.

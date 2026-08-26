@@ -24,6 +24,14 @@ the same change that ships a feature listed below.
 ## Per-feature flip table (do ALL flips in the SAME release as the feature)
 
 ### T-020 — RevenueCat cosmetic purchases
+> **Code landed 26 Aug 2026 (t020-unity):** the binary now carries `purchases-unity` 9.8.1 and
+> the merged manifest adds **`com.android.vending.BILLING`** plus
+> **`android.permission.ACCESS_NETWORK_STATE`** (both from Play Billing; normal-level,
+> install-time — APK diff in STATUS 26 Aug). The activity's `launchMode` is patched
+> singleTask → singleTop at build time (billing requirement, `AndroidLaunchModeFix.cs`).
+> The first upload containing this build MUST do every flip below in the same release. Until
+> that upload happens, the Console's declared state above stays truthful for the track it
+> describes.
 - App access → **Sí** (the form lists "pagos" explicitly). Instruction entry: "Optional
   cosmetic IAP via Google Play billing; no account/code exists; all gameplay accessible
   without purchase."
