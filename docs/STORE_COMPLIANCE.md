@@ -30,8 +30,10 @@ the same change that ships a feature listed below.
 - Data safety → Financial info / purchase history = collected (RevenueCat is a service
   provider processing purchase tokens).
 - Content rating questionnaire → redo; "digital purchases" = yes.
-- Listing → "contains in-app purchases" flag + a cosmetics paragraph (docs/store-kit/listing.md
-  has the annotated slot).
+- Listing → "contains in-app purchases" flag + a cosmetics paragraph. The exact paragraph to paste
+  is held ready in `docs/store-kit/LISTING.md` §3 under "HELD BACK — the COSMETICS ONLY paragraph",
+  together with the §5 Console rows (IAP flag, content rating) that flip in the same release.
+  (Path updated 26 Aug: the old `listing.md` was merged into `LISTING.md`.)
 - Privacy policy → add purchases section, bump effective date, redeploy site
   (docs/PRIVACY_POLICY.md header comment marks this).
 - Console → set up **License Testing** emails so testers/judges buy without real money.
