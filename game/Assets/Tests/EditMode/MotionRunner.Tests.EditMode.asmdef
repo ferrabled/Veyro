@@ -4,6 +4,7 @@
     "references": [
         "MotionRunner.Track",
         "MotionRunner.Pose",
+        "MotionRunner.Commerce",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
