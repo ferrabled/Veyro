@@ -5,9 +5,17 @@ Written 23 Aug 2026 (owner dashboard session). Supersedes the two-SKU proposal i
 sold directly, plus a Season 1 pass with a free and a paid reward track**. D6 still binds —
 everything here is cosmetic; nothing affects gameplay, physics, or track generation.
 
-**Status: proposal awaiting owner sign-off on the ★ fields in §7.** Product ids are immutable once
-created in Play Console and entitlement ids are referenced from code — those are the one-way doors.
-Display names, prices (until first publish), item art, and the paywall are all changeable later.
+**Status: confirmed by the owner 24 Aug and built in the RevenueCat dashboard** for both the Test
+Store and the Play Store app — ids, entitlements, offering `default` and the paywall all exist there.
+The ★ fields in §7 are therefore committed, not proposed; §7 now records which are hard-committed vs.
+still tunable.
+
+**Not yet done: the three products do not exist in Play Console.** The same ids must be created
+there character-for-character (`PLAY_CONSOLE_SETUP.md` §D1) before any real purchase can be
+verified; until then the Play row of each RevenueCat package is empty and only Test Store purchases
+work. Product ids are immutable once created in Play Console and entitlement ids are referenced from
+code — those are the one-way doors. Display names, prices (until first publish), item art, and the
+paywall are all changeable later.
 
 ---
 
@@ -97,11 +105,34 @@ richest premium surface (paid track + instant level-1 unlock, §3).
 - **Level 1 is the starting level**, so both level-1 rewards unlock the moment the track is first
   shown — and buying the pass grants its level-1 item **instantly**. A judge redeeming a promo
   code sees immediate payoff without grinding.
-- **Season 1 window ★:** production launch (~22 Sep per D11) → **31 Oct 2026**. After that the
-  paid items stay owned (non-consumable entitlement; nothing is ever taken away) — only the
-  *earning* window ends. Post-hackathon problem regardless.
-- Progress is stored locally (no backend, D10); T-009 later syncs it via Play Games Saved Games.
-  The entitlement itself always survives reinstall via the store account + Restore.
+- **Season 1 window ★:** production launch (~16 Sep) → **31 Oct 2026**. The date ends the season as
+  an *event* — the free-track promotion, the "Season 1" framing, and whenever a Season 2 product
+  appears. **It does not end earning for anyone who owns `season1`.**
+
+  **Why the rule is written that way (tightened 26 Aug).** The earlier version said "the paid items
+  stay owned, only the earning window ends" — which was not true, because pass-track items unlock on
+  *level*, and level is derived from locally stored XP:
+
+  > reinstall or new phone → local XP is gone → `Restore` brings back the `season1` **entitlement**
+  > but resets the ladder to level 1 → after 31 Oct there is no way to re-earn → items the player
+  > paid €4.99 for are permanently unreachable.
+
+  That is a refund request with a good argument behind it, and it is created entirely by the
+  deadline: v1.0 ships no rollover code, no expiry code and no Season 2, so nothing technical
+  depends on the window closing. Keeping the ladder earnable indefinitely for entitlement holders
+  costs nothing and removes the failure mode. A reinstall then costs a player their **progress** —
+  already true of best score and streak under D10 — but never **content they paid for**.
+
+  Consequences for T-025: the ladder's earn path must not be gated on a date check. If a
+  "Season 1 has ended" state is ever added, it must gate the free-track promotion only.
+
+- Progress is stored locally (no backend, D10); **T-009 (post-v1.0) is what makes progress itself
+  durable**, via Play Games Saved Games. Until it lands, the honest statement is: the entitlement
+  always survives reinstall via the store account + Restore; the *level* does not. Buying the pass
+  grants its level-1 reward instantly (below), so a fresh install after Restore is never empty.
+- **Say so at the point of sale.** The pass's paywall/store copy should state that progress is
+  stored on the device until cloud save ships — one line, and it converts a future complaint into a
+  disclosed limitation.
 
 ### Season 1 reward ladder (proposal ★)
 
@@ -193,10 +224,22 @@ All items compose from capabilities the project already ships — no new art tec
 
 ## 7. Owner sign-off checklist (★ items)
 
-- [ ] Product ids: `veyro.skin.ember`, `veyro.skin.frost`, `veyro.season1.pass` — **immutable**
-- [ ] Entitlement ids: `skin_ember`, `skin_frost`, `season1` — referenced from code
-- [ ] Prices: €2.99 / €2.99 / €4.99
-- [ ] Skins sold individually (vs. one duo pack)
-- [ ] Skin names Ember & Frost; pass exclusive named Prism
-- [ ] 10 levels for Season 1, ladder as in §3 (item mix freely editable until T-025 lands)
-- [ ] Season 1 window: launch → 31 Oct 2026
+**Confirmed 24 Aug** — created in the RevenueCat dashboard for the Test Store *and* Play Store apps,
+so these are now committed:
+
+- [x] Product ids: `veyro.skin.ember`, `veyro.skin.frost`, `veyro.season1.pass` — **immutable**
+- [x] Entitlement ids: `skin_ember`, `skin_frost`, `season1` — referenced from code
+- [x] Prices: €2.99 / €2.99 / €4.99 — changeable until first publish, then not
+- [x] Skins sold individually (vs. one duo pack)
+- [x] Skin names Ember & Frost; pass exclusive named Prism
+- [x] 10 levels for Season 1
+- [x] Season 1 window: launch → 31 Oct 2026 — **as an event only**, see §3: earning never closes for
+      anyone holding `season1`
+
+Still tunable, no dashboard or store dependency:
+
+- [ ] Ladder item mix (§3) — freely editable until T-025 lands
+- [ ] XP curve / level thresholds — frozen before the production release, not before
+
+Still owed on the **Play** side (not a sign-off, a task): create the three products in Play Console
+with the ids above (`PLAY_CONSOLE_SETUP.md` §D1).

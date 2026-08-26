@@ -33,13 +33,16 @@ check "app name" 30 \
 'Veyro Run: Motion Runner'
 
 check "short description" 80 \
-'Tilt your phone to swerve and jump. A daily endless runner you play by moving.'
+'Play hands-free with the camera, or tilt to steer. A new endless track daily.'
 
 check "full description" 4000 "$(sed -n '/^Your phone is the controller\.$/,/^feels wrong the fastest way to change it is to tell us\.$/p' "$(dirname "$0")/LISTING.md")"
 
-# --- camera-update delta (§4 of LISTING.md) ---
-check "short desc (camera)" 80 \
-'Play hands-free with the camera, or tilt to steer. A new endless track daily.'
+# --- alternates from §2, checked so a swap never needs a re-measure ---
+check "short desc (alt: body)" 80 \
+'Move your body or tilt your phone. A new endless track every single day.'
+
+check "short desc (alt: modes)" 80 \
+'Hands-free camera mode or tilt controls. One new endless track every day.'
 
 echo
 if [ "$fail" -ne 0 ]; then

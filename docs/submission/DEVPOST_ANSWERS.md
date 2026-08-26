@@ -99,7 +99,8 @@ change that would silently alter an already-played daily fails CI instead.
 
 ## Monetization
 
-RevenueCat, cosmetics only. One entitlement, one-time non-consumable unlocks, a paywall built in
+RevenueCat, cosmetics only. Three one-time non-consumable products — two skins and a Season 1 pass —
+each mapped to its own entitlement (`skin_ember`, `skin_frost`, `season1`), with a paywall built in
 RevenueCat's Paywall Builder so it can be iterated without an app update. Nothing for sale affects
 gameplay: no lives, no boosts, no advantage. [N: conversion / revenue figures — real numbers only,
 or omit this sentence.]
@@ -152,10 +153,16 @@ that judges see is not the one that shipped on day one. [N: what actually change
 
 ### HAMM
 ```
-Cosmetics only, priced [N], one entitlement, one-time non-consumable purchases. The decision that
-shaped everything: no revives, no continues, no currency. An endless runner that sells second chances
-is selling relief from its own difficulty curve, and it corrupts a shared Daily Run — everyone has to
-be running the same course under the same rules for the daily score to mean anything.
+Cosmetics only, one-time non-consumable purchases: two skins at €2.99 and a Season 1 pass at €4.99.
+Deliberately three entitlements rather than one shared "cosmetics" flag — a buyer who wants one skin
+is not forced into a bundle, and because products attach to entitlements dashboard-side, a Supporter
+Bundle granting all three can ship later with zero app-code change. Packaging stays a pricing
+decision instead of becoming a release.
+
+The decision that shaped everything: no revives, no continues, no currency. An endless runner that
+sells second chances is selling relief from its own difficulty curve, and it corrupts a shared Daily
+Run — everyone has to be running the same course under the same rules for the daily score to mean
+anything.
 
 The paywall is server-configured through RevenueCat's Paywall Builder, so pricing and presentation
 were iterated after launch without an app update. [N: conversion numbers — real ones or none.]

@@ -24,17 +24,17 @@ Motion-controlled 3D endless runner for RevenueCat Shipaton 2026. Phone tilt (la
 ## Engineering rules
 
 1. **Code-first Unity.** Minimal scenes; wire systems from a single bootstrap scene in code (ScriptableObjects for data, prefabs only for visual assets). Scenes/prefabs are YAML merge hazards — one owner per scene, never two tracks editing the same scene file.
-2. **Input goes through `IGameInput`** (GetMoveAxis / IsJumpPressed / IsSlidePressed / IsSpecialPressed). Adapters: GyroInput, TouchInput, CameraPoseInput. Gameplay code never touches sensors, cameras, or ML directly.
-3. **CV never blocks release.** Camera mode is a parallel track (handoff §8); v1.0 ships with gyro+touch regardless of CV status. Primary CV path: BlazePose via Unity Inference Engine (`com.unity.ai.inference`), models from Hugging Face `unity/inference-engine-blaze-pose`. On-device only — no servers.
+2. **Input goes through `IGameInput`** (GetMoveAxis / IsJumpPressed / IsSlidePressed / IsSpecialPressed). Adapters, as they actually exist: `GyroTiltInput`, `TouchTapInput`, `CameraFaceInput`, `KeyboardInput` (Editor), composed by `CompositeInput`. Gameplay code never touches sensors, cameras, or ML directly.
+3. **CV never blocks release.** Camera mode is built behind a menu choice and always falls back to tilt+touch; a slow device is gated out before the permission ask. Shipping CV path: **BlazeFace** (face detector only, CPU backend, 418 KB ONNX committed under `game/Assets/Scripts/CameraInput/Resources/`) via Unity Inference Engine (`com.unity.ai.inference`). **BlazePose is abandoned** — it missed the 30 ms gate at 118 ms median on the Nord 2 (T-010); its ~20 MB weights stay gitignored and are used only by the benchmark spike. On-device only — no servers.
 4. **Determinism.** Track generation must be reproducible from (seed, version, worldId). No `System.Random` without an injected seed; no time-based randomness in generation.
-5. **Third-party SDKs**: RevenueCat `purchases-unity` ≥ 8.4.0 (Paywalls supported), OneSignal Unity SDK, Layers `com.layers.analytics` (UPM). Keep each behind a thin wrapper so tests run without them.
+5. **Third-party SDKs**: RevenueCat `purchases-unity` pinned to **exactly `9.8.1`** — not "≥ 8.4.0"; the rationale and the drift it avoids are in `docs/REVENUECAT_PLAN.md` §1. Plus OneSignal Unity SDK and Layers `com.layers.analytics` (UPM). Keep each behind a thin wrapper so tests run without them.
 6. **Verification.** Prefer Unity batchmode for headless checks: `Unity -batchmode -projectPath game -runTests -testPlatform EditMode` (PlayMode where needed). Anything requiring a physical device (gyro feel, camera, IAP, mirroring latency) → mark the task "needs human device test" in STATUS.md with exact steps to run.
 7. **Performance budget**: 60 FPS on mid-tier Android; CV inference ≤ every 2nd–3rd frame, lite model, 640×480 camera feed.
 
 ## Running the game
 
 - **In editor:** open `game/Assets/Scenes/Main.unity` (intentionally empty) and press Play — `GameBootstrap` builds everything at runtime. Keyboard: A/D or arrows steer, Space jumps. Never hand-edit scene content.
-- **CV spike (T-010, off by default):** `docs/cv-spike.sh on`, then `-executeMethod MotionRunner.EditorTools.CvSpikeBuild.BuildAndroid` → `builds/VeyroCvSpike.apk`, a separate app (`com.ferrabled.veyro.cvspike`). `docs/cv-spike.sh off` when done. Camera mode is parked pending OPEN_QUESTIONS 7.
+- **CV spike (T-010, off by default):** `docs/cv-spike.sh on`, then `-executeMethod MotionRunner.EditorTools.CvSpikeBuild.BuildAndroid` → `builds/VeyroCvSpike.apk`, a separate app (`com.ferrabled.veyro.cvspike`). `docs/cv-spike.sh off` when done. This is the **BlazePose benchmark only** — it is not the shipping camera path and it is not parked work. Camera mode itself is built (T-011/T-012/T-013, BlazeFace) and **ships in v1.0**, camera included, per the 24 Aug owner call (OPEN_QUESTIONS 12).
 - **On device:** `Unity -batchmode -quit -projectPath game -buildTarget Android -executeMethod MotionRunner.EditorTools.BuildScript.BuildAndroid` → `builds/MotionRunner.apk` → adb install/launch/screencap (see STATUS 20 Aug for the proven loop). Materials: always `RuntimeMaterials.Lit(color)` — never primitive default materials (URP + stripping, see STATUS).
 
 ## Known gotchas (each one cost real time — do not rediscover them)

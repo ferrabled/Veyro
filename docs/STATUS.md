@@ -4,6 +4,77 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-26 — PR #2 review pass: entitlement model, judge-code hardening, season-window fix, timeline recomputed (doc session)
+
+Worked the Copilot review on PR #2 (17 inline + 7 suppressed comments — all 24 verified against the
+repo, none spurious). No runtime code touched; `game/Assets/Scripts/Commerce/` still does not exist,
+which is exactly why these mattered: the T-020 Unity session reads these docs as the spec.
+
+**Design changes, not just wording:**
+
+- **Three entitlements, everywhere.** `REVENUECAT_PLAN.md` still specified a single `cosmetics`
+  entitlement in five places (§3.2 const, §3.3 paywall row, §7 checklist steps 1/3, step 11) — dead
+  since the 23 Aug catalog redesign. Implementing it would have made *every* entitlement check fail.
+  The §7 checklist was the dangerous one: it told the owner to create **two** products and one
+  `cosmetics` entitlement in Play Console, where ids are immutable. Now `skin_ember` / `skin_frost` /
+  `season1` throughout, matching `PLAY_CONSOLE_SETUP.md` §D (which was already correct).
+- **`PresentIfNeeded` → `Present`.** With three independent entitlements no single
+  `requiredEntitlementIdentifier` answers "already owned": any one of them shows the paywall to
+  someone who owns the other two. `IStore.PresentPaywall` lost its entitlement argument; gate the
+  call site instead.
+- **`PurchaseOutcome` is a struct, not an enum.** It was sketched as
+  `enum { … Failed(reason) }`, which does not compile — a C# enum cannot carry a payload, and the
+  reason is needed for §6 diagnostics. Now `PurchaseStatus` enum + optional `StoreError`.
+- **Judge codes are random and absent from the APK.** The proposed `LogIn("shipaton-judge-<n>")`
+  (OPEN_QUESTIONS 10) was a guessable shared identifier — `strings` on the APK confirms the pattern
+  and the next person to try `-2` inherits the granted entitlement. Now one high-entropy code per
+  judge (`openssl rand -hex 6`), generated out-of-band, validated by nothing, revocable per-ID.
+  Blast radius was only a cosmetic, but the fix is free at design time and impossible afterwards.
+- **Season 1 earning never closes for pass owners.** The catalog claimed paid items "stay owned"
+  after 31 Oct because the entitlement is non-consumable. Not true: pass-track items unlock on
+  *level*, level derives from local XP (D10), so reinstall → Restore returns `season1` but resets the
+  ladder → after 31 Oct the items are permanently unreachable. v1.0 ships no rollover, expiry or
+  Season 2 code, so nothing technical depended on the window closing — 31 Oct is now an *event* date
+  only. **T-025 constraint: the earn path must not be date-gated.** T-009 stays post-v1.0 as the fix
+  for progress durability itself, and the paywall copy should disclose device-local progress.
+
+**Stale facts corrected:** `AGENTS.md` in four places (adapter names → `GyroTiltInput` /
+`TouchTapInput` / `CameraFaceInput`; BlazePose → BlazeFace, since BlazePose missed the gate at 118 ms;
+`≥ 8.4.0` → exact `9.8.1` pin; camera "parked pending OPEN_QUESTIONS 7" → ships in v1.0). Five stale
+"blocked on P1" markers, incl. `BACKLOG` T-020 which read ⛔ on the same line as "Unblocked 24 Aug".
+`CHECKLIST` privacy-policy ref pointed at OPEN_QUESTIONS 12 (the camera decision) instead of 9.
+
+**Camera-in-v1.0 reached the store kit.** `LISTING.md` §4 was a "paste only when the camera update is
+LIVE" delta — folded into the shipping copy: short description now `Play hands-free with the camera,
+or tilt to steer. A new endless track daily.` (77/80) and the full description carries the
+`HANDS-FREE CAMERA MODE (BETA)` block and the FEATURES bullet (2,828/4,000). Verified by
+`check-lengths.sh`, which now also measures both §2 alternates. `SCREENSHOTS.md` Shot 5 (mode-select
+menu) reversed from "hold for v1.0" to ship — it is the visual half of explaining the CAMERA
+permission to a reviewer. Shot 7 likewise. `VIDEO_SCRIPT.md` contingency retired.
+
+**Timeline recomputed — closed testing went LIVE 26 Aug**, five days ahead of the ~1 Sep plan:
+
+| | Was | Now |
+|---|---|---|
+| 14 days elapse | ~15 Sep | **~9 Sep** (from the day the **12th** tester is opted in, not from upload) |
+| Apply for production | ~7–8 Sep (impossible) / ~15 Sep | **~9 Sep** |
+| Production live | ~22 Sep | **~16 Sep** |
+| Slack before 30 Sep | ~8 days | **~10 days**, all of it after production access |
+
+`PLAY_CONSOLE_SETUP.md` §E had "apply ~7–8 Sep", which was arithmetically impossible against a ~1 Sep
+start; gone. BACKLOG T-031 is now 🚧, and the 🔷 marker (code complete, awaiting device test) was
+added to the legend — it was in use on T-011/12/13 but undocumented.
+
+**Needs the owner:** create the **3 in-app products in Play Console** — they exist in RevenueCat but
+not in Play, so no real purchase can be verified and each package's Play row is empty
+(`PLAY_CONSOLE_SETUP.md` §D1) — then the service-account JSON (§D3, ~36 h propagation). And **get to
+12 testers opted in**: the 14-day clock starts at the 12th, not at upload, so this is now the single
+uncompressible item on the critical path. Recruit 16–18.
+
+**Not addressed (owner's call):** `VIDEO_SCRIPT.md` §0:00–0:18 still says "one continuous take" *and*
+"cut in a tight insert at ~0:10" *and* "no cuts inside the lean-swerve beat" — three rules that cannot
+all hold. Low stakes, but ambiguous for the shoot.
+
 ## 2026-08-24 (merge) — `main` reconciled into `revenueCat-prep`: AAB path + privacy policy + camera-in-v1.0 meet the RevenueCat prep
 
 Merging `main` (camera-feature + the compliance session below) changed facts the RevenueCat-side

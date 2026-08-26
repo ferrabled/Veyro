@@ -7,8 +7,19 @@ and was checked against the live page on 23 Aug 2026.
 T-020 is the **contest eligibility gate**: without a working RevenueCat-powered purchase in the
 published build, the Shipaton submission is filtered out before a judge sees it ([S2]).
 
-**Blocked on:** P1 (Play Console account — requested, approval pending) and P4 (RevenueCat account).
-Everything in §1–§7 can be done the day both exist.
+**Status (26 Aug): not blocked.** P1 ✅ (Play developer account registered + identity-verified,
+24 Aug) and P4 ✅ (RevenueCat account, project, and the full catalog created for the Test Store
+*and* Play Store apps). The Unity half of T-020 is buildable and device-testable **today** against
+Test Store products.
+
+Two Play-side items remain, and neither blocks any code in §1–§7:
+
+- The three in-app products do **not** exist in Play Console yet (`PLAY_CONSOLE_SETUP.md` §D1).
+  They exist in RevenueCat; the Play rows of each package are still empty.
+- The service-account JSON is not uploaded (§D3, ~36 h propagation).
+
+Both are only needed for **real-purchase** verification (checklist item 14). Everything up to and
+including a Test Store purchase → entitlement → unlock is unblocked.
 
 ---
 
@@ -172,7 +183,7 @@ game/Assets/Scripts/Commerce/
   MotionRunner.Commerce.asmdef            noEngineReferences: true, references: []
     IStore.cs            the seam
     StoreOffer.cs        plain data: id, title, localized price string, entitlement id
-    PurchaseOutcome.cs   enum: Purchased | Cancelled | AlreadyOwned | Failed(reason)
+    PurchaseOutcome.cs   readonly struct: PurchaseStatus enum + optional StoreError (§3.2)
     Entitlements.cs      pure logic: is X unlocked, given a set of active entitlement ids
     CosmeticCatalog.cs   SKU id -> what it changes in game (colour set, trail, …)
     FakeStore.cs         in-memory IStore for tests and for the Editor
@@ -205,7 +216,7 @@ namespace MotionRunner.Commerce
         /// every entitlement as locked but never block the player from running.
         bool IsReady { get; }
 
-        /// Active entitlement ids, e.g. { "cosmetics" }. Empty when unknown.
+        /// Active entitlement ids, e.g. { "skin_ember", "season1" }. Empty when unknown.
         IReadOnlyCollection<string> ActiveEntitlements { get; }
 
         /// Raised whenever ActiveEntitlements changes, including at startup and
@@ -219,20 +230,48 @@ namespace MotionRunner.Commerce
 
         void Restore(Action<PurchaseOutcome> done);
 
-        /// Presents the dashboard-configured paywall. On platforms/builds where
-        /// no native paywall exists (Editor), completes immediately as Cancelled.
-        void PresentPaywall(string requiredEntitlementId, Action<PurchaseOutcome> done);
+        /// Presents the dashboard-configured paywall for offering `default`.
+        /// Deliberately takes NO required-entitlement argument: the catalog has
+        /// three independent entitlements (§3.2), so "does the user already have
+        /// it" is never a single question. Gate the call site instead — only open
+        /// the paywall for items the player does not own. On platforms/builds
+        /// where no native paywall exists (Editor), completes as Cancelled.
+        void PresentPaywall(Action<PurchaseOutcome> done);
     }
 }
 ```
 
-`Entitlements` is where the game asks its questions, and it is pure:
+`Entitlements` is where the game asks its questions, and it is pure. **There are three, one per
+product** — there is deliberately no single `cosmetics` flag, so that packaging (a later "Supporter
+Bundle" granting all three) stays a dashboard decision with zero app-code change
+(`COSMETICS_CATALOG.md` §2):
 
 ```csharp
 public static class Entitlements
 {
-    public const string Cosmetics = "cosmetics";
+    public const string SkinEmber = "skin_ember";
+    public const string SkinFrost = "skin_frost";
+    public const string Season1   = "season1";
+
     public static bool Has(IReadOnlyCollection<string> active, string id) => active.Contains(id);
+}
+```
+
+`PurchaseOutcome` **cannot be a bare enum** — a failure has to carry why, or the diagnostics in
+§3.4/§6 are impossible. Status enum plus an optional error:
+
+```csharp
+public enum PurchaseStatus { Purchased, Restored, Cancelled, AlreadyOwned, Failed }
+
+public readonly struct PurchaseOutcome
+{
+    public PurchaseStatus Status { get; }
+    /// Non-null only when Status == Failed.
+    public StoreError Error { get; }
+
+    public bool Succeeded => Status is PurchaseStatus.Purchased
+                                    or PurchaseStatus.Restored
+                                    or PurchaseStatus.AlreadyOwned;
 }
 ```
 
@@ -248,7 +287,7 @@ Signatures verified against `RevenueCat/Scripts/Purchases.cs` @ 9.8.1 [S27]:
 | `FetchOffers` | `GetOfferings((offerings, error) => …)`, read `offerings.Current.AvailablePackages` |
 | `Purchase` | `PurchasePackage(package, result => …)`; `PurchaseResult` has `UserCancelled`, `Error`, `CustomerInfo`, `ProductIdentifier` [S30] |
 | `Restore` | `RestorePurchases((customerInfo, error) => …)` |
-| `PresentPaywall` | `await RevenueCatUI.PaywallsPresenter.PresentIfNeeded(requiredEntitlementIdentifier: "cosmetics")` → `PaywallResultType.Purchased / Restored / Cancelled` [S26] |
+| `PresentPaywall` | `await RevenueCatUI.PaywallsPresenter.Present()` → `PaywallResultType.Purchased / Restored / Cancelled` [S26]. **Not `PresentIfNeeded`** — that takes one `requiredEntitlementIdentifier`, and with three independent entitlements (§3.2) no single id answers "already owned": passing any one of them shows the paywall to a player who owns the other two, and passing a non-existent `"cosmetics"` shows it to everyone forever. |
 
 Notes that belong in the adapter's header comment when it is written:
 
@@ -280,22 +319,31 @@ The device-only half (a real sandbox purchase, entitlement surviving reinstall) 
 
 ## 4. Catalog proposal
 
-> **Superseded 23 Aug 2026 (owner session):** the catalog is now **2 premium skins + a Season 1
-> pass** — 3 products, 3 entitlements — specified in **`docs/COSMETICS_CATALOG.md`**. That file
-> wins on any conflict with this section; §§1–3 and 5–7 of this plan stand (read "two products"
-> as "three" in the §7 checklist). Kept below for the original reasoning.
+> **SUPERSEDED AND HISTORICAL — do not implement anything in this section.** Superseded 23 Aug 2026
+> (owner session) and **confirmed in the RevenueCat dashboard 24 Aug**: the catalog is 2 premium
+> skins + a Season 1 pass — **3 products, 3 entitlements** (`skin_ember`, `skin_frost`, `season1`) —
+> specified in **`docs/COSMETICS_CATALOG.md`**, which wins on any conflict. §§1–3 and 5–7 of this
+> plan stand and have been brought in line (26 Aug); the earlier "read two products as three in §7"
+> instruction is gone because **§7 itself is now correct** — nothing is left for the reader to patch
+> mentally. Kept below only for the original reasoning.
 
-Pricing and final SKU naming are the owner's call — **written up as a proposal in
-`docs/OPEN_QUESTIONS.md` (item 9), not decided here.** The engineering-relevant shape:
+Pricing and final SKU naming were the owner's call, made 24 Aug — see the *Answered* section of
+`docs/OPEN_QUESTIONS.md` (this was item 9; **9 now means privacy-policy hosting**, renumbered in the
+24 Aug merge). The shape proposed at the time, all three bullets now wrong:
 
-- **One entitlement**, id `cosmetics`. One entitlement keeps `Entitlements.Has` trivial and means a
-  second SKU later does not change any gameplay code.
-- **Two one-time, non-consumable products** (see §2.1 — non-consumable is not optional):
-  a small "support" skin unlock and a larger bundle. Both grant `cosmetics`.
-- **One offering**, id `default`, with the two products as packages of type `Custom`/`Lifetime`.
-  The Paywall Builder needs an offering to attach to [S31].
+- ~~**One entitlement**, id `cosmetics`~~ → **three**, one per product. The single-flag argument
+  ("a second SKU later does not change any gameplay code") turned out to cut the other way: with
+  per-product entitlements, a later Supporter Bundle granting all three is a dashboard change with
+  no app-code change at all, because products attach to entitlements server-side.
+  See §3.2 and `COSMETICS_CATALOG.md` §2.
+- ~~**Two** one-time, non-consumable products~~ → **three**. Non-consumable is still not optional
+  (§2.1).
+- ~~One offering `default` with **the two products** as packages~~ → three packages, custom
+  identifiers `skin_ember` / `skin_frost` / `season1_pass`. The Paywall Builder still needs an
+  offering to attach to [S31].
 - **Store product ids** must be created in the Play Console *and* mirrored in RevenueCat; they are
-  immutable once created, so the owner should approve the exact strings before anyone types them.
+  immutable once created. Still true, and still outstanding on the Play side as of 26 Aug —
+  `PLAY_CONSOLE_SETUP.md` §D1.
 
 D6 binds this: **cosmetics only, no pay-to-win.** The runner's colour already comes from
 `RuntimeMaterials.Lit(color)` at `GameBootstrap.cs:44`, so a skin SKU is a colour/material swap and
@@ -378,10 +426,29 @@ single most common support thread on this is developers and users looking for a 
 Do not improvise at 11pm on 30 Sep. RevenueCat lets an entitlement be **granted** to an app user ID
 from the dashboard without a store transaction. That is only usable if we can identify the judge's
 app user ID — which anonymous IDs make impossible. **Decision needed (OPEN_QUESTIONS 10):** ship a
-hidden "judge mode" that calls `LogIn("shipaton-judge-<n>")` behind a code entry on the title screen,
-so a specific ID can be granted from the dashboard as a manual override.
+hidden "judge mode" — a code entry on the title screen that calls `LogIn(<code>)`, so that specific
+ID can be granted the entitlements from the dashboard as a manual override.
 Recommended default: **yes, build it** — it is ~20 lines, it costs nothing in the APK, and the
 alternative failure mode is an unscoreable submission.
+
+**The code must be random, and the app must not contain it.** The obvious version —
+`shipaton-judge-1`, `-2`, `-3` — is an unlocked door: the pattern is guessable, `strings` on the APK
+would confirm it, and the first person to try `shipaton-judge-2` inherits whatever that ID was
+granted. The blast radius is only a cosmetic, but the fix is free at design time and impossible
+afterwards, so:
+
+- **One high-entropy code per judge**, generated once and written down out-of-band — e.g.
+  `judge-7f3a9c1e4b8d` (≥ 12 hex chars ≈ 48 bits; `openssl rand -hex 6`). Not sequential, not
+  derived from anything.
+- **The app validates nothing and stores no list.** The screen passes whatever is typed straight to
+  `LogIn(code)`. An unknown code produces a real app user ID with zero entitlements — a harmless
+  no-op — which is exactly why no secret needs to ship in the binary.
+- **Revocable:** entitlements are granted per-ID in the dashboard, so a leaked code is revoked by
+  revoking that one ID. Nothing else is affected.
+- Keep the codes out of the repo, out of STATUS.md, and out of the Devpost description (promo codes
+  go there — §6 — this is the private fallback).
+- Log out (`LogOut()`) restores the anonymous ID, so a judge testing on a shared device does not
+  leave the entitlement behind.
 
 **Compliance line, non-negotiable:** promo-code redemptions are $0 and are the intended judge path.
 Buying our own SKU to inflate revenue violates store policy and would poison the submission
@@ -413,14 +480,19 @@ catalog item is answered, and that number now refers to privacy-policy hosting).
 
 **A — Dashboard / console (no Unity, can be done while waiting):**
 
-1. Play Console: create the app, application id `com.ferrabled.veyro.run`, then create the two
-   one-time products with the owner-approved ids and prices, and **activate** them.
+1. Play Console: create the app, application id `com.ferrabled.veyro.run`, then create the **three**
+   one-time products, ids character-for-character from `COSMETICS_CATALOG.md` §2 — `veyro.skin.ember`
+   (€2.99) · `veyro.skin.frost` (€2.99) · `veyro.season1.pass` (€4.99) — and **activate** each.
+   **Still outstanding as of 26 Aug**; full runbook in `PLAY_CONSOLE_SETUP.md` §D1.
 2. Play Console: enrol in the **15% reduced service-fee tier** (`LICENSING_REVENUE.md` §2).
-3. RevenueCat: create the project + Play Store app, upload the service-account JSON, import the two
-   products, **set both to non-consumable** (§2.1 — this is the one that bites), create entitlement
-   `cosmetics`, attach both products to it, create offering `default`.
-4. RevenueCat: build a paywall on `default` in the Paywall Builder. Ugly is fine today; §5 means it
-   can be redesigned after the store build is frozen.
+3. RevenueCat — **done 24 Aug**, kept here for the record: project + Play Store app + Test Store app,
+   three products, **all non-consumable** (§2.1 — this is the one that bites), three entitlements
+   `skin_ember` / `skin_frost` / `season1` (one product each — *not* one shared `cosmetics` flag,
+   see §3.2), offering `default` with packages `skin_ember` / `skin_frost` / `season1_pass`.
+   Remaining: upload the service-account JSON and fill the empty **Play** row of each package once
+   step 1 exists (`PLAY_CONSOLE_SETUP.md` §D3–§D4).
+4. RevenueCat: paywall on `default` in the Paywall Builder — **done 24 Aug**. §5 means it can be
+   redesigned after the store build is frozen.
 
 **B — Unity, in order:**
 
@@ -438,8 +510,12 @@ catalog item is answered, and that number now refers to privacy-policy hosting).
    `GameBootstrap` alongside the other systems, fail-open.
 10. UI: a cosmetics entry point on the result screen (`RunHud` builds the result panel in code) and a
     **Restore** button. Both code-first UGUI, matching `ModeSelectMenu`/`RunHud` — no scene content.
-11. Apply the entitlement: `Entitlements.Has(store.ActiveEntitlements, Entitlements.Cosmetics)` picks
-    the runner colour at `GameBootstrap.cs:44`. This is the smallest honest "premium feature".
+11. Apply the entitlements — one check per catalog item, not one flag:
+    `Entitlements.Has(store.ActiveEntitlements, Entitlements.SkinEmber)` and `…SkinFrost` each
+    unlock their skin preset (the runner colour at `GameBootstrap.cs:44` is the smallest honest
+    "premium feature"), and `…Season1` unlocks the paid track of the reward ladder. Route all three
+    through `CosmeticCatalog`'s unlock rules (Default / Entitlement / SeasonLevel) rather than
+    branching at the call site — T-025 owns the ladder itself.
 12. Re-read entitlements on app resume (§6.3).
 13. Set `productName` to **Veyro Run** and `companyName` away from `DefaultCompany` in Player
     Settings — currently `Motion Runner` / `DefaultCompany`, which is what the launcher label and the

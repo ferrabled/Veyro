@@ -86,13 +86,16 @@ hook goes first and the paywall goes last.
 - **Why:** shows the loop closes and that progress is tracked. Also the natural "beat my score"
   share image for #BuildInPublic and Noise.
 
-### Shot 5 — mode-select menu *(camera update only — hold for v1.0)*
+### Shot 5 — mode-select menu *(ship in v1.0)*
 
 - **State:** `ModeSelectMenu` showing TILT & TOUCH vs CAMERA (BETA).
 - **Why:** it is the honest way to show camera mode exists without claiming it is the default. The
   BETA label being visible in the screenshot is the point.
-- **Do not ship in the v1.0 listing** — the v1.0 build has no menu worth showing and the listing
-  does not mention the camera (LISTING.md §4).
+- **Ship this in the v1.0 listing.** Reversed 26 Aug: the old note said to hold it because "the v1.0
+  build has no menu worth showing and the listing does not mention the camera" — both are now false.
+  `ModeSelectMenu` is in the build, camera mode ships in v1.0 (OPEN_QUESTIONS 12), and the listing
+  advertises it (LISTING.md §2–§3). This shot is also the visual half of explaining the CAMERA
+  permission to a reviewer, which makes it one of the more valuable slots, not an optional extra.
 
 ### Shot 6 — paywall *(only once T-020 is in the build)*
 
@@ -102,7 +105,7 @@ hook goes first and the paywall goes last.
 - **Watch for:** a real localized price string from the store, not `$0.00` and not a placeholder.
   This is device-only — the paywall does not render in the Editor (REVENUECAT_PLAN §5).
 
-### Shot 7 — hands-free camera mode, in use *(camera update only; needs a second camera)*
+### Shot 7 — hands-free camera mode, in use *(v1.0; needs a second camera to capture)*
 
 - **State:** a person standing 2 m from a propped-up phone, mid-lean, game visible on screen.
 - **Why:** the single most differentiating image the project can produce.

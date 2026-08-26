@@ -70,10 +70,16 @@ the question. Keep this file short; it is read every session.
 10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
     (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
     user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.
-    Proposal: a code-entry on the title screen that calls `LogIn("shipaton-judge-<n>")`, so that ID
-    can be granted the entitlement from the RevenueCat dashboard as a manual override.
+    Proposal: a code-entry on the title screen that calls `LogIn(<code>)`, so that ID can be granted
+    the entitlements from the RevenueCat dashboard as a manual override.
     *Recommended default: **yes** — roughly 20 lines, no APK cost, and the alternative failure mode
     is an unscoreable submission.*
+
+    **Codes must be random, one per judge, and absent from the APK** (`REVENUECAT_PLAN.md` §6.4,
+    tightened 26 Aug): `judge-7f3a9c1e4b8d`-style, `openssl rand -hex 6`, generated out-of-band.
+    A predictable `shipaton-judge-<n>` would let anyone who guesses or extracts it inherit the
+    granted entitlement. The app validates nothing and ships no list — an unknown code just yields
+    an app user ID with no entitlements. Leaked codes are revoked per-ID in the dashboard.
 
 11. **Demo video: voiceover, and who is on camera?** (`docs/submission/VIDEO_SCRIPT.md` §"Owner
     decisions"). *Recommended default: voiceover — #BuildInPublic and Grand Prize reward a person

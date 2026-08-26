@@ -23,14 +23,16 @@ That is D11's constraint, re-confirmed today. The owner's account is new and per
 
 | | Date | Note |
 |---|---|---|
-| Play Console account approved + identity verified | **pending — P1** | The only blocker. Verification alone can take days. |
-| First APK uploaded to a closed track; 12 testers opted in | **by ~1 Sep** | Ugly is fine. The build only has to install and run. |
-| 14 continuous days elapse | **~15 Sep** | Zero slack: any tester who drops out and rejoins resets *their* clock, and 12 is a floor, not a target. |
-| Apply for production | **~15 Sep** | |
-| Production review returns | **~22 Sep** (up to 7 days, sometimes longer) | |
+| Play Console account approved + identity verified | **26 Aug** ✅ | Cleared 24 Aug (P1, owner-reported). No longer a blocker. |
+| First AAB uploaded to a closed track; 12 testers opted in | **26 Aug** ✅ | Closed testing went live — five days ahead of the ~1 Sep plan. |
+| 14 continuous days elapse | **~9 Sep** | Counts from the day the **12th** tester is opted in, not from upload. Any tester who drops out and rejoins resets *their own* clock, and 12 is a floor, not a target. |
+| Apply for production | **~9 Sep** | |
+| Production review returns | **~16 Sep** (up to 7 days, sometimes longer) | |
 | Devpost submission deadline | **30 Sep, 11:45pm PDT** | Needs a **live store URL** [S2] |
 
-**Slack in this plan: about 8 days, all of it in the review step, none of it in the tester step.**
+**Slack in this plan: about 14 days** (updated 26 Aug — the closed test went live five days early and
+P1 cleared ahead of schedule). Still **none of it in the tester step**: the 14 days are a hard
+minimum that no amount of slack elsewhere can shorten.
 
 Two consequences worth stating plainly:
 

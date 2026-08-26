@@ -116,8 +116,22 @@ BILLING permission §D1 waits for, and ships as a track update.
 
 Play Console dashboard → *Apply for production access*. Google reviews the testing story (tester
 engagement, feedback acted on, pre-launch report crash-free) — 12×14 is the minimum, not an
-auto-approval. Answer honestly: recruited friends/Shipaton peers, what feedback changed. Target
-per D11: apply ~7–8 Sep, production release ~22 Sep.
+auto-approval. Answer honestly: recruited friends/Shipaton peers, what feedback changed.
+
+**Dates, recomputed 26 Aug** (the closed test went live that day, five days ahead of the ~1 Sep plan;
+D11's ~22 Sep production target predates this and is now conservative):
+
+| | Date | Note |
+|---|---|---|
+| Closed track live | **26 Aug** ✅ | |
+| 14 continuous days elapse | **~9 Sep** | From the day the **12th** tester is opted in, not from upload. A tester who drops and rejoins restarts *their own* 14 days. |
+| Apply for production | **~9 Sep** | |
+| Production live | **~16 Sep** | Review is usually ≤7 days, occasionally longer. |
+| Devpost deadline | **30 Sep** | ~2 weeks of slack — the first real slack this schedule has had. |
+
+The old "apply ~7–8 Sep" line here was arithmetically impossible (14 days from ~1 Sep is ~15 Sep) and
+is gone. Spend the new slack on T-020 and the listing assets, not on delaying the application:
+production access is the gate everything else queues behind.
 
 ---
 

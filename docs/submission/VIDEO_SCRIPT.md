@@ -49,10 +49,13 @@ body in real time; a cut there reads as a fake, and every viewer who suspects a 
 **Why this opens the video:** handoff §14.6 puts the hook first, and this is the strongest 18 seconds
 the project can produce. It is also the only part a screener is guaranteed to see.
 
-> **Contingency — if camera mode has not shipped to production by the shoot date:** do not fake it.
-> Open instead on a tight shot of hands visibly tilting the phone with the game reacting (the §14.2
-> "proof clip" shot), and move the camera-mode footage to 1:30–1:50 labelled **BETA — shipping in
-> the next update**, with the mode-select menu visible on screen. Showing a beta as a beta is fine.
+> **Contingency — largely retired 26 Aug.** Camera mode ships **in v1.0**, in the closed-testing
+> build and the production release (OPEN_QUESTIONS 12), so the hook is footage of a shipped feature
+> and needs no hedge. The rule behind the contingency still stands, though, and it is the one that
+> matters: **do not fake it, and do not shoot the hook before the build is live in production.** If
+> production review somehow slips past the shoot date, open instead on a tight shot of hands
+> visibly tilting the phone with the game reacting (the §14.2 "proof clip" shot) and move the
+> camera footage to 1:30–1:50 with the mode-select menu visible. Showing a beta as a beta is fine.
 > Showing an unreleased feature as the headline is what gets a submission disqualified.
 
 ## 0:18–0:32 — The premise
