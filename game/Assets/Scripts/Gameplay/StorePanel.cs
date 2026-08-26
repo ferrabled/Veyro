@@ -26,6 +26,11 @@ namespace MotionRunner.Gameplay
         static readonly Color OwnedColor = new Color(0.24f, 0.42f, 0.28f);
         static readonly Color StatusColor = new Color(0.72f, 0.76f, 0.85f);
 
+        /// True while a store panel is on screen. RunSession checks it so the tap that opens
+        /// the store (or taps inside it) can never double as the "tap anywhere to restart"
+        /// input - jump fires on the same TouchPhase.Ended as the button click.
+        public static bool IsOpen { get; private set; }
+
         IStore _store;
         SkinService _skins;
         Text _status;
@@ -41,6 +46,7 @@ namespace MotionRunner.Gameplay
         {
             var go = new GameObject("StorePanel");
             var panel = go.AddComponent<StorePanel>();
+            IsOpen = true;
             panel._store = store;
             panel._skins = skins;
             panel.Build();
@@ -52,6 +58,7 @@ namespace MotionRunner.Gameplay
 
         void OnDestroy()
         {
+            IsOpen = false;
             if (_store != null) _store.EntitlementsChanged -= RefreshRows;
         }
 

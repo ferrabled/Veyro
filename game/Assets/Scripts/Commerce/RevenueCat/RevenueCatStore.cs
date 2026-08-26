@@ -21,6 +21,7 @@ namespace MotionRunner.Commerce.RevenueCat
     {
         Purchases _purchases;
         string _apiKey;
+        bool _configured;
         readonly HashSet<string> _active = new HashSet<string>();
 
         public bool IsReady { get; private set; }
@@ -65,6 +66,7 @@ namespace MotionRunner.Commerce.RevenueCat
                 Debug.LogWarning("[Store] RevenueCat configuration failed - store disabled, game playable: " + e.Message);
                 yield break;
             }
+            _configured = true;
             RefreshCustomerInfo();
         }
 
@@ -263,7 +265,10 @@ namespace MotionRunner.Commerce.RevenueCat
             return null;
         }
 
-        bool SdkConfigured() => _purchases != null && _purchases.IsConfigured();
+        /// Our own flag, never Purchases.IsConfigured(): that call NREs before the SDK
+        /// component's Start() binds its platform wrapper, and Unity delivers the first
+        /// OnApplicationPause(false) earlier than that (found on device, 27 Aug).
+        bool SdkConfigured() => _purchases != null && _configured;
 
         static StoreError NotConfigured() => new StoreError("not_configured", "store is not available yet");
 

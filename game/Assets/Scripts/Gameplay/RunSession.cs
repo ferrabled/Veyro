@@ -52,6 +52,7 @@ namespace MotionRunner.Gameplay
         int _sessionSalt;
         float _elapsed;
         float _restartLockout;
+        bool _pendingRestart;
 
         void Start()
         {
@@ -110,7 +111,22 @@ namespace MotionRunner.Gameplay
             if (!IsRunning)
             {
                 _restartLockout -= deltaTime;
-                if (_restartLockout <= 0f && (Input.IsJumpPressed() || Input.IsSpecialPressed())) StartRun();
+
+                // A jump restarts the run one frame LATER, and only if that same tap did not
+                // open the store: TouchTapInput reports jump on the same TouchPhase.Ended that
+                // fires a UI button's click, so the SKINS & STORE tap would otherwise also
+                // restart the run behind the panel (found on device, 27 Aug). While the store
+                // is open, restart input is ignored entirely.
+                if (_pendingRestart)
+                {
+                    _pendingRestart = false;
+                    if (!StorePanel.IsOpen) StartRun();
+                }
+                else if (_restartLockout <= 0f && !StorePanel.IsOpen &&
+                         (Input.IsJumpPressed() || Input.IsSpecialPressed()))
+                {
+                    _pendingRestart = true;
+                }
                 return;
             }
 
