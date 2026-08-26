@@ -14,6 +14,7 @@ Motion-controlled 3D endless runner for RevenueCat Shipaton 2026. Phone tilt (la
 - `docs/COSMETICS_CATALOG.md` — the store catalog (products/entitlements/offering, Season 1 pass, item list) and the product-vs-entitlement-vs-item rules. Read before touching commerce, cosmetics, or either store dashboard. `docs/REVENUECAT_PLAN.md` is the companion integration plan (SDK version, wrapper seam, judge path).
 - `docs/PLAY_CONSOLE_SETUP.md` — ordered human-only Play Console checklist (listing → testers → products → RevenueCat credentials). Agents: read it to know what the owner has/hasn't done; never assume a console step happened.
 - `docs/LICENSING_REVENUE.md` — Unity Personal / RevenueCat / store-economics compliance analysis. Constraints there are binding (e.g., attribution line if a credits screen exists; no artificial revenue).
+- `docs/STORE_COMPLIANCE.md` — Google Play declaration state + the per-release "flip table". Read it before any release that adds an SDK, permission, purchase, login, or network feature; update it in the same change.
 
 ## Repo layout
 

@@ -8,6 +8,48 @@ same product. If T-006 lands a style first, the icon follows it rather than the 
 
 ---
 
+## 0a. STATUS AND BRAND SYSTEM — merged from `listing.md`, 26 Aug
+
+This brief was written 23 Aug as "no assets produced". That is **out of date**: the 25 Aug owner
+session produced the icon and feature graphic and locked a brand system. Merged here from
+`docs/store-kit/listing.md` (deleted in the same merge — it collided case-insensitively with
+`LISTING.md` on Windows).
+
+**Asset state.** The 25 Aug notes in the deleted `listing.md` said the icon/graphic were "not in
+repo" and screenshots were "missing". Both are wrong as of this merge — the files are committed under
+`screenshots/`. Dimensions below are **measured from the actual files**, not copied from the old note:
+
+| Asset | Required spec | In repo | Verdict |
+|---|---|---|---|
+| App icon (Play) | 512×512 PNG, ≤1 MB, no rounded corners | `screenshots/icon.png` — **1254×1254**, 1.9 MB | ⚠️ square, so it downscales cleanly, but **must be resized to 512×512 and re-compressed** — 1.9 MB is over the 1 MB cap |
+| App icon (Devpost) | 1024×1024 [CHECKLIST B5] | same source | ⚠️ export a second 1024×1024 copy from the same art |
+| Feature graphic | exactly 1024×500, JPEG or 24-bit PNG, no alpha | `screenshots/graphic.png` — **1796×876**, 2.4 MB | ✅ aspect is 2.050:1 vs the required 2.048:1, so a straight resize to 1024×500 is visually lossless. **Strip alpha** on export |
+| Phone screenshots | 2–8, portrait, each side 320–3840 px | `screenshots/v1.0.1/` — **7 × 1080×2400** JPEG | ✅ **satisfied.** Play's minimum of 2 is met with room to pick the best |
+| Devpost frameless | exactly 1179×2556 | — | ☐ **still missing.** The 1080×2400 captures are the wrong aspect (0.450 vs 0.461), so this needs its own capture — recipe in `SCREENSHOTS.md` §3 |
+
+Both AI-generated assets are uploaded to the Console and **tagged AI** in the listing's AI-asset
+declaration. Keep that declaration accurate if the art is ever replaced by hand-drawn work.
+
+**Referenced but not present in the repo** (the old note described these as existing; they do not):
+`PROMPT_ICON.md`, `PROMPT_FEATURE_GRAPHIC.md`, `docs/store-kit/src/`, `store-assets/`. Either the
+handoffs were never committed or they live outside the repo. Treat the paths as the *intended*
+convention — binaries out of `docs/`, SVG sources in `src/` — and note that the assets currently sit
+in `screenshots/`, which is where anything referencing them should point until that is reorganised.
+
+**Brand system (locked 25 Aug).** Riso print: teal `#12454C` + fluoro pink `#EE3D87` on paper
+`#FBF5E9`, Anybody type. **No capsule-person figures — owner veto** (see `site/README.md`
+"Placeholder figures"); human-figure art is postponed until the real character model exists, which is
+T-037's dependency. The icon subject is the **daily ticket + V monogram**, owner-approved.
+
+**Execution handoffs:** `PROMPT_ICON.md` and `PROMPT_FEATURE_GRAPHIC.md` in this folder, each with a
+coding-agent version and an image-model version. Rendered PNGs land in `store-assets/` (binaries stay
+out of `docs/store-kit/`), SVG sources in `docs/store-kit/src/`.
+
+Where this brief's §1–§2 disagree with the shipped assets, the shipped assets win — but keep the §0
+trademark constraint, which still binds.
+
+---
+
 ## 0. The hard constraint, first
 
 **Nothing automotive. Nothing racing.**

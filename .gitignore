@@ -47,3 +47,6 @@ game/CvModels/
 # here permanently — CvSpikeBuild stages it per spike build and deletes it in a finally.
 game/Assets/CV/Resources/
 game/Assets/CV/Resources.meta
+
+# Wrangler local state (account ids, caches) 
+site/.wrangler/

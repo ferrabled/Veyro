@@ -75,6 +75,68 @@ uncompressible item on the critical path. Recruit 16–18.
 "cut in a tight insert at ~0:10" *and* "no cuts inside the lean-swerve beat" — three rules that cannot
 all hold. Low stakes, but ambiguous for the shoot.
 
+## 2026-08-25 — T-036 marketing website built; privacy policy gets a real home (veyro-site session)
+
+**Headline: the complete marketing site exists at `site/`, ready to deploy to veyro.ferrabled.com —
+which also resolves OPEN_QUESTIONS 9 (privacy-policy hosting + contact email).** Owner decisions
+this session: Cloudflare free tier + Wrangler (not GitHub Pages), subdomain `veyro.ferrabled.com`,
+contact email `ferrabled+veyro@gmail.com` (temporary alias, will be replaced), and the design —
+"Riso Print" (two-ink risograph poster, teal #12454C + fluoro pink #EE3D87 on paper #FBF5E9),
+picked from a 2-round pitch (owner explicitly wants nothing that reads AI-generated; camera mode
+is the headline feature, tilt secondary). Pitch artifact:
+https://claude.ai/code/artifact/c0ca2d3c-4582-4968-8592-8b2a9cfb46be
+
+- `site/public/`: index (7 independent sections: hero / how-it-plays / camera-privacy / daily-ticket
+  / cosmetics-pledge / spec-strip / about), `/privacy/` (mirrors `docs/PRIVACY_POLICY.md`, whose two
+  email TODOs are now filled), `/terms/` (cosmetic-IAP + physical-safety terms), `/support/`
+  (FAQ + data-deletion statement), 404, favicon, `_headers` (CSP), robots.txt. No framework, no
+  build step; fonts Anybody / Atkinson Hyperlegible / Fragment Mono. Hero CTA is in pre-launch
+  state (closed-test mailto); the Google Play CTA is in the HTML, commented, for launch day.
+- `GameLinks.PrivacyPolicyUrl` → `https://veyro.ferrabled.com/privacy/` (was GitHub Pages).
+  **The URL 404s until the first deploy — deploy before any build that ships this constant.**
+- Copy compliance checked: grep for the ART_DIRECTION banned words (race/speed/drive/circuit/turbo)
+  is clean across `site/`; camera copy carries the BETA label + on-device lines matching the policy.
+- Verified via local static server + headless DOM checks: all pages/assets 200, unknown path 404s,
+  zero console errors, no horizontal overflow at 1280px or 375px (panels stack on mobile), daily
+  ticket regenerates from today's UTC date (JS), CSS/fonts load. **Not visually inspected by a
+  human yet — needs the owner to look at it** (`npx serve site/public` or `npx wrangler dev`).
+- **Needs human:** (1) `cd site && npx wrangler login && npx wrangler deploy` — first deploy
+  auto-creates the custom domain in the ferrabled.com zone; (2) eyeball the design on desktop +
+  phone; (3) when the Play listing goes live, flip the hero CTA (marked in `site/README.md`).
+- Owner reviewed the site 25 Aug: approved except the capsule-person figures — "once we have the
+  main model and skins, we will replicate those." Filed as **T-037** (blocked on the character
+  model); the exact spots to swap are tabled under "Placeholder figures" in `site/README.md`.
+
+## 2026-08-25 — First Play upload done; site live + compliance register created (compliance session)
+
+**Headline: versionCode 1 is on the internal track, the marketing/legal site is live at
+veyro.ferrabled.com, and store compliance now has a canonical doc.**
+
+- Owner registered the Play account, created the upload keystore (D5 ✅), built and uploaded
+  `MotionRunner.aab` (44.8 MB, target SDK 36, ARM64, jarsigner-verified) to **internal testing**.
+- **Rebuild required before closed testing:** versionCode 1 has the dead GitHub Pages privacy
+  URL baked in (verified in the AAB's IL2CPP metadata). Rebuild with `VEYRO_VERSION_CODE=2`
+  and upload that to the closed track. Recorded as the "URL coupling" rule in STORE_COMPLIANCE.
+- Site live and verified (privacy/terms/support): passes the User Data policy checklist; added
+  "Your rights" + "About this website" sections (effective date 25 Aug), hedged the support
+  purchases FAQ ("coming in a future update"); owner redeployed. `site/.wrangler/` gitignored
+  (held the Cloudflare account id). Terms already said "may offer" purchases — left as-is.
+- Copilot PR review triaged: kept `APP_UI_EDITOR_ONLY` (it *strips* App UI runtime from player
+  builds — asmdef constraint `UNITY_EDITOR || !APP_UI_EDITOR_ONLY`; removing it would bloat the
+  APK), reverted the dangling `com.unity.dt.app-ui` EditorBuildSettings entry (GUID exists
+  nowhere), documented `AndroidKeystoreName: '{inproject}: '` as the deliberate post-build wipe
+  and made only bundle builds touch keystore fields.
+- **`docs/STORE_COMPLIANCE.md` created** (owner request): current Console declaration state +
+  per-release flip table (T-020 purchases, T-021 push/AD_ID check, Layers, T-009 login/
+  leaderboard incl. the account-deletion policy trap) + standing rules. Linked from CLAUDE.md
+  canonical docs. Store-listing text drafted in `docs/store-kit/listing.md`.
+- Console App content answers agreed (all recorded in STORE_COMPLIANCE): App access "No",
+  Data safety "no collection", content rating all-No → PEGI 3, target audience 13+, Arcade.
+
+**Needs a human:** rebuild + upload versionCode 2 to closed testing; finish Console items
+(content rating, target audience, Data safety, category/contact, listing); **store graphics
+missing** (512×512 icon, 1024×500 feature graphic, ≥2 screenshots — specs in
+docs/store-kit/listing.md); recruit 12 testers (H6); commit + merge this branch (PR open).
 ## 2026-08-24 (merge) — `main` reconciled into `revenueCat-prep`: AAB path + privacy policy + camera-in-v1.0 meet the RevenueCat prep
 
 Merging `main` (camera-feature + the compliance session below) changed facts the RevenueCat-side

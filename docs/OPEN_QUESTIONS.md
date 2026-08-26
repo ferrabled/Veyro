@@ -56,16 +56,29 @@ the question. Keep this file short; it is read every session.
    there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
    and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
 
-9. **Privacy policy hosting + public contact email.** Play requires a live privacy-policy URL on
-   the store listing *and* reachable in-app — hard-required here because CAMERA is a sensitive
-   permission, and **it gates publishing the closed-testing track, i.e. the 12×14 clock**
-   (`PLAY_CONSOLE_SETUP.md` §A4). The policy text is drafted at `docs/PRIVACY_POLICY.md` and the
-   app links to `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). *Recommended
-   default: enable GitHub Pages on github.com/ferrabled/Veyro (Settings → Pages → deploy from
-   branch → `main`, `/docs` folder) — requires the repo to be public; any other host works if
-   `GameLinks.PrivacyPolicyUrl` is updated to match.* Also needed from the owner: a public contact
-   email for the policy's two `[TODO]` slots and the Play listing (the day-job address is probably
-   not the one to publish).
+9. **Privacy policy hosting + public contact email.** ✅ **ANSWERED by owner, 25 Aug 2026:**
+   hosting is **Cloudflare Workers static assets** (free tier) at **https://veyro.ferrabled.com/privacy/**,
+   deployed with wrangler from the new `site/` folder (marketing site + privacy/terms/support pages,
+   built on branch `veyro-site`). Contact email is **ferrabled+veyro@gmail.com** — explicitly a
+   temporary alias; the owner will replace it later (grep `site/` + `docs/PRIVACY_POLICY.md` when
+   that happens). `GameLinks.PrivacyPolicyUrl` and the policy's TODO slots are updated. Remaining
+   owner action: run `npx wrangler login && npx wrangler deploy` from `site/` — the URL 404s until
+   that first deploy, and the Play Console privacy-policy field needs the new URL.
+
+   **Merged 26 Aug — hosting is DONE; the live risk moved into the binary.** The site is deployed and
+   verified at `https://veyro.ferrabled.com/` (privacy/terms/support), so the "404s until first
+   deploy" caveat above is stale — STATUS 25 Aug (compliance session) records it live and passing the
+   User Data policy checklist. What is *not* resolved is the **URL baked into the shipped build**:
+   versionCode 1 went to internal testing with the dead GitHub Pages privacy URL compiled in
+   (verified in the AAB's IL2CPP metadata), and the fix is a rebuild with `VEYRO_VERSION_CODE=2`.
+   Closed testing went live **26 Aug** — so:
+
+   **Owner: confirm the closed track is serving versionCode 2, not 1.** If it is versionCode 1, the
+   live testers' in-app privacy link points at a dead URL while CAMERA — a sensitive permission — is
+   in the build, which is precisely what a production reviewer checks. Also confirm the Play Console
+   privacy-policy field and `GameLinks.PrivacyPolicyUrl` both read the `veyro.ferrabled.com` URL.
+   The "URL coupling" rule in `docs/STORE_COMPLIANCE.md` is the standing version of this trap.
+
 
 10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
     (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
