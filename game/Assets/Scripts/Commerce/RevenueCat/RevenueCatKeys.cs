@@ -18,10 +18,19 @@ namespace MotionRunner.Commerce.RevenueCat
         /// RevenueCat -> Veyro Run -> API keys -> Play Store app. Starts with "goog_".
         public const string PlayStoreKey = "goog_EFrxXlNiBEnmurJnEilutfuyGRo";
 
+        /// Which key this build ships, decided by BuildScript-set defines:
+        ///   VEYRO_STORE_BUILD (BuildAndroidBundle, .aab)     -> Play key
+        ///   VEYRO_DEV_STORE   (BuildAndroidDev, debuggable)  -> Test Store key
+        ///   neither (release APKs, camera dev flavour)       -> none: store disabled, fail-open
+        /// The Test Store key deliberately never reaches a release artifact: RevenueCat
+        /// enforces it too - a non-debuggable build using a test key shows "Wrong API Key"
+        /// and closes itself (seen on device, 27 Aug).
 #if VEYRO_STORE_BUILD
         public const string ActiveKey = PlayStoreKey;
-#else
+#elif VEYRO_DEV_STORE
         public const string ActiveKey = TestStoreKey;
+#else
+        public const string ActiveKey = "";
 #endif
     }
 }

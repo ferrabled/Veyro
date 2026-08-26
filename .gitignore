@@ -50,3 +50,8 @@ game/Assets/CV/Resources.meta
 
 # Wrangler local state (account ids, caches) 
 site/.wrangler/
+
+# Unity performance-test framework writes these into Assets/Resources during batchmode
+# builds/test runs (debris, regenerated every session; a few hundred bytes if shipped).
+game/Assets/Resources/PerformanceTestRunInfo.json*
+game/Assets/Resources/PerformanceTestRunSettings.json*

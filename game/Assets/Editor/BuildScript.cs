@@ -15,10 +15,12 @@ namespace MotionRunner.EditorTools
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
 
-        /// Compile-time switch for RevenueCat key selection (RevenueCatKeys.ActiveKey):
-        /// present only while building the Play upload artifact. StoreBuildGuard enforces
-        /// the pairing on every Android build, whoever started it.
+        /// Compile-time switches for RevenueCat key selection (RevenueCatKeys.ActiveKey).
+        /// StoreBuildDefine is present only while building the Play upload artifact;
+        /// DevStoreDefine only in the debuggable Test-Store flavour. StoreBuildGuard
+        /// enforces the pairing on every Android build, whoever started it.
         public const string StoreBuildDefine = "VEYRO_STORE_BUILD";
+        public const string DevStoreDefine = "VEYRO_DEV_STORE";
         // Immutable once the first Play Console upload happens, changeable freely until then.
         // Reverse-DNS of ferrabled.com, a domain the owner holds, so the namespace cannot
         // collide with another developer's. Keep the iOS bundle ID identical (T-032):
@@ -29,6 +31,13 @@ namespace MotionRunner.EditorTools
         static string RepoRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
 
         public static void BuildAndroid() => Build(PackageName, "Veyro Run", "MotionRunner.apk", bundle: false);
+
+        /// The RevenueCat device-test flavour: a DEVELOPMENT (debuggable) APK carrying the
+        /// Test Store key. Debuggable is not optional - the SDK closes a release build that
+        /// uses a test key ("Wrong API Key", seen on device 27 Aug). Same package name, so
+        /// it installs over the game; never upload it anywhere.
+        public static void BuildAndroidDev() =>
+            Build(PackageName, "Veyro Run", "MotionRunnerDev.apk", bundle: false, development: true);
 
         /// The Play Store upload artifact. Google Play only accepts App Bundles for new apps,
         /// signed with the upload key (Play App Signing then re-signs for distribution). The
@@ -48,7 +57,8 @@ namespace MotionRunner.EditorTools
         public static void BuildAndroidCamDev() =>
             Build("com.ferrabled.veyro.camdev", "Veyro Cam Dev", "VeyroCamDev.apk", bundle: false);
 
-        static void Build(string packageName, string productName, string outputName, bool bundle)
+        static void Build(string packageName, string productName, string outputName, bool bundle,
+            bool development = false)
         {
             EnsureScene();
 
@@ -75,7 +85,7 @@ namespace MotionRunner.EditorTools
             PlayerSettings.SplashScreen.showUnityLogo = false;
 
             EditorUserBuildSettings.buildAppBundle = bundle;
-            ApplyStoreKeyPairing(bundle, previousDefines);
+            ApplyStoreKeyPairing(bundle, development, previousDefines);
             if (bundle)
             {
                 ApplyUploadKeystoreFromEnv();
@@ -93,7 +103,7 @@ namespace MotionRunner.EditorTools
                     scenes = new[] { ScenePath },
                     locationPathName = outPath,
                     target = BuildTarget.Android,
-                    options = BuildOptions.None
+                    options = development ? BuildOptions.Development : BuildOptions.None
                 };
 
                 var report = BuildPipeline.BuildPlayer(options);
@@ -128,16 +138,17 @@ namespace MotionRunner.EditorTools
             }
         }
 
-        /// The pairing rule that must never break: APKs (dev/sideload) compile with the Test
-        /// Store key, .aab store builds compile with the Play key (COSMETICS_CATALOG §6).
-        /// Selection is the VEYRO_STORE_BUILD define; this validates the keys and sets the
-        /// define for exactly the duration of the build (restored in the finally above).
-        /// StoreBuildGuard re-checks inside BuildPlayer, so an editor-GUI build cannot slip by.
-        static void ApplyStoreKeyPairing(bool storeBuild, string currentDefines)
+        /// The pairing rule that must never break (COSMETICS_CATALOG §6): the .aab store build
+        /// compiles with the Play key, the debuggable dev flavour compiles with the Test Store
+        /// key, every other artifact ships no key at all (store disabled, fail-open). This
+        /// validates the keys and sets the matching define for exactly the duration of the
+        /// build (defines restored in the finally above). StoreBuildGuard re-checks inside
+        /// BuildPlayer, so an editor-GUI build cannot slip by.
+        static void ApplyStoreKeyPairing(bool storeBuild, bool devStore, string currentDefines)
         {
             var defines = currentDefines
                 .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Where(d => d != StoreBuildDefine)
+                .Where(d => d != StoreBuildDefine && d != DevStoreDefine)
                 .ToList();
 
             if (storeBuild)
@@ -150,15 +161,14 @@ namespace MotionRunner.EditorTools
                         "An .aab must never carry the Test Store key.");
                 defines.Add(StoreBuildDefine);
             }
-            else
+            else if (devStore)
             {
                 string key = RevenueCatKeys.TestStoreKey;
-                if (!string.IsNullOrEmpty(key) && !key.StartsWith("test_"))
+                if (string.IsNullOrEmpty(key) || !key.StartsWith("test_"))
                     throw new BuildFailedException(
-                        "Dev builds ship the Test Store key ('test_...'). RevenueCatKeys.TestStoreKey " +
-                        "holds something else - a Play key here would hit the real backend from sideloads.");
-                if (string.IsNullOrEmpty(key))
-                    Debug.LogWarning("[Store] RevenueCatKeys.TestStoreKey is empty - this dev build's store is disabled (fail-open).");
+                        "The dev-store flavour exists to test against the Test Store: set " +
+                        "RevenueCatKeys.TestStoreKey (starts with 'test_') before BuildAndroidDev.");
+                defines.Add(DevStoreDefine);
             }
 
             PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
