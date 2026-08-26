@@ -50,15 +50,14 @@ the question. Keep this file short; it is read every session.
    there (the shipping camera code needs it), so that branch's APK carries the package's ~8.8 MB
    and the CAMERA permission by design. `main` keeps the clean 29.6 MB / INTERNET-only baseline.
 
-9. **Privacy policy hosting + public contact email.** Play requires a live privacy-policy URL on
-   the store listing *and* reachable in-app — hard-required here because CAMERA is a sensitive
-   permission. The policy text is drafted at `docs/PRIVACY_POLICY.md` and the app links to
-   `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). *Recommended default: enable
-   GitHub Pages on github.com/ferrabled/Veyro (Settings → Pages → deploy from branch → `main`,
-   `/docs` folder) — requires the repo to be public; any other host works if
-   `GameLinks.PrivacyPolicyUrl` is updated to match.* Also needed from the owner: a public contact
-   email for the policy's two `[TODO]` slots and the Play listing (the day-job address is probably
-   not the one to publish).
+9. **Privacy policy hosting + public contact email.** ✅ **ANSWERED by owner, 25 Aug 2026:**
+   hosting is **Cloudflare Workers static assets** (free tier) at **https://veyro.ferrabled.com/privacy/**,
+   deployed with wrangler from the new `site/` folder (marketing site + privacy/terms/support pages,
+   built on branch `veyro-site`). Contact email is **ferrabled+veyro@gmail.com** — explicitly a
+   temporary alias; the owner will replace it later (grep `site/` + `docs/PRIVACY_POLICY.md` when
+   that happens). `GameLinks.PrivacyPolicyUrl` and the policy's TODO slots are updated. Remaining
+   owner action: run `npx wrangler login && npx wrangler deploy` from `site/` — the URL 404s until
+   that first deploy, and the Play Console privacy-policy field needs the new URL.
 
 10. **Record the 24 Aug owner call in DECISIONS.md (owner-only):** closed testing and v1.0 ship
     the `camera-feature` branch — camera mode included — under the real package name. This amends

@@ -1,0 +1,15 @@
+// Veyro Run marketing site — Cloudflare Workers static assets (assets-only, free tier).
+// Deploy:   npx wrangler login   (once)
+//           npx wrangler deploy  (from this folder)
+// The custom domain below is created automatically in the ferrabled.com zone on first deploy.
+{
+  "name": "veyro-site",
+  "compatibility_date": "2026-08-25",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "veyro.ferrabled.com", "custom_domain": true }
+  ]
+}
