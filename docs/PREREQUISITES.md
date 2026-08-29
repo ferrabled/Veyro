@@ -9,13 +9,13 @@ Agents cannot do these. Items marked **[BLOCKING]** gate the schedule. Update th
 | P1 | **[BLOCKING]** Register a NEW personal Google Play developer account TODAY ($25 one-time, play.google.com/console/signup). Confirmed 20 Aug: owner has an old Google account but **no Play developer account** — the Nov-2023 cutoff is about the *developer* account, so the **12 testers × 14 days closed-testing rule applies**, plus identity verification for new accounts (can take days) | Register → verify → closed test from ~Sep 1 → apply for production ~Sep 15 → release ~Sep 22. Any slip kills the Play release | Every day counts | ✅ registered + verified (24 Aug, owner-reported). **Next: `docs/PLAY_CONSOLE_SETUP.md`** |
 | P2 | Apple side — friend's existing Apple Developer account (confirmed as an option 20 Aug). Workflow: Unity on Windows exports the Xcode project → friend archives/signs/uploads on their Mac (runbook: T-032). App will be listed under the friend's developer name — acceptable for Devpost (submission needs the store URL; RevenueCat verification is by bundle ID) | iOS release path without owning a Mac | Friend needs Xcode + ~1–2h per release | ☐ friend confirmed ☐ runbook tested |
 | P3 | Samsung Galaxy Store commercial seller account | Samsung category requires Galaxy Store publication | Days; approval is manual | ☐ |
-| P4 | RevenueCat account + project | Eligibility requirement | Minutes | ✅ account + project + full catalog for Test Store *and* Play Store apps (24 Aug, `COSMETICS_CATALOG.md` §6). Remaining: service-account JSON (`PLAY_CONSOLE_SETUP.md` §D3) |
+| P4 | RevenueCat account + project | Eligibility requirement | Minutes | ✅ COMPLETE 29 Aug — service credentials "valid", Play products created + attached, license-test purchase verified end-to-end through the real Play Store |
 | P5 | OneSignal account | $25k category | Minutes | ☐ |
 | P6 | Layers account + App ID | $15k category | Minutes | ☐ |
 | P7 | Noise account | $15k category | Minutes | ☐ |
 | P8 | Devpost registration for Shipaton 2026 (also unlocks Ship Kit freebies) | Required to submit | Minutes | ☐ |
 | P9 | Social account(s) for #BuildInPublic (X and/or LinkedIn/TikTok) — first post | $30k category; judged on journey, not audience size | Minutes | ☐ |
-| P10 | Store payout/tax profiles (Play, App Store, Galaxy) | IAP cannot go live without them | Can take days | ☐ **now urgent for Play** — first item in `PLAY_CONSOLE_SETUP.md` §A |
+| P10 | Store payout/tax profiles (Play, App Store, Galaxy) | IAP cannot go live without them | Can take days | ⚠️ Play merchant profile ✅ created + linked (~27 Aug, W-8BEN treaty claim filed). **Payout bank account still unwired** — non-blocking (sales accrue; only payouts wait), wire within ~2 weeks. Galaxy/Apple untouched |
 
 ## Hardware & tooling
 

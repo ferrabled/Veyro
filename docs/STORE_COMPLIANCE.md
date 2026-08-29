@@ -45,7 +45,16 @@ the same change that ships a feature listed below.
 - Privacy policy → add purchases section, bump effective date, redeploy site
   (docs/PRIVACY_POLICY.md header comment marks this).
 - Console → set up **License Testing** emails so testers/judges buy without real money.
-- Terms already cover purchases ("may offer") — no site change needed beyond privacy.
+- Terms already cover purchases ("may offer") — ~~no site change needed beyond privacy~~ flipped to
+  present tense ("offers optional…") 29 Aug so the terms match a build that actually sells things.
+- **Text status (29 Aug 2026):**
+  `docs/PRIVACY_POLICY.md` + `site/public/privacy/index.html` (purchases section, effective date
+  29 Aug), `site/public/terms/index.html` (§3 present tense, date bumped),
+  `site/public/support/index.html` (purchases/restore/offline/camera/data-deletion answers),
+  `site/public/index.html` (privacy bullet + spec strip) and `docs/store-kit/LISTING.md` §3 (the
+  COSMETICS ONLY paragraph is un-held) no longer carry the absolute "no network requests" claim.
+  Owner runs `npx wrangler deploy` from `site/`; the deploy, the listing paste and every Console
+  flip above go out with the versionCode-5 upload, not before. Declared state above is untouched.
 
 ### T-021 — OneSignal push notifications
 - Data safety → device/push identifiers = collected.

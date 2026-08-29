@@ -64,7 +64,9 @@ Veyro Run is a motion-controlled endless runner for Android. You tilt the phone 
 jump — no virtual joystick, no thumbs over the screen. Or you prop the phone up, step back, and play
 hands-free: the front camera tracks you, and leaning steers the runner.
 
-Everything runs on the device. No servers, no accounts, no connection required.
+Everything that makes the game work runs on the device: the tracking, the physics, the daily track.
+No servers, no accounts, no analytics, and a run never needs a connection — the only thing that goes
+online is an optional cosmetic purchase.
 
 ## Why it's built this way
 

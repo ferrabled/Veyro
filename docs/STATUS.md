@@ -4,6 +4,83 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-29 — store split in two: skins buy straight on the Google Play sheet, the pass keeps the paywall (t020-direct-purchase session)
+
+> **Owner device verification COMPLETE, 29 Aug evening (dev-store flavour, fresh
+> `MotionRunnerDev.apk` built + adb-installed same day): 6/6 checks pass.** Skins raise the
+> purchase dialog directly (valid/cancel/failed all correct, instant equip on success);
+> season-pass paywall renders (verified on a clean-state reinstall — Android Auto Backup had
+> been resurrecting the old anonymous ID and its Test Store entitlements, so the reinstall ran
+> with `bmgr` restore off); RESTORE round-trips proven in logcat (two `_restorePurchases`
+> responses captured — "does nothing" was correct both times: once everything was already
+> owned, once the fresh identity owned nothing). USD prices are Test Store placeholders;
+> the Play build localizes via the buyer's Play-account country. Two follow-ups filed for the
+> game-UX phase, NOT this release: restore status should say "nothing to restore" when zero
+> items return; consider the same wording note for the paywall. Real-Play spot check (license
+> tester: buy → uninstall → reinstall from Play → RESTORE returns it) happens on the
+> versionCode-5 internal build before the closed submission.
+
+**Headline: the owner's 29 Aug call is implemented — tapping EMBER or FROST now raises the native
+Google Play purchase sheet directly, no paywall in between; SEASON 1 PASS still opens the
+dashboard-configured RevenueCat paywall.** Both paths are gated identically (a row is only
+purchasable while it is locked) and entitlements remain the single source of truth for "owned".
+**166/166 EditMode tests pass** (was 162; +4).
+
+**Why so little code moved:** the seam already had the right call. `IStore.Purchase(packageId)` →
+`GetOfferings` → `PurchasePackage` existed and was tested from 26 Aug; it was simply never wired
+to the UI, where every tap went to `PresentPaywall`. `StorePanel` now routes skin rows to
+`Purchase` and the pass row to `PresentPaywall`. `PurchasePackage` is deliberate — the SDK's
+`PurchaseProduct` overload defaults to `type: "subs"`, which is wrong for three one-time
+non-consumables, and RevenueCat's own guidance is to use the package call whenever the Offerings
+system is in play.
+
+Four things the paywall used to handle that the direct path now owns:
+
+- **Cancel is silent.** Backing out of the sheet reports `Cancelled`, prints no status text,
+  grants nothing, and leaves the panel usable. Accepted from *either* `PurchaseResult.UserCancelled`
+  *or* error code 1 — Android can surface the same event as either.
+- **Pending is not failure.** New `PurchaseStatus.Pending`, mapped from error code 20
+  (`PaymentPendingError`: cash/voucher payments, parental approval, SCA). Nothing is granted —
+  that would hand out an unpaid skin — and the panel says the payment is pending and unlocks
+  itself. The existing `OnApplicationPause(false)` cache-drop + re-read is what picks the
+  entitlement up when Google confirms.
+- **The unlock is immediate.** `ApplyCustomerInfo(result.CustomerInfo)` now runs *before* the
+  callback, so the entitlement is live by the time the panel reacts — no restart, no second fetch.
+  A skin bought this way also auto-equips: the tap already said "I want this one".
+- **The sheet opens on the tap, not after a round trip.** The adapter caches the last `Offerings`
+  it fetched (the panel fetches on open for prices), so a tap goes straight to `PurchasePackage`,
+  falling back to `GetOfferings` when nothing is cached.
+
+The three branch codes are named constants now (1 cancelled / 6 already-purchased / 20 pending).
+The numbering is shared across every RevenueCat SDK; `purchases-ios` `Sources/Generated/ErrorCode.swift`
+is the generated source of truth if it ever needs re-checking. Also new:
+`Entitlements.PackageFor(entitlementId)`, the inverse of `ForPackage`, living in the engine-free
+assembly so the map the direct tap depends on is EditMode-tested — `StorePanel`'s hand-rolled
+if-chain is gone.
+
+**Verified:** `Unity 6000.5.9f1 -batchmode -runTests -testPlatform EditMode` against this tree
+(owner's editor closed — no scratch copy needed), **166/166, 0 failed**, including the four new
+tests: entitlement↔package inverse map, every sellable skin has a package, Pending grants nothing
+and is neither success nor failure, a direct skin purchase leaves the pass alone. No new packages,
+no new permissions, no SDK type outside `MotionRunner.Commerce.RevenueCat`; EditMode still compiles
+and runs with no SDK in sight. Nothing in STORE_COMPLIANCE flips — same Billing surface, same
+declarations. 4ab3335 is intact: `StorePanel.IsOpen` is untouched and the panel stays open across
+the Play sheet, so the pause/resume the sheet causes cannot restart the run either.
+
+**Needs the owner (~10 min, phone in hand — license tester, `BuildAndroidDev`, Test Store):**
+1. Tap **EMBER** → the **Google Play purchase sheet must appear directly**, with no paywall first.
+2. Complete the purchase → row turns owned **and the runner turns ember immediately** (auto-equip),
+   with no restart.
+3. Tap **FROST** → sheet appears → **press back / cancel** → nothing happens: no error text, row
+   still shows its price, store still usable, run still frozen behind it.
+4. Tap **SEASON 1 PASS** → the **dashboard paywall must still render** (this is the regression to
+   watch; it is the only remaining paywall call site).
+5. **RESTORE PURCHASES** still returns everything; relaunch → still owned.
+
+One dashboard note, not a code issue: the paywall attached to offering `default` lists all three
+packages, so the pass's paywall can still sell a skin. If the owner wants that paywall to show the
+pass alone, it is a Paywall Builder edit with no app release (REVENUECAT_PLAN §5).
+
 ## 2026-08-27 — T-020 on device: keys in, store live against the Test Store; three bugs found and fixed in the install loop (t020-unity session)
 
 **Headline: the owner pasted both public API keys and the store now runs on the phone — SDK
@@ -269,6 +346,26 @@ https://claude.ai/code/artifact/c0ca2d3c-4582-4968-8592-8b2a9cfb46be
 - Owner reviewed the site 25 Aug: approved except the capsule-person figures — "once we have the
   main model and skins, we will replicate those." Filed as **T-037** (blocked on the character
   model); the exact spots to swap are tabled under "Placeholder figures" in `site/README.md`.
+
+## 2026-08-29 — Play ↔ RevenueCat verified end-to-end; T-020 needs only the flip release (compliance session)
+
+**Headline: a license-test purchase through the real Play Store landed in RevenueCat's Play
+Store app — the whole monetization pipeline works.** 3 products live in both consoles
+(`veyro.skin.ember`/`.frost` €2.99, `veyro.season1.pass` €4.99), credentials "valid",
+license testing on, T-020 AAB (versionCode 4, BILLING) on the internal track. P4 ✅ complete;
+P10 merchant profile ✅ (payout bank still unwired — non-blocking, sales accrue).
+
+**Remaining for T-020 (handed off to a t020-release session, brief given to owner 29 Aug):**
+1. Store UX decision (owner, 29 Aug): the in-game store currently opens the season-pass
+   RevenueCat paywall for every purchase — change to paywall **only for the season pass**;
+   the two skins purchase **directly** (`Purchases.PurchasePackage` on their offering
+   packages). Research + implement + device-verify.
+2. The **atomic closed-track flip release** (STORE_COMPLIANCE T-020 section): versionCode 5
+   build + App access "Sí" + Data safety purchase-history + content-rating redo + IAP flag +
+   held-back cosmetics paragraph (LISTING.md §3) + privacy-policy purchases section on
+   docs + site (redeploy = owner wrangler run).
+3. Owner-only, still open: **§D2 15% fee tier**, payout bank, address-publication decision
+   (register), OPEN_QUESTIONS 10/12 → DECISIONS.md.
 
 ## 2026-08-25 — First Play upload done; site live + compliance register created (compliance session)
 

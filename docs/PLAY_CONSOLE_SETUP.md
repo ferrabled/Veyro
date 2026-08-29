@@ -34,6 +34,17 @@ production date slips.
 
 1. **Payments profile (P10).** Play Console → Setup → *Payments profile* — create/link the Google
    payments merchant account. Products cannot be created without it; approval can take days.
+   Form guidance (researched 26 Aug, owner = individual in Spain):
+   - Public merchant name: `ferrabled` (trade name, no registration needed for a persona física;
+     legal name stays in the legal section). Buyer card-statement name: `VEYRO RUN`. Website
+     veyro.ferrabled.com. Support email is MERCHANT-level (appears on receipts for every future
+     app): use a studio-generic one — ideally `support@ferrabled.com` via free Cloudflare Email
+     Routing, else `ferrabled+play@gmail.com`; editable later. The `ferrabled+veyro` alias stays
+     as the per-app listing/site/privacy contact.
+   - EU VAT: Google is merchant of record — charges and remits it; no VAT invoicing/filing for
+     Play sales. Spain side is separate and independent of Google's forms: income is actividad
+     económica from €1 (IRPF), alta censal 036/037 + the autónomo question → gestor, can run in
+     parallel (not tax advice).
 2. **Create the app.** All apps → *Create app*: name **Veyro Run**, default language, type
    **Game**, **Free** (⚠️ irreversible once published — correct for us, free + IAP), accept the
    declarations. The **package name is not asked here** — it binds permanently from the first
@@ -47,11 +58,9 @@ production date slips.
    - feature graphic **1024×500**
    - **≥ 2 phone screenshots** (briefs in `store-kit/SCREENSHOTS.md`, `ART_DIRECTION.md`)
 4. **App content declarations** (Policy → App content) — the closed-track gate:
-   - **Privacy policy URL** — the text is already drafted at `docs/PRIVACY_POLICY.md` and the app
-     links to `https://ferrabled.github.io/Veyro/privacy/` (`GameLinks.cs`). Remaining
-     (OPEN_QUESTIONS 9): enable GitHub Pages + fill the two `[TODO]` contact-email slots. Do it
-     first, everything else here waits on it. Hard-required: CAMERA is a sensitive permission and
-     ships in v1.0.
+   - **Privacy policy URL** — ✅ resolved 25 Aug:
+     the policy is live at `https://veyro.ferrabled.com/privacy/` (Cloudflare, OPEN_QUESTIONS 9
+     answered), `GameLinks.cs` and the Console field both point there, contact email filled.
    - App access: *all functionality available without special access* (no login exists).
    - Ads: **No** (v1.0 has none).
    - Content rating questionnaire (IARC): category Game; honest answers should land Everyone /
@@ -85,10 +94,15 @@ BILLING permission §D1 waits for, and ships as a track update.
 3. Once live: share the **opt-in URL** with the testers; they opt in *and install*. The clock
    counts opted-in testers continuously — check the tester panel stays ≥ 12. Pushing updated
    builds to the track is fine and expected; it does not reset the clock.
-4. Setup → **License testing**: add the owner's and testers' Gmail addresses (license response
-   NORMAL). Required for sandbox purchases (`REVENUECAT_PLAN.md` §6.5).
+4. ✅ *(done 29 Aug)* Setup → **License testing**: add the owner's and testers' Gmail addresses
+   (license response NORMAL). Required for sandbox purchases (`REVENUECAT_PLAN.md` §6.5).
 
 ## D. Monetization + RevenueCat credentials
+
+> **Status 29 Aug 2026: D1 ✅, D3 ✅ (credentials "valid"), D4 ✅ — verified end-to-end: license-test
+> purchase through the real Play Store flowed into RevenueCat's Play Store app (earlier Test Store
+> purchases confirmed the entitlement wiring separately). The T-020 AAB (versionCode 4, BILLING
+> permission) is on the internal track. **D2 (15% fee tier) still pending — owner.**
 
 1. **Create the 3 in-app products.** Monetize → Products → In-app products → *Create product* —
    ids **character-for-character** from `docs/COSMETICS_CATALOG.md` §2 (immutable):

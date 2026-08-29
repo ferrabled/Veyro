@@ -87,7 +87,25 @@ reads as one.
 
 ---
 
-## 3. Full description (limit 4,000) — v1.0
+## 3. Full description (limit 4,000) — v1.0 + purchases
+
+> ⚠️ **PASTE THIS WITH THE T-020 RELEASE, NOT BEFORE (prepared 29 Aug 2026).** The block below is
+> the description for the submission that ships the purchases build (versionCode 5) — it names the
+> cosmetics and it no longer claims the game never connects. Pasting it earlier would advertise a
+> feature the live build does not have and contradict the Console answers currently on file.
+> Pasting the *old* text after that build ships is the mirror-image error: it would claim
+> "no connection required" about a binary that talks to Google Play billing and RevenueCat.
+> The listing edit, the Console flips and `wrangler deploy` from `site/` all happen in one sitting
+> (`STORE_COMPLIANCE.md` T-020).
+>
+> **Delta vs. the text currently live on the listing** — three spots, nothing else:
+> 1. `PLAYS OFFLINE` — "No connection required." replaced; the paragraph now says every run works
+>    offline and names the one exception.
+> 2. `COSMETICS ONLY` paragraph added directly after `PLAYS OFFLINE` (this is the previously
+>    held-back paragraph, released — with "no speed boosts" reworded to "no boosts", since
+>    *speed* is on the banned-words list in §3's "Deliberately absent" note).
+> 3. FEATURES — "Fully offline — no account, no connection" → "Plays fully offline — no account,
+>    no sign-in", plus one new "Cosmetics only" bullet.
 
 Play indexes this field, so the search terms appear in natural sentences rather than a keyword block.
 Structure: hook → how it plays → daily loop → what is honest about the scope → feature list.
@@ -124,8 +142,15 @@ best scores live on your phone.
 
 PLAYS OFFLINE
 
-No connection required. No servers, no sign-in, no ads interrupting a run. Everything the game needs
-is on the device.
+Every run works with no connection at all. No servers, no sign-in, no ads interrupting a run —
+everything the game needs to play is already on the device. The only thing that ever goes online is
+an optional cosmetic purchase, and only if you choose to make one.
+
+COSMETICS ONLY
+
+If you want to support development you can unlock cosmetic looks for your runner. They change how
+you look and nothing else — no boosts, no extra lives, no advantage of any kind over a player who
+never spends a penny. The game you download is the whole game.
 
 CAMERA, TILT OR TOUCH — YOUR CALL
 
@@ -140,35 +165,17 @@ FEATURES
 • Hands-free camera mode (BETA) — play by moving your body, all on-device
 • Daily Run — one shared, identical track per day, generated from the date
 • Instant restart — crash, tap, you are running again
-• Fully offline — no account, no connection, no interruptions
+• Plays fully offline — no account, no sign-in, no interruptions
+• Cosmetics only — optional skins that change nothing but how you look
 • Built for one hand and for short sessions
 
 Veyro Run is made by one developer, in public. It is early, it will get better, and if something
 feels wrong the fastest way to change it is to tell us.
 ```
 
-**HELD BACK — the COSMETICS ONLY paragraph (26 Aug merge).** It used to sit between PLAYS OFFLINE
-and FEATURES and has been cut from the copy above, because `veyro-site` carried the stricter and
-correct rule: *do not mention purchases until the RevenueCat release actually ships them.* The build
-on the closed track has **no purchases** — T-020 is not done — so advertising cosmetic unlocks now
-would describe a feature that does not exist, and it would contradict the Console answers already
-filed (Data safety "no collection", content rating digital-purchases "no", IAP flag off — see
-`docs/STORE_COMPLIANCE.md`).
 
-Paste this back in **the same release that ships T-020**, together with the rest of that release's
-paperwork flip (BACKLOG T-020 lists all of it: App access, Data safety → purchase history, content
-rating → digital purchases yes, listing IAP flag, privacy-policy purchases section, License Testers):
-
-```
-COSMETICS ONLY
-
-If you want to support development you can unlock cosmetic looks for your runner. They change how
-you look and nothing else — no speed boosts, no extra lives, no advantage of any kind over a player
-who never spends a penny. The game you download is the whole game.
-```
-
-Length check: run `docs/store-kit/check-lengths.sh` — comfortably inside 4,000, with the camera
-block now included.
+Length check: run `docs/store-kit/check-lengths.sh` — comfortably inside 4,000, with the camera and
+cosmetics blocks now included.
 
 **Deliberately absent, and why:**
 
@@ -226,13 +233,13 @@ the closed track.
 | App category | Games → Arcade (Action is the alternate; Arcade fits an endless runner better) |
 | Tags | Choose from Play's fixed list: *Arcade*, *Casual*, *Endless runner* if offered |
 | Contact email | **ferrabled+veyro@gmail.com** (answered 25 Aug, OPEN_QUESTIONS 9). Explicitly a temporary alias the owner will replace — grep `site/` + `docs/PRIVACY_POLICY.md` when that happens. **Not** the OpenZeppelin work address. |
-| Website / privacy policy | ✅ **Live** at `https://veyro.ferrabled.com/privacy/` (Cloudflare Workers, deployed + verified 25 Aug). The GitHub Pages plan was dropped. ⚠️ **versionCode 1 still has the dead GitHub Pages URL compiled in** — the closed track must serve versionCode 2, and `GameLinks.PrivacyPolicyUrl` must match the field above (OPEN_QUESTIONS 9; "URL coupling" in `STORE_COMPLIANCE.md`). |
+| Website / privacy policy | ✅ **Live** at `https://veyro.ferrabled.com/privacy/` (Cloudflare Workers, deployed + verified 25 Aug). The GitHub Pages plan was dropped. ⚠️ **versionCode 1 still has the dead GitHub Pages URL compiled in** — the closed track must serve versionCode 2, and `GameLinks.PrivacyPolicyUrl` must match the field above (OPEN_QUESTIONS 9; "URL coupling" in `STORE_COMPLIANCE.md`). **Purchases section written 29 Aug, effective date 29 August 2026, not yet deployed** — `npx wrangler deploy` from `site/` belongs to the T-020 submission. |
 | Content rating | Filed 25 Aug: all-No → **PEGI 3**. Digital purchases answered **no**, which is correct while the build has none — it flips to **yes** in the T-020 release (`STORE_COMPLIANCE.md` flip table). |
 | Ads | **No** (v1.0 contains no ads — see the T-023 verdict in STATUS) |
-| In-app purchases | **No, for now** — the IAP flag stays off until T-020 ships, matching the held-back COSMETICS ONLY copy in §3 and the Console answers already filed. Flip it, with the price range, in that same release. |
+| In-app purchases | **Flips to Yes in the T-020 submission** — the flag stays off until the versionCode-5 build with `purchases-unity` in it is the one being uploaded, then goes on with the price range (€2.99–€4.99: `veyro.skin.ember`, `veyro.skin.frost` €2.99; `veyro.season1.pass` €4.99). Same submission as the §3 description with COSMETICS ONLY in it — the two must not be published apart. |
 | Target audience | 13+ recommended. Under-13 pulls in Families policy, Designed-for-Families review and extra ad/data rules for no benefit here |
-| Support URL | `https://veyro.ferrabled.com/support/` (live; its purchases FAQ is already hedged to "coming in a future update") |
-| Terms | `https://veyro.ferrabled.com/terms/` (live). Already says the app "may offer" purchases — deliberately left as-is, so it needs no edit at T-020. |
+| Support URL | `https://veyro.ferrabled.com/support/` (live). **Rewritten 29 Aug, not yet deployed:** the purchases FAQ is now present tense, a "restore purchases" answer was added, and the camera/offline answers no longer claim the game makes no network requests. Deploy with the T-020 submission. |
+| Terms | `https://veyro.ferrabled.com/terms/` (live). **Rewritten 29 Aug, not yet deployed:** §3 moved from "may offer" to "offers" purchases, §2 names the one online exception, effective date bumped to 29 August 2026. Deploy with the T-020 submission. |
 
 **Two claims from the old `listing.md` draft that must NOT be carried forward** (it was deleted in the
 26 Aug merge; its asset/brand half moved to `ART_DIRECTION.md` §0a):
@@ -242,10 +249,13 @@ the closed track.
    `KeyboardInput` and `FaceSteering`, but `RunnerController.Step()` reads only `GetMoveAxis()` and
    `IsJumpPressed()`, so the input is dropped. Advertising it is a false feature claim; see the
    *Deliberately absent* list in §3.
-2. *"No data collection — the game makes zero network requests"* — true today, **false the moment
-   T-020's SDK is in the build** (purchase history is collected). Do not paste an absolute
-   no-network claim into copy that outlives the current build; the Data safety form and this line
-   have to move together.
+2. *"No data collection — the game makes zero network requests"* — **now false: T-020's SDK is in
+   the build** and purchase history is collected. The rule this taught stands permanently: never
+   put an absolute no-network claim in copy that outlives a build. Any wording about connectivity
+   is now the qualified form — *the game plays fully offline; the network is used only for optional
+   purchases (Google Play billing + RevenueCat); no analytics, no ads, no accounts, and camera
+   frames are never transmitted.* The full sweep of that wording across `site/` and this file was
+   done 29 Aug 2026; the Data safety form flips in the same submission.
 
 ---
 
