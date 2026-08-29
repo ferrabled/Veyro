@@ -19,10 +19,23 @@ namespace MotionRunner.Commerce.RevenueCat
     /// commerce (the same shape camera mode uses for rule 3).
     public sealed class RevenueCatStore : Purchases.UpdatedCustomerInfoListener, IStore
     {
+        /// RevenueCat error codes we branch on. The numbering is shared across every
+        /// RevenueCat SDK (purchases-ios ErrorCode.swift is the generated source of truth);
+        /// the Unity SDK only hands us the int, so name them here rather than in-line.
+        const int ErrorPurchaseCancelled = 1;
+        const int ErrorProductAlreadyPurchased = 6;
+        const int ErrorPaymentPending = 20;
+
         Purchases _purchases;
         string _apiKey;
         bool _configured;
         readonly HashSet<string> _active = new HashSet<string>();
+
+        /// Last offering the SDK handed us. Kept so a direct-purchase tap reaches the Google
+        /// Play sheet without a second round trip - the store panel has already fetched it
+        /// for the prices it shows. Packages are plain data (an id plus a product), so the
+        /// only staleness risk is an offering edited in the dashboard mid-session.
+        Purchases.Offerings _offerings;
 
         public bool IsReady { get; private set; }
 
@@ -98,6 +111,7 @@ namespace MotionRunner.Commerce.RevenueCat
 
             _purchases.GetOfferings((offerings, error) =>
             {
+                if (offerings != null) _offerings = offerings;
                 if (error != null || offerings?.Current?.AvailablePackages == null)
                 {
                     done?.Invoke(Array.Empty<StoreOffer>(), ToStoreError(error) ?? new StoreError("no_offering", "no current offering"));
@@ -117,6 +131,9 @@ namespace MotionRunner.Commerce.RevenueCat
             });
         }
 
+        /// The direct-purchase path: one tap on a skin row raises the native Google Play
+        /// sheet, no paywall in between (owner call, 29 Aug). The season pass still goes
+        /// through PresentPaywall - that is the offering the Paywall Builder is designed for.
         public void Purchase(string offerId, Action<PurchaseOutcome> done)
         {
             if (!SdkConfigured())
@@ -125,37 +142,78 @@ namespace MotionRunner.Commerce.RevenueCat
                 return;
             }
 
+            // Straight to the sheet when the offering is already in hand; otherwise fetch it
+            // first, which is also what makes a cold tap (panel opened offline, network back)
+            // work rather than fail.
+            var known = FindPackage(_offerings, offerId);
+            if (known != null)
+            {
+                Buy(known, done);
+                return;
+            }
+
             _purchases.GetOfferings((offerings, error) =>
             {
+                if (offerings != null) _offerings = offerings;
                 var package = FindPackage(offerings, offerId);
                 if (error != null || package == null)
                 {
                     done?.Invoke(PurchaseOutcome.Failed(ToStoreError(error) ?? new StoreError("unknown_offer", offerId)));
                     return;
                 }
+                Buy(package, done);
+            });
+        }
 
-                _purchases.PurchasePackage(package, result =>
+        /// PurchasePackage, never PurchaseProduct: the product overload defaults to type
+        /// "subs" and all three of our SKUs are one-time non-consumables, and the SDK's own
+        /// guidance is to use the package call whenever the Offerings system is in play.
+        void Buy(Purchases.Package package, Action<PurchaseOutcome> done)
+        {
+            _purchases.PurchasePackage(package, result =>
+            {
+                // Entitlements before the callback, always: whoever handles the outcome
+                // (the store rows, SkinService) must already see the unlock, so a bought
+                // skin applies immediately instead of after a restart.
+                if (result.CustomerInfo != null) ApplyCustomerInfo(result.CustomerInfo);
+
+                int code = result.Error?.Code ?? 0;
+
+                // Backing out of the sheet is a choice, not an error - report it silently and
+                // leave the store usable. Android surfaces it as UserCancelled; code 1 is the
+                // same event seen as an error, and either one can arrive.
+                if (result.UserCancelled || code == ErrorPurchaseCancelled)
                 {
-                    if (result.CustomerInfo != null) ApplyCustomerInfo(result.CustomerInfo);
+                    done?.Invoke(PurchaseOutcome.Cancelled());
+                    return;
+                }
 
-                    if (result.UserCancelled)
-                    {
-                        done?.Invoke(PurchaseOutcome.Cancelled());
-                    }
-                    else if (result.Error != null)
-                    {
-                        // Code 6 = ProductAlreadyPurchased: ownership, not failure - the
-                        // promo-code-redeemed-outside-the-app path lands here.
-                        done?.Invoke(result.Error.Code == 6
-                            ? PurchaseOutcome.AlreadyOwned()
-                            : PurchaseOutcome.Failed(ToStoreError(result.Error)));
-                        if (result.Error.Code == 6) RefreshCustomerInfo();
-                    }
-                    else
-                    {
-                        done?.Invoke(PurchaseOutcome.Purchased());
-                    }
-                });
+                if (result.Error == null)
+                {
+                    done?.Invoke(PurchaseOutcome.Purchased());
+                    return;
+                }
+
+                if (code == ErrorProductAlreadyPurchased)
+                {
+                    // Ownership, not failure - the promo-code-redeemed-outside-the-app path
+                    // lands here. Pull the fresh entitlements before reporting.
+                    RefreshCustomerInfo();
+                    done?.Invoke(PurchaseOutcome.AlreadyOwned());
+                    return;
+                }
+
+                if (code == ErrorPaymentPending)
+                {
+                    // Order placed, money not taken (cash/voucher payment, parental approval,
+                    // SCA). Granting here would hand out an unpaid skin; the entitlement
+                    // arrives on its own and the resume re-read in OnApplicationPause is what
+                    // picks it up once Google confirms.
+                    done?.Invoke(PurchaseOutcome.Pending());
+                    return;
+                }
+
+                done?.Invoke(PurchaseOutcome.Failed(ToStoreError(result.Error)));
             });
         }
 
@@ -179,6 +237,8 @@ namespace MotionRunner.Commerce.RevenueCat
             });
         }
 
+        /// The season pass's path (owner call, 29 Aug): the dashboard paywall is what sells
+        /// the pass, and it stays server-side revisable (REVENUECAT_PLAN §5).
         /// Present, never PresentIfNeeded: with three independent entitlements no single id
         /// answers "already owned" - the call site gates instead (REVENUECAT_PLAN §3.3).
         public void PresentPaywall(Action<PurchaseOutcome> done)

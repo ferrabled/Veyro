@@ -83,6 +83,36 @@ namespace MotionRunner.Tests
         }
 
         [Test]
+        public void EntitlementToPackageMapIsTheExactInverse()
+        {
+            // The direct-purchase tap (owner call, 29 Aug) turns a locked item's entitlement
+            // into the package id it hands IStore.Purchase. If the two maps ever disagree,
+            // tapping a skin buys the wrong thing or nothing at all.
+            foreach (var entitlement in Entitlements.All)
+            {
+                var package = Entitlements.PackageFor(entitlement);
+                Assert.IsNotNull(package, entitlement + " has no package to buy it through");
+                Assert.AreEqual(entitlement, Entitlements.ForPackage(package));
+            }
+            Assert.IsNull(Entitlements.PackageFor("cosmetics"),
+                "an entitlement this build does not sell must degrade to 'not for sale', not crash");
+            Assert.IsNull(Entitlements.PackageFor(null));
+        }
+
+        [Test]
+        public void EverySellableSkinHasAPackageBehindIt()
+        {
+            // The store panel derives each row's package from its unlock rule; a skin whose
+            // entitlement maps to nothing would render as locked with no way to buy it.
+            foreach (var item in CosmeticCatalog.Items)
+            {
+                if (item.Rule.Kind != UnlockKind.Entitlement) continue;
+                Assert.IsNotNull(Entitlements.PackageFor(item.Rule.EntitlementId),
+                    item.Id + " is locked behind an entitlement no package sells");
+            }
+        }
+
+        [Test]
         public void SeasonLevelRule_FreeTrackNeedsOnlyTheLevel()
         {
             var rule = UnlockRule.SeasonLevel(SeasonTrack.Free, 3);

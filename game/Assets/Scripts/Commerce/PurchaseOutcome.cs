@@ -6,6 +6,14 @@ namespace MotionRunner.Commerce
         Restored,
         Cancelled,
         AlreadyOwned,
+
+        /// Google took the order but nobody has paid yet - a cash/voucher payment, a
+        /// parental approval, or an SCA challenge. Neither success nor failure: grant
+        /// nothing, say so, and let the resume re-read pick the entitlement up when the
+        /// payment clears. Only reachable on the direct-purchase path; the paywall
+        /// handles its own pending state.
+        Pending,
+
         Failed
     }
 
@@ -32,6 +40,7 @@ namespace MotionRunner.Commerce
         public static PurchaseOutcome Restored() => new PurchaseOutcome(PurchaseStatus.Restored, null);
         public static PurchaseOutcome Cancelled() => new PurchaseOutcome(PurchaseStatus.Cancelled, null);
         public static PurchaseOutcome AlreadyOwned() => new PurchaseOutcome(PurchaseStatus.AlreadyOwned, null);
+        public static PurchaseOutcome Pending() => new PurchaseOutcome(PurchaseStatus.Pending, null);
         public static PurchaseOutcome Failed(StoreError error) =>
             new PurchaseOutcome(PurchaseStatus.Failed, error ?? new StoreError("unknown", "unknown store error"));
     }

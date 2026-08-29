@@ -29,5 +29,18 @@ namespace MotionRunner.Commerce
             "season1_pass" => Season1,
             _ => null
         };
+
+        /// The inverse: which package sells a given entitlement. The direct-purchase path
+        /// needs it - a locked catalog item knows only its entitlement, and IStore.Purchase
+        /// takes a package id. Null for an entitlement nothing in this offering sells on its
+        /// own (a future bundle-only unlock), which the call site must treat as "not for sale"
+        /// rather than as an error.
+        public static string PackageFor(string entitlementId) => entitlementId switch
+        {
+            SkinEmber => "skin_ember",
+            SkinFrost => "skin_frost",
+            Season1 => "season1_pass",
+            _ => null
+        };
     }
 }

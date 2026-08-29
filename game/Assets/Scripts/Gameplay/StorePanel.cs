@@ -10,9 +10,17 @@ namespace MotionRunner.Gameplay
 {
     /// The cosmetics store, reached from the result screen (T-020). Code-first UGUI like
     /// RunHud/ModeSelectMenu (CLAUDE.md rule 1). It lists the catalog with live lock state,
-    /// equips owned skins, opens the dashboard-configured RevenueCat paywall for anything
-    /// locked (gating the call site - the paywall itself takes no entitlement argument,
-    /// REVENUECAT_PLAN §3.3), and carries the visible Restore button judges need (§6.3).
+    /// equips owned skins, and carries the visible Restore button judges need (§6.3).
+    ///
+    /// Two purchase paths, split by product (owner call, 29 Aug):
+    ///   * the two skins buy DIRECTLY - one tap raises the native Google Play sheet, because
+    ///     a €2.99 colour swap the player just tapped needs no sales page in front of it;
+    ///   * the Season 1 pass opens the dashboard-configured RevenueCat paywall, which is the
+    ///     offering that paywall was built for and stays revisable without a store release
+    ///     (REVENUECAT_PLAN §5).
+    /// Both are gated the same way: a row is only ever purchasable when the player does not
+    /// already own it - the paywall itself takes no entitlement argument (§3.3), and
+    /// entitlements stay the single source of truth for "owned".
     ///
     /// Fail-open: with the store unavailable everything shows locked, every tap completes
     /// with a message, and CLOSE always works - the player is never stuck (rule 3's shape).
@@ -196,14 +204,13 @@ namespace MotionRunner.Gameplay
             y -= 130f;
         }
 
-        static string PackageForItem(CosmeticItem item)
-        {
-            // Package identifiers as configured in offering `default` (COSMETICS_CATALOG §2).
-            if (item.Rule.Kind != UnlockKind.Entitlement) return null;
-            if (item.Rule.EntitlementId == Entitlements.SkinEmber) return "skin_ember";
-            if (item.Rule.EntitlementId == Entitlements.SkinFrost) return "skin_frost";
-            return null;
-        }
+        /// Which package of offering `default` sells this item, or null for one nothing sells
+        /// on its own (the free runner, and any later bundle-only unlock). The map itself
+        /// lives in Commerce so it is EditMode-tested - the direct-purchase tap depends on it.
+        static string PackageForItem(CosmeticItem item) =>
+            item.Rule.Kind == UnlockKind.Entitlement
+                ? Entitlements.PackageFor(item.Rule.EntitlementId)
+                : null;
 
         void OnSkinTapped(string itemId, string packageId)
         {
@@ -214,7 +221,7 @@ namespace MotionRunner.Gameplay
                 RefreshRows();
                 return;
             }
-            OpenPaywall();
+            BuySkin(itemId, packageId);
         }
 
         void OnPassTapped()
@@ -224,7 +231,33 @@ namespace MotionRunner.Gameplay
             OpenPaywall();
         }
 
-        /// Only ever called for something the player does not own - that is the whole gate.
+        /// Skins go straight to the Google Play sheet. Only ever called for something the
+        /// player does not own - that is the whole gate.
+        void BuySkin(string itemId, string packageId)
+        {
+            if (packageId == null)
+            {
+                // A catalog item with no package behind it: locked, but nothing to sell.
+                _status.text = "this one is not for sale yet";
+                return;
+            }
+
+            _busy = true;
+            _status.text = "opening Google Play…";
+            _store.Purchase(packageId, outcome =>
+            {
+                _busy = false;
+                _status.text = Describe(outcome, "purchase");
+                // The tap said "I want this skin", so a purchase that lands wears it. The
+                // entitlement is already applied by the time this runs, so Equip succeeds;
+                // it silently does nothing if it somehow is not, because equipping never grants.
+                if (outcome.Succeeded) _skins.Equip(itemId);
+                RefreshRows();
+            });
+        }
+
+        /// The pass's path: the dashboard paywall. Only ever called for something the player
+        /// does not own - that is the whole gate.
         void OpenPaywall()
         {
             _busy = true;
@@ -257,7 +290,10 @@ namespace MotionRunner.Gameplay
                 case PurchaseStatus.Purchased: return "purchase complete!";
                 case PurchaseStatus.Restored: return "purchases restored";
                 case PurchaseStatus.AlreadyOwned: return "already owned - unlocked";
+                // Backing out of the Play sheet says nothing - the rows are already right.
                 case PurchaseStatus.Cancelled: return string.Empty;
+                case PurchaseStatus.Pending:
+                    return "payment pending with Google\nit unlocks by itself once they confirm";
                 default:
                     return what + " failed - you can keep playing\n" +
                            (outcome.Error != null ? outcome.Error.Message : string.Empty);

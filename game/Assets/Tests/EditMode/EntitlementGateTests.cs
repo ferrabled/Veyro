@@ -135,12 +135,44 @@ namespace MotionRunner.Tests
         }
 
         [Test]
+        public void PendingIsNeitherOwnershipNorFailureAndGrantsNothing()
+        {
+            // Google has the order but not the money (cash payment, parental approval, SCA).
+            // The direct-purchase path reports it so the player is told what happened - but
+            // an unpaid skin must stay locked until the entitlement actually arrives.
+            var store = ReadyStore();
+            store.NextPurchaseOutcome = PurchaseOutcome.Pending();
+
+            PurchaseOutcome? outcome = null;
+            store.Purchase("skin_ember", o => outcome = o);
+
+            Assert.AreEqual(PurchaseStatus.Pending, outcome.Value.Status);
+            Assert.IsFalse(outcome.Value.Succeeded);
+            Assert.IsNull(outcome.Value.Error, "waiting on a payment is not a failure to report");
+            Assert.IsFalse(CosmeticCatalog.IsUnlocked(CosmeticCatalog.EmberSkinId, store.ActiveEntitlements, 1));
+        }
+
+        [Test]
+        public void BuyingASkinDirectlyLeavesThePassAlone()
+        {
+            // Skins buy through Purchase (native Play sheet), the pass through the paywall
+            // (owner call, 29 Aug). Whichever path ran, only the bought entitlement lands.
+            var store = ReadyStore();
+            store.Purchase(Entitlements.PackageFor(Entitlements.SkinFrost), _ => { });
+
+            Assert.IsTrue(Entitlements.Has(store.ActiveEntitlements, Entitlements.SkinFrost));
+            Assert.IsFalse(Entitlements.Has(store.ActiveEntitlements, Entitlements.Season1));
+            Assert.IsFalse(Entitlements.Has(store.ActiveEntitlements, Entitlements.SkinEmber));
+        }
+
+        [Test]
         public void SucceededCoversExactlyTheThreeOwnershipStatuses()
         {
             Assert.IsTrue(PurchaseOutcome.Purchased().Succeeded);
             Assert.IsTrue(PurchaseOutcome.Restored().Succeeded);
             Assert.IsTrue(PurchaseOutcome.AlreadyOwned().Succeeded);
             Assert.IsFalse(PurchaseOutcome.Cancelled().Succeeded);
+            Assert.IsFalse(PurchaseOutcome.Pending().Succeeded);
             Assert.IsFalse(PurchaseOutcome.Failed(new StoreError("x", "y")).Succeeded);
         }
 

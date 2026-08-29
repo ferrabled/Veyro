@@ -25,6 +25,13 @@ namespace MotionRunner.Commerce
         /// The current offering, flattened. Empty if offerings have not loaded.
         void FetchOffers(Action<IReadOnlyList<StoreOffer>, StoreError> done);
 
+        /// Buys one package of the current offering directly - on Android this raises the
+        /// native Google Play purchase sheet with no paywall in between (owner call,
+        /// 29 Aug: the two skins buy this way, the season pass keeps the paywall). Always
+        /// completes: Cancelled when the player backs out, Pending when Google has the
+        /// order but not the money, AlreadyOwned when the store says they already have it.
+        /// Entitlements are up to date by the time `done` runs, so the caller can unlock
+        /// immediately without a restart or a second fetch.
         void Purchase(string offerId, Action<PurchaseOutcome> done);
 
         void Restore(Action<PurchaseOutcome> done);
