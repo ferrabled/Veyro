@@ -75,6 +75,11 @@ long as the two-ink rule holds and each pose still reads at a glance.
    *T-020 (purchases) written 29 Aug 2026 — privacy, terms, support and the home page all
    drop the absolute "no network requests" claim and are awaiting deploy. `wrangler deploy`
    goes out in the same window as the versionCode-5 upload, not before.*
+   *Corrected 30 Aug 2026 (PR #4 review), still undeployed: the 29 Aug wording replaced one
+   absolute claim with another — that the game contacts RevenueCat only when you buy. It
+   does not; the SDK is configured at boot and refreshed on every resume, so every launch
+   contacts it. All four pages now say so. Any future page that describes when the game goes
+   online has to match `docs/PRIVACY_POLICY.md` §Purchases.*
 4. **Contact email** `ferrabled+veyro@gmail.com` is a temporary alias — when the real one
    exists, grep the whole `site/` + `docs/PRIVACY_POLICY.md` for it.
 
