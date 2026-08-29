@@ -72,6 +72,9 @@ long as the two-ink rule holds and each pose still reads at a glance.
 3. **Privacy policy**: source of truth is `docs/PRIVACY_POLICY.md`; `/privacy/` here must match
    it. Both MUST be updated before RevenueCat purchases / OneSignal / Layers ship (they start
    real data collection). The in-game link is `GameLinks.PrivacyPolicyUrl`.
+   *T-020 (purchases) written 29 Aug 2026 — privacy, terms, support and the home page all
+   drop the absolute "no network requests" claim and are awaiting deploy. `wrangler deploy`
+   goes out in the same window as the versionCode-5 upload, not before.*
 4. **Contact email** `ferrabled+veyro@gmail.com` is a temporary alias — when the real one
    exists, grep the whole `site/` + `docs/PRIVACY_POLICY.md` for it.
 
