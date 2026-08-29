@@ -24,11 +24,24 @@ the same change that ships a feature listed below.
 ## Per-feature flip table (do ALL flips in the SAME release as the feature)
 
 ### T-020 — RevenueCat cosmetic purchases
+> **Code landed 26 Aug 2026 (t020-unity):** the binary now carries `purchases-unity` 9.8.1 and
+> the merged manifest adds **`com.android.vending.BILLING`** plus
+> **`android.permission.ACCESS_NETWORK_STATE`** (both from Play Billing; normal-level,
+> install-time — APK diff in STATUS 26 Aug). The activity's `launchMode` is patched
+> singleTask → singleTop at build time (billing requirement, `AndroidLaunchModeFix.cs`).
+> The first upload containing this build MUST do every flip below in the same release. Until
+> that upload happens, the Console's declared state above stays truthful for the track it
+> describes.
 - App access → **Sí** (the form lists "pagos" explicitly). Instruction entry: "Optional
   cosmetic IAP via Google Play billing; no account/code exists; all gameplay accessible
   without purchase."
 - Data safety → Financial info / purchase history = collected (RevenueCat is a service
-  provider processing purchase tokens).
+  provider processing purchase tokens). **Also device or other IDs = collected**: the SDK is
+  configured at boot and refreshed on every resume, so every install — not just a buyer — gets
+  an anonymous RevenueCat app user ID sent off-device with app version, platform and store
+  country. Declaring only purchase history would under-declare a launch-time transmission.
+  Follow RevenueCat's own "Google Play data safety" guide; the privacy policy's Purchases
+  section (corrected 30 Aug) is the text this row must agree with.
 - Content rating questionnaire → redo; "digital purchases" = yes.
 - Listing → "contains in-app purchases" flag + a cosmetics paragraph. The exact paragraph to paste
   is held ready in `docs/store-kit/LISTING.md` §3 under "HELD BACK — the COSMETICS ONLY paragraph",
@@ -37,7 +50,16 @@ the same change that ships a feature listed below.
 - Privacy policy → add purchases section, bump effective date, redeploy site
   (docs/PRIVACY_POLICY.md header comment marks this).
 - Console → set up **License Testing** emails so testers/judges buy without real money.
-- Terms already cover purchases ("may offer") — no site change needed beyond privacy.
+- Terms already cover purchases ("may offer") — ~~no site change needed beyond privacy~~ flipped to
+  present tense ("offers optional…") 29 Aug so the terms match a build that actually sells things.
+- **Text status (29 Aug 2026):**
+  `docs/PRIVACY_POLICY.md` + `site/public/privacy/index.html` (purchases section, effective date
+  29 Aug), `site/public/terms/index.html` (§3 present tense, date bumped),
+  `site/public/support/index.html` (purchases/restore/offline/camera/data-deletion answers),
+  `site/public/index.html` (privacy bullet + spec strip) and `docs/store-kit/LISTING.md` §3 (the
+  COSMETICS ONLY paragraph is un-held) no longer carry the absolute "no network requests" claim.
+  Owner runs `npx wrangler deploy` from `site/`; the deploy, the listing paste and every Console
+  flip above go out with the versionCode-5 upload, not before. Declared state above is untouched.
 
 ### T-021 — OneSignal push notifications
 - Data safety → device/push identifiers = collected.

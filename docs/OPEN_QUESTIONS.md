@@ -80,6 +80,12 @@ the question. Keep this file short; it is read every session.
    The "URL coupling" rule in `docs/STORE_COMPLIANCE.md` is the standing version of this trap.
 
 
+9b. ~~Paste the two RevenueCat public API keys~~ ✅ **ANSWERED by owner, 27 Aug:** both public
+    keys are in `game/Assets/Scripts/Commerce/RevenueCat/RevenueCatKeys.cs` (`test_…` + `goog_…`).
+    Key/artifact pairing since 27 Aug: `.aab` → Play key, `BuildAndroidDev` (debuggable) → Test
+    Store key, every other APK → no key (store disabled, fail-open); wrong pairings fail the
+    build. Reminder unchanged: never paste an `sk_` secret key anywhere in the repo.
+
 10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
     (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
     user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.

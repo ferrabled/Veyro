@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using MotionRunner.Commerce.RevenueCat;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
@@ -12,6 +14,13 @@ namespace MotionRunner.EditorTools
     public static class BuildScript
     {
         const string ScenePath = "Assets/Scenes/Main.unity";
+
+        /// Compile-time switches for RevenueCat key selection (RevenueCatKeys.ActiveKey).
+        /// StoreBuildDefine is present only while building the Play upload artifact;
+        /// DevStoreDefine only in the debuggable Test-Store flavour. StoreBuildGuard
+        /// enforces the pairing on every Android build, whoever started it.
+        public const string StoreBuildDefine = "VEYRO_STORE_BUILD";
+        public const string DevStoreDefine = "VEYRO_DEV_STORE";
         // Immutable once the first Play Console upload happens, changeable freely until then.
         // Reverse-DNS of ferrabled.com, a domain the owner holds, so the namespace cannot
         // collide with another developer's. Keep the iOS bundle ID identical (T-032):
@@ -22,6 +31,13 @@ namespace MotionRunner.EditorTools
         static string RepoRoot => Path.GetFullPath(Path.Combine(ProjectRoot, ".."));
 
         public static void BuildAndroid() => Build(PackageName, "Veyro Run", "MotionRunner.apk", bundle: false);
+
+        /// The RevenueCat device-test flavour: a DEVELOPMENT (debuggable) APK carrying the
+        /// Test Store key. Debuggable is not optional - the SDK closes a release build that
+        /// uses a test key ("Wrong API Key", seen on device 27 Aug). Same package name, so
+        /// it installs over the game; never upload it anywhere.
+        public static void BuildAndroidDev() =>
+            Build(PackageName, "Veyro Run", "MotionRunnerDev.apk", bundle: false, development: true);
 
         /// The Play Store upload artifact. Google Play only accepts App Bundles for new apps,
         /// signed with the upload key (Play App Signing then re-signs for distribution). The
@@ -41,7 +57,8 @@ namespace MotionRunner.EditorTools
         public static void BuildAndroidCamDev() =>
             Build("com.ferrabled.veyro.camdev", "Veyro Cam Dev", "VeyroCamDev.apk", bundle: false);
 
-        static void Build(string packageName, string productName, string outputName, bool bundle)
+        static void Build(string packageName, string productName, string outputName, bool bundle,
+            bool development = false)
         {
             EnsureScene();
 
@@ -49,42 +66,49 @@ namespace MotionRunner.EditorTools
             string previousProduct = PlayerSettings.productName;
             bool previousBundle = EditorUserBuildSettings.buildAppBundle;
             int previousVersionCode = PlayerSettings.Android.bundleVersionCode;
+            string previousDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
 
-            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, packageName);
-            PlayerSettings.productName = productName;
-            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
-            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
-            // Play's floor for new apps is API 36 from 31 Aug 2026. Pinned rather than left at
-            // "highest installed" so the store requirement can't drift with the local SDK.
-            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel36;
-
-            // No "Made with Unity" splash. Unity 6 Personal is allowed to turn it off
-            // (docs/LICENSING_REVENUE.md §2.12) — the attribution line only becomes
-            // required if the game ever shows a credits screen. Set here rather than left
-            // to the editor UI so a headless build can never quietly ship it again.
-            PlayerSettings.SplashScreen.show = false;
-            PlayerSettings.SplashScreen.showUnityLogo = false;
-
-            EditorUserBuildSettings.buildAppBundle = bundle;
-            if (bundle)
-            {
-                ApplyUploadKeystoreFromEnv();
-                string versionCode = Env("VEYRO_VERSION_CODE");
-                if (versionCode != null) PlayerSettings.Android.bundleVersionCode = int.Parse(versionCode);
-            }
-
-            string outPath = Path.Combine(RepoRoot, "builds", outputName);
-            Directory.CreateDirectory(Path.GetDirectoryName(outPath));
-
+            // Everything that mutates the project goes inside the try, not before it: the
+            // setup itself throws (a missing Play key, an unset VEYRO_KEYSTORE, a malformed
+            // VEYRO_VERSION_CODE), and a throw before the try left the dev package name, the
+            // bundle flag, the store define and — worst — the local keystore path serialized
+            // into the committed ProjectSettings.asset. The finally is the only exit.
             try
             {
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, packageName);
+                PlayerSettings.productName = productName;
+                PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+                PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                // Play's floor for new apps is API 36 from 31 Aug 2026. Pinned rather than left at
+                // "highest installed" so the store requirement can't drift with the local SDK.
+                PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel36;
+
+                // No "Made with Unity" splash. Unity 6 Personal is allowed to turn it off
+                // (docs/LICENSING_REVENUE.md §2.12) — the attribution line only becomes
+                // required if the game ever shows a credits screen. Set here rather than left
+                // to the editor UI so a headless build can never quietly ship it again.
+                PlayerSettings.SplashScreen.show = false;
+                PlayerSettings.SplashScreen.showUnityLogo = false;
+
+                EditorUserBuildSettings.buildAppBundle = bundle;
+                ApplyStoreKeyPairing(bundle, development, previousDefines);
+                if (bundle)
+                {
+                    ApplyUploadKeystoreFromEnv();
+                    string versionCode = Env("VEYRO_VERSION_CODE");
+                    if (versionCode != null) PlayerSettings.Android.bundleVersionCode = int.Parse(versionCode);
+                }
+
+                string outPath = Path.Combine(RepoRoot, "builds", outputName);
+                Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+
                 var options = new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath },
                     locationPathName = outPath,
                     target = BuildTarget.Android,
-                    options = BuildOptions.None
+                    options = development ? BuildOptions.Development : BuildOptions.None
                 };
 
                 var report = BuildPipeline.BuildPlayer(options);
@@ -103,6 +127,7 @@ namespace MotionRunner.EditorTools
                 PlayerSettings.productName = previousProduct;
                 EditorUserBuildSettings.buildAppBundle = previousBundle;
                 PlayerSettings.Android.bundleVersionCode = previousVersionCode;
+                PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, previousDefines);
                 if (bundle)
                 {
                     // keystoreName/keyaliasName serialize into ProjectSettings.asset (the passwords
@@ -116,6 +141,42 @@ namespace MotionRunner.EditorTools
                     PlayerSettings.Android.keyaliasPass = "";
                 }
             }
+        }
+
+        /// The pairing rule that must never break (COSMETICS_CATALOG §6): the .aab store build
+        /// compiles with the Play key, the debuggable dev flavour compiles with the Test Store
+        /// key, every other artifact ships no key at all (store disabled, fail-open). This
+        /// validates the keys and sets the matching define for exactly the duration of the
+        /// build (defines restored in the finally above). StoreBuildGuard re-checks inside
+        /// BuildPlayer, so an editor-GUI build cannot slip by.
+        static void ApplyStoreKeyPairing(bool storeBuild, bool devStore, string currentDefines)
+        {
+            var defines = currentDefines
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(d => d != StoreBuildDefine && d != DevStoreDefine)
+                .ToList();
+
+            if (storeBuild)
+            {
+                string key = RevenueCatKeys.PlayStoreKey;
+                if (string.IsNullOrEmpty(key) || !key.StartsWith("goog_"))
+                    throw new BuildFailedException(
+                        "Store builds ship the PLAY public SDK key: set RevenueCatKeys.PlayStoreKey " +
+                        "(RevenueCat -> Veyro Run -> API keys -> Play Store app, starts with 'goog_'). " +
+                        "An .aab must never carry the Test Store key.");
+                defines.Add(StoreBuildDefine);
+            }
+            else if (devStore)
+            {
+                string key = RevenueCatKeys.TestStoreKey;
+                if (string.IsNullOrEmpty(key) || !key.StartsWith("test_"))
+                    throw new BuildFailedException(
+                        "The dev-store flavour exists to test against the Test Store: set " +
+                        "RevenueCatKeys.TestStoreKey (starts with 'test_') before BuildAndroidDev.");
+                defines.Add(DevStoreDefine);
+            }
+
+            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
         }
 
         static void ApplyUploadKeystoreFromEnv()

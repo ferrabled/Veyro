@@ -4,6 +4,285 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-30 — PR #4 review fixes: privacy text now matches the build (pr4-review session)
+
+Copilot raised six findings on PR #4; all six verified against the code, all six real.
+
+**Privacy copy — the one that mattered.** It claimed a player who never buys never contacts
+RevenueCat. The build has never worked that way: `GameBootstrap` configures the SDK at boot and
+`OnApplicationPause` refetches on every resume. Corrected the **text**, not the behaviour —
+`SkinService` needs entitlements at boot and the resume re-read is the judge promo-code path
+(REVENUECAT_PLAN §6.3). The claim sat in five places (policy ×2, support ×2, listing); terms §2 and
+the home page had softer versions. All fixed, policy and site page re-verified in sync, none deployed.
+→ **Data safety must now declare device/other IDs, not just purchase history** (an anonymous app user
+ID leaves the device every launch). `STORE_COMPLIANCE.md` + `PLAY_CONSOLE_SETUP.md` updated —
+**owner should read that wording before filling the Console form.**
+
+**Three correctness fixes** (owner committed as `b55e03c`): `RevenueCatStore` reported `AlreadyOwned`
+(and paywall success) before the entitlement refresh landed, breaking `IStore.Purchase`'s written
+guarantee — `RefreshCustomerInfo` now takes a completion callback. `StorePanel` callbacks touched
+`_status` with no liveness check → `MissingReferenceException` on close mid-call; now a `StillOpen`
+helper, with `Equip` outside it so a paid-for skin is worn even if the panel is gone. `BuildScript`
+mutated the project before entering its rollback `try`; all mutations moved inside.
+
+**Verified.** 166/166 EditMode tests, clean compile. Rollback measured with `VEYRO_KEYSTORE` unset:
+pre-fix leaked `VEYRO_STORE_BUILD` into the defines (and into the committed `ProjectSettings.asset`)
+and left `buildAppBundle` true; fixed leaves both untouched. Device (Nord 2, fresh dev APK): full
+store flow clean, zero game-side exceptions — prices, direct Play sheet, valid purchase →
+auto-**EQUIPPED** and skin persists into the next run, failed purchase, restore, close, resume re-read.
+
+**Not verified.** The `StillOpen` guard never fired: Test Store answers in ~90 ms, two `adb` taps
+can't land closer than ~60 ms, and the purchase dialog is modal — needs a throwaway build with a
+delayed callback. `AlreadyOwned` is unreachable via the UI (an owned row equips instead of buying);
+fold both into the versionCode-5 internal spot check.
+
+**Also:** T-020's backlog entry still claimed 162/162 tests and pending keys/device test (both done
+27–29 Aug) — rewritten so the next agent does not redo finished work.
+
+**Needs a human:** commit the docs/site changes (GPG prompts for a passphrase); then the atomic
+versionCode-5 flip — `wrangler deploy` from `site/` in the same window as the .aab upload, so the
+corrected policy is live before the build that talks to RevenueCat reaches testers.
+
+## 2026-08-29 — store split in two: skins buy straight on the Google Play sheet, the pass keeps the paywall (t020-direct-purchase session)
+
+> **Owner device verification COMPLETE, 29 Aug evening (dev-store flavour, fresh
+> `MotionRunnerDev.apk` built + adb-installed same day): 6/6 checks pass.** Skins raise the
+> purchase dialog directly (valid/cancel/failed all correct, instant equip on success);
+> season-pass paywall renders (verified on a clean-state reinstall — Android Auto Backup had
+> been resurrecting the old anonymous ID and its Test Store entitlements, so the reinstall ran
+> with `bmgr` restore off); RESTORE round-trips proven in logcat (two `_restorePurchases`
+> responses captured — "does nothing" was correct both times: once everything was already
+> owned, once the fresh identity owned nothing). USD prices are Test Store placeholders;
+> the Play build localizes via the buyer's Play-account country. Two follow-ups filed for the
+> game-UX phase, NOT this release: restore status should say "nothing to restore" when zero
+> items return; consider the same wording note for the paywall. Real-Play spot check (license
+> tester: buy → uninstall → reinstall from Play → RESTORE returns it) happens on the
+> versionCode-5 internal build before the closed submission.
+
+**Headline: the owner's 29 Aug call is implemented — tapping EMBER or FROST now raises the native
+Google Play purchase sheet directly, no paywall in between; SEASON 1 PASS still opens the
+dashboard-configured RevenueCat paywall.** Both paths are gated identically (a row is only
+purchasable while it is locked) and entitlements remain the single source of truth for "owned".
+**166/166 EditMode tests pass** (was 162; +4).
+
+**Why so little code moved:** the seam already had the right call. `IStore.Purchase(packageId)` →
+`GetOfferings` → `PurchasePackage` existed and was tested from 26 Aug; it was simply never wired
+to the UI, where every tap went to `PresentPaywall`. `StorePanel` now routes skin rows to
+`Purchase` and the pass row to `PresentPaywall`. `PurchasePackage` is deliberate — the SDK's
+`PurchaseProduct` overload defaults to `type: "subs"`, which is wrong for three one-time
+non-consumables, and RevenueCat's own guidance is to use the package call whenever the Offerings
+system is in play.
+
+Four things the paywall used to handle that the direct path now owns:
+
+- **Cancel is silent.** Backing out of the sheet reports `Cancelled`, prints no status text,
+  grants nothing, and leaves the panel usable. Accepted from *either* `PurchaseResult.UserCancelled`
+  *or* error code 1 — Android can surface the same event as either.
+- **Pending is not failure.** New `PurchaseStatus.Pending`, mapped from error code 20
+  (`PaymentPendingError`: cash/voucher payments, parental approval, SCA). Nothing is granted —
+  that would hand out an unpaid skin — and the panel says the payment is pending and unlocks
+  itself. The existing `OnApplicationPause(false)` cache-drop + re-read is what picks the
+  entitlement up when Google confirms.
+- **The unlock is immediate.** `ApplyCustomerInfo(result.CustomerInfo)` now runs *before* the
+  callback, so the entitlement is live by the time the panel reacts — no restart, no second fetch.
+  A skin bought this way also auto-equips: the tap already said "I want this one".
+- **The sheet opens on the tap, not after a round trip.** The adapter caches the last `Offerings`
+  it fetched (the panel fetches on open for prices), so a tap goes straight to `PurchasePackage`,
+  falling back to `GetOfferings` when nothing is cached.
+
+The three branch codes are named constants now (1 cancelled / 6 already-purchased / 20 pending).
+The numbering is shared across every RevenueCat SDK; `purchases-ios` `Sources/Generated/ErrorCode.swift`
+is the generated source of truth if it ever needs re-checking. Also new:
+`Entitlements.PackageFor(entitlementId)`, the inverse of `ForPackage`, living in the engine-free
+assembly so the map the direct tap depends on is EditMode-tested — `StorePanel`'s hand-rolled
+if-chain is gone.
+
+**Verified:** `Unity 6000.5.9f1 -batchmode -runTests -testPlatform EditMode` against this tree
+(owner's editor closed — no scratch copy needed), **166/166, 0 failed**, including the four new
+tests: entitlement↔package inverse map, every sellable skin has a package, Pending grants nothing
+and is neither success nor failure, a direct skin purchase leaves the pass alone. No new packages,
+no new permissions, no SDK type outside `MotionRunner.Commerce.RevenueCat`; EditMode still compiles
+and runs with no SDK in sight. Nothing in STORE_COMPLIANCE flips — same Billing surface, same
+declarations. 4ab3335 is intact: `StorePanel.IsOpen` is untouched and the panel stays open across
+the Play sheet, so the pause/resume the sheet causes cannot restart the run either.
+
+**Needs the owner (~10 min, phone in hand — license tester, `BuildAndroidDev`, Test Store):**
+1. Tap **EMBER** → the **Google Play purchase sheet must appear directly**, with no paywall first.
+2. Complete the purchase → row turns owned **and the runner turns ember immediately** (auto-equip),
+   with no restart.
+3. Tap **FROST** → sheet appears → **press back / cancel** → nothing happens: no error text, row
+   still shows its price, store still usable, run still frozen behind it.
+4. Tap **SEASON 1 PASS** → the **dashboard paywall must still render** (this is the regression to
+   watch; it is the only remaining paywall call site).
+5. **RESTORE PURCHASES** still returns everything; relaunch → still owned.
+
+One dashboard note, not a code issue: the paywall attached to offering `default` lists all three
+packages, so the pass's paywall can still sell a skin. If the owner wants that paywall to show the
+pass alone, it is a Paywall Builder edit with no app release (REVENUECAT_PLAN §5).
+
+## 2026-08-27 — T-020 on device: keys in, store live against the Test Store; three bugs found and fixed in the install loop (t020-unity session)
+
+**Headline: the owner pasted both public API keys and the store now runs on the phone — SDK
+configured, customer info received, offerings fetched, the store panel shows live Test Store
+prices ($2.99 / $2.99 / $4.99) with equip/lock state and Restore.** The chain configure →
+entitlements → offerings → UI is device-verified; what remains human is the purchase itself
+(paywall render, buy, restore) — steps below still apply, with one command change.
+
+Three real findings from the first installs, all fixed and re-verified on device:
+
+1. **`Purchases.IsConfigured()` NREs before the SDK's `Start()`** binds its platform wrapper —
+   and Unity delivers the first `OnApplicationPause(false)` earlier than that, so the resume
+   re-read crashed at boot. `RevenueCatStore` now tracks its own `_configured` flag and never
+   asks the SDK.
+2. **A Test Store key closes a release build.** RevenueCat shows "Wrong API Key … the app will
+   close now to protect the security of test purchases" on any **non-debuggable** build using a
+   `test_` key. So the key scheme changed: **`BuildAndroidDev`** (new, `BuildOptions.Development`,
+   output `builds/MotionRunnerDev.apk`) is the Test-Store flavour; plain `BuildAndroid` release
+   APKs now ship **no key** (store disabled, fail-open) instead of a test key that force-closes.
+   `StoreBuildGuard` enforces all of it: VEYRO_DEV_STORE requires a Development build + `test_`
+   key; .aab still requires VEYRO_STORE_BUILD + `goog_` key and refuses the dev define.
+   **Device-test command is therefore `BuildAndroidDev`, not `BuildAndroid`** — the 26 Aug entry's
+   step 2 is superseded by this.
+3. **Opening the store restarted the run behind it.** `TouchTapInput` reports jump on the same
+   `TouchPhase.Ended` that fires a UI button's click, so the tap on SKINS & STORE also hit the
+   result screen's "tap anywhere to restart". Restart is now deferred one frame and cancelled if
+   that tap opened the store (`StorePanel.IsOpen`); keyboard space and the camera-mode hop
+   restart still work.
+
+**Verified on the Nord 2:** dev build installs over the Play-track copy (uninstall needed once —
+different signing key, expected), boots with no dialog and no exceptions, `Development Build`
+watermark present, logcat shows `_receiveCustomerInfo`/`_getCustomerInfo`, result screen shows
+SKINS & STORE, panel opens with live prices and the run stays frozen on the result behind it.
+Screenshots in the session log. Keys: OPEN_QUESTIONS 9b marked answered.
+
+**Still needs the owner (~10 min, phone in hand):** in the open store panel — tap EMBER → the
+dashboard paywall must render → complete the fake Test Store purchase → row turns owned → equip
+→ runner turns ember; relaunch → still owned; RESTORE PURCHASES returns it; background the app,
+grant/revoke an entitlement in the dashboard, foreground → updates without restart. (Reinstall →
+Restore stays a Play-sandbox-only test — Test Store receipts don't survive a new anonymous id.)
+
+## 2026-08-26 — T-020 code complete: RevenueCat 9.8.1 in, Commerce seam + store UI + key guard; needs keys + device test (t020-unity session)
+
+**Headline: the whole Unity half of T-020 is built and green — SDK 9.8.1 via OpenUPM, the
+`MotionRunner.Commerce` seam with 22 new EditMode tests (162/162 total), a store panel wired to
+the dashboard paywall, entitlement-driven skins, and a build guard that makes shipping the Test
+Store key in an .aab a build failure. Two things stand between this and done: the owner must
+paste the two public API keys (OPEN_QUESTIONS 9b — the handoff's key placeholders were never
+filled in), then run the Test-Store device test below.**
+
+**Install route: OpenUPM (plan §1.1), EDM4U in mainTemplate-patch mode.** `manifest.json` pins
+`com.revenuecat.purchases-unity` + `com.revenuecat.purchases-ui-unity` **9.8.1** exactly and
+`com.google.external-dependency-manager` **1.2.188** (latest on OpenUPM; ≥ 1.2.187 keeps the iOS
+SPM path open — the plan's 1.2.186 was a verify-at-install placeholder). Instead of letting EDM4U
+download AARs into `Assets/Plugins/Android` (Compose has dozens of transitive deps — exactly the
+gotcha-11 debris class), the three gradle templates are committed under `Assets/Plugins/Android/`
+and EDM4U patches `mainTemplate.gradle` with 4 dependency lines
+(`purchases-hybrid-common[-ui] 18.31.0`, androidx.activity/annotation); Gradle pulls transitives
+at build time. EDM4U settings are pinned project-side in `ProjectSettings/GvhProjectSettings.xml`
+(not per-machine EditorPrefs), resolution record in `ProjectSettings/AndroidResolverDependencies.xml`
+— all committed deliberately (plan §2.7). The templates are copies of 6000.5.9f1's defaults: on a
+Unity version bump, re-copy them and let EDM4U re-patch.
+
+**APK diff (gotcha 10), release `BuildAndroid`, same tree before/after** (the old 29.6 MB figure
+was the pre-camera baseline; `main` ships camera mode since PR #1, so the honest baseline was
+rebuilt first):
+
+| | bytes | permissions |
+|---|---|---|
+| baseline (this tree, pre-RevenueCat) | 47,024,127 (44.8 MB) | INTERNET, CAMERA |
+| with RevenueCat 9.8.1 + wrapper + UI | 58,205,601 (55.5 MB) | + `com.android.vending.BILLING`, + `ACCESS_NETWORK_STATE` |
+
++10.7 MB — the Jetpack-Compose-for-paywalls line item the plan budgeted for (§1.2); acceptable,
+UGUI-fallback question closed. BILLING is required; ACCESS_NETWORK_STATE rides in with Play
+Billing (normal-level, install-time). Both noted in STORE_COMPLIANCE with the flip table.
+
+**Found and fixed while checking §2.2:** the merged manifest gave `UnityPlayerGameActivity`
+`launchMode="singleTask"` (Unity's default) — RevenueCat requires standard/singleTop or a
+purchase dies when the player is bounced to a banking/3DS app mid-payment. New
+`AndroidLaunchModeFix` (IPostGenerateGradleAndroidProject) patches it to **singleTop** at build
+time; verified `launchMode=1` in the rebuilt APK's manifest. No committed AndroidManifest.xml
+shadows Unity's template.
+
+**The seam (plan §3):** `MotionRunner.Commerce` (engine-free, `noEngineReferences: true`):
+`IStore` (callback-shaped; `PresentPaywall()` takes no entitlement argument — Present, never
+PresentIfNeeded), `StoreOffer`, `PurchaseOutcome` (status + optional `StoreError`),
+`Entitlements` (`skin_ember`/`skin_frost`/`season1` + the package→entitlement map),
+`CosmeticCatalog` with unlock rules **Default | Entitlement(id) | SeasonLevel(track, level)**
+per COSMETICS_CATALOG §5 — the SeasonLevel shape exists and is tested, but no season items and
+no XP ship: that is T-025, deliberately untouched — and `FakeStore`. 22 new EditMode tests cover
+the §3.4 list: locked→purchase→unlocked, restore-after-reinstall shape, same-set re-announce,
+cancel ≠ failure, AlreadyOwned (the out-of-app promo path), fail-open (not-ready grants nothing
+and throws nothing), catalog integrity, SeasonLevel truth table. **162/162 EditMode tests pass**
+(was 140), run in batchmode against this tree (owner's editor closed — no scratch copy needed).
+
+**The adapter:** `MotionRunner.Commerce.RevenueCat` / `RevenueCatStore` — the only assembly that
+sees an SDK type. Runtime setup on a persistent GameObject (`useRuntimeSetup` set before the
+component's `Start()`; `Configure` deferred one frame because `Purchases` binds its platform
+wrapper in `Start()` and configuring earlier NREs), **anonymous app user id** (null → SDK
+generates, §3.3), `UpdatedCustomerInfoListener` → `EntitlementsChanged`, purchase error code 6
+(ProductAlreadyPurchased) mapped to `AlreadyOwned`, and **entitlements re-read on
+`OnApplicationPause(false)`** with `InvalidateCustomerInfoCache` — the §6.3 out-of-app promo
+redemption path. Fail-open throughout: no key / no network / no offering → locked entitlements,
+playable game, no exceptions. In the Editor (where the SDK NREs, §2.5) GameBootstrap hands the
+game a ready `FakeStore`, so the store UI is exercisable in Play mode.
+
+**UI (code-first UGUI, matching RunHud/ModeSelectMenu):** the result screen gained a
+**SKINS & STORE** button (RunHud card 780→920) opening `StorePanel`: catalog rows with live lock
+state and localized prices from `GetOfferings`, tap-to-equip for owned skins, the dashboard
+paywall for locked ones (the call site gates — it only opens for items the player does not own),
+a Season 1 pass row honestly labelled "reward ladder arrives with the Season 1 update", a visible
+**RESTORE PURCHASES** button (§6.3), and fail-open status text. Skins apply through
+`SkinService` → `CosmeticCatalog` → `RuntimeMaterials.Shared` at the GameBootstrap colour site;
+the default skin pins the original orange (test-enforced), Ember/Frost are colour swaps until
+T-025 builds the full presets. Selection persists in `veyro.skin`; a revoked entitlement falls
+back to the default on the next apply.
+
+**Key handling (the door that must not open the wrong way):** `RevenueCatKeys.cs` holds both
+**public** SDK keys — currently **empty: the session handoff's key placeholders were never
+filled** (→ OPEN_QUESTIONS 9b). Selection is compile-time: `BuildAndroidBundle` sets
+`VEYRO_STORE_BUILD` for the duration of the build (restored in `finally`) → `ActiveKey =
+PlayStoreKey`; APK builds never set it → `ActiveKey = TestStoreKey`. `ApplyStoreKeyPairing` plus
+`StoreBuildGuard` (IPreprocessBuildWithReport — catches editor-GUI builds too) fail the build on
+any mismatch: .aab without the define, .aab with a non-`goog_` key, APK with a non-`test_` key.
+Consequence today: **dev APKs build with the store disabled (fail-open, loud build-log warning);
+`BuildAndroidBundle` refuses to build until the Play key is pasted** — deliberate, an .aab with
+a missing/test key would be a dead store build.
+
+**T-031 AAB path:** `BuildAndroidBundle` already existed (24 Aug) and gains only the key guard;
+signing unchanged via `VEYRO_KEYSTORE`/`VEYRO_KEYSTORE_PASS` (+ optional `VEYRO_KEYALIAS`,
+`VEYRO_KEYALIAS_PASS`, `VEYRO_VERSION_CODE`) env vars. The upload keystore exists — owner created
+it 25 Aug (D5 ✅; the keytool runbook stays in PREREQUISITES D5 for recovery). The next .aab
+carries BILLING + the purchases SDK, so **every STORE_COMPLIANCE T-020 flip rides that same
+release** (note added there).
+
+**Also:** `companyName` DefaultCompany → **Ferrabled** (`productName` was already "Veyro Run") —
+plan §7B item 13. Rename in ProjectSettings if a different publisher label is wanted; cheap now,
+awkward after store screenshots.
+
+**Needs the owner (in order):**
+1. **Paste the two public API keys** into `game/Assets/Scripts/Commerce/RevenueCat/RevenueCatKeys.cs`
+   (OPEN_QUESTIONS 9b) and commit — public keys, safe in git; never the `sk_` secret ones.
+2. **Test-Store device test** (~15 min). Rebuild + install:
+   `Unity -batchmode -quit -projectPath game -buildTarget Android -executeMethod MotionRunner.EditorTools.BuildScript.BuildAndroid`,
+   `adb install -r builds/MotionRunner.apk`. Then:
+   - crash a run → **SKINS & STORE** → tap Ember → the dashboard paywall renders (it cannot
+     render in the Editor) → buy via the Test Store sheet → row turns owned → equip → runner
+     turns ember; relaunch → still owned, still equipped.
+   - background the app → grant/revoke an entitlement on the customer in the RevenueCat
+     dashboard → foreground → state updates without a restart (§6.3 resume re-read).
+   - **RESTORE PURCHASES** on the same install returns the entitlements.
+   - uninstall → reinstall → Restore: **expect empty on the Test Store** — a fresh anonymous app
+     user id has no Test Store receipts behind it. The real reinstall→Restore acceptance test
+     (T-020's AC) only means something against Play sandbox (plan §7C item 16), once the Play
+     products (§D1) + service-account JSON (§D3) exist.
+3. **Play side, unchanged:** create the 3 products (PLAY_CONSOLE_SETUP §D1), upload the
+   service-account JSON (§D3), then `BuildAndroidBundle` → internal track (unlocks in-app product
+   creation) / closed track as the next update, with the STORE_COMPLIANCE flips in the same
+   release.
+
+**Next:** keys + device test → T-020 🔷→✅; after that the paywall is pure dashboard iteration
+(plan §5, no store review). T-025 (season pass content) now has its rule shapes and seam waiting.
+
 ## 2026-08-26 — PR #2 review pass: entitlement model, judge-code hardening, season-window fix, timeline recomputed (doc session)
 
 Worked the Copilot review on PR #2 (17 inline + 7 suppressed comments — all 24 verified against the
@@ -106,6 +385,26 @@ https://claude.ai/code/artifact/c0ca2d3c-4582-4968-8592-8b2a9cfb46be
 - Owner reviewed the site 25 Aug: approved except the capsule-person figures — "once we have the
   main model and skins, we will replicate those." Filed as **T-037** (blocked on the character
   model); the exact spots to swap are tabled under "Placeholder figures" in `site/README.md`.
+
+## 2026-08-29 — Play ↔ RevenueCat verified end-to-end; T-020 needs only the flip release (compliance session)
+
+**Headline: a license-test purchase through the real Play Store landed in RevenueCat's Play
+Store app — the whole monetization pipeline works.** 3 products live in both consoles
+(`veyro.skin.ember`/`.frost` €2.99, `veyro.season1.pass` €4.99), credentials "valid",
+license testing on, T-020 AAB (versionCode 4, BILLING) on the internal track. P4 ✅ complete;
+P10 merchant profile ✅ (payout bank still unwired — non-blocking, sales accrue).
+
+**Remaining for T-020 (handed off to a t020-release session, brief given to owner 29 Aug):**
+1. Store UX decision (owner, 29 Aug): the in-game store currently opens the season-pass
+   RevenueCat paywall for every purchase — change to paywall **only for the season pass**;
+   the two skins purchase **directly** (`Purchases.PurchasePackage` on their offering
+   packages). Research + implement + device-verify.
+2. The **atomic closed-track flip release** (STORE_COMPLIANCE T-020 section): versionCode 5
+   build + App access "Sí" + Data safety purchase-history + content-rating redo + IAP flag +
+   held-back cosmetics paragraph (LISTING.md §3) + privacy-policy purchases section on
+   docs + site (redeploy = owner wrangler run).
+3. Owner-only, still open: **§D2 15% fee tier**, payout bank, address-publication decision
+   (register), OPEN_QUESTIONS 10/12 → DECISIONS.md.
 
 ## 2026-08-25 — First Play upload done; site live + compliance register created (compliance session)
 

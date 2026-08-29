@@ -1,0 +1,18 @@
+{
+    "name": "MotionRunner.Commerce.RevenueCat",
+    "rootNamespace": "MotionRunner.Commerce.RevenueCat",
+    "references": [
+        "MotionRunner.Commerce",
+        "revenuecat.purchases-unity",
+        "revenuecat.purchases-unity-ui"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

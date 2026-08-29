@@ -21,6 +21,10 @@ namespace MotionRunner.Gameplay
         /// button is a nicety and being able to start the next run is not.
         public event Action RestartRequested;
 
+        /// Raised by the SKINS button on the result screen - the store entry point (T-020).
+        /// GameBootstrap owns what opens; the HUD only announces the tap.
+        public event Action StoreRequested;
+
         Text _score;
         Text _coins;
         Text _combo;
@@ -145,7 +149,7 @@ namespace MotionRunner.Gameplay
             var cardRect = card.AddComponent<RectTransform>();
             card.transform.SetParent(_resultPanel.transform, false);
             Stretch(cardRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            cardRect.sizeDelta = new Vector2(760f, 780f);
+            cardRect.sizeDelta = new Vector2(760f, 920f);
             card.AddComponent<Image>().color = PanelColor;
 
             CreateText("Title", card.transform,
@@ -164,6 +168,7 @@ namespace MotionRunner.Gameplay
                 38, TextAnchor.UpperCenter, TextColor);
 
             BuildRestartButton(card.transform);
+            BuildSkinsButton(card.transform);
 
             // Anchored to the screen, not the card: inside the card it would sit under the
             // button, which is exactly where it landed on the first device build.
@@ -192,6 +197,29 @@ namespace MotionRunner.Gameplay
             CreateText("Label", go.transform,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 52, TextAnchor.MiddleCenter, new Color(0.08f, 0.06f, 0.04f)).text = "RUN AGAIN";
+        }
+
+        /// Secondary on purpose: RUN AGAIN keeps the primary colour and size, the store is
+        /// one visible tap away from every crash - which is what a judge needs (§6.3).
+        void BuildSkinsButton(Transform parent)
+        {
+            var go = new GameObject("Skins");
+            var rect = go.AddComponent<RectTransform>();
+            go.transform.SetParent(parent, false);
+            Stretch(rect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
+            rect.anchoredPosition = new Vector2(0f, 250f);
+            rect.sizeDelta = new Vector2(480f, 100f);
+
+            var image = go.AddComponent<Image>();
+            image.color = new Color(0.24f, 0.28f, 0.40f);
+
+            var button = go.AddComponent<Button>();
+            button.targetGraphic = image;
+            button.onClick.AddListener(() => StoreRequested?.Invoke());
+
+            CreateText("Label", go.transform,
+                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
+                42, TextAnchor.MiddleCenter, TextColor).text = "SKINS & STORE";
         }
 
         static Text CreateText(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax,
