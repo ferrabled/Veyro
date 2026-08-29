@@ -69,8 +69,11 @@ production date slips.
      policy and its extra requirements.
    - Data safety: for the first closed build (camera in v1.0, on-device-only, no RevenueCat yet):
      **no data collected**, camera frames never leave the device. From the T-020 build onward:
-     purchases/purchase history are collected — follow RevenueCat's "Google Play data safety"
-     guide when updating the form; revisit again when OneSignal/Layers land (T-021/T-022).
+     purchases/purchase history **and device or other IDs** are collected — the RevenueCat SDK
+     is configured at boot and refreshed on resume, so an anonymous app user ID leaves the
+     device on every launch whether or not the player ever buys. Follow RevenueCat's "Google
+     Play data safety" guide when updating the form; revisit again when OneSignal/Layers land
+     (T-021/T-022).
    - News / government / financial / health: No.
 5. **Recruit the 12 testers (H6).** Email list or Google Group in Testing → Closed testing →
    Testers tab. The recruiting pack is `docs/store-kit/CLOSED_TESTING.md`. They must be real

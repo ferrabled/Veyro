@@ -36,7 +36,12 @@ the same change that ships a feature listed below.
   cosmetic IAP via Google Play billing; no account/code exists; all gameplay accessible
   without purchase."
 - Data safety → Financial info / purchase history = collected (RevenueCat is a service
-  provider processing purchase tokens).
+  provider processing purchase tokens). **Also device or other IDs = collected**: the SDK is
+  configured at boot and refreshed on every resume, so every install — not just a buyer — gets
+  an anonymous RevenueCat app user ID sent off-device with app version, platform and store
+  country. Declaring only purchase history would under-declare a launch-time transmission.
+  Follow RevenueCat's own "Google Play data safety" guide; the privacy policy's Purchases
+  section (corrected 30 Aug) is the text this row must agree with.
 - Content rating questionnaire → redo; "digital purchases" = yes.
 - Listing → "contains in-app purchases" flag + a cosmetics paragraph. The exact paragraph to paste
   is held ready in `docs/store-kit/LISTING.md` §3 under "HELD BACK — the COSMETICS ONLY paragraph",

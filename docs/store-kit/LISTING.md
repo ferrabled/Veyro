@@ -143,8 +143,8 @@ best scores live on your phone.
 PLAYS OFFLINE
 
 Every run works with no connection at all. No servers, no sign-in, no ads interrupting a run —
-everything the game needs to play is already on the device. The only thing that ever goes online is
-an optional cosmetic purchase, and only if you choose to make one.
+everything the game needs to play is already on the device. The only thing that goes online is the
+cosmetics shop: the game checks which cosmetics you own, and buys or restores one if you ask it to.
 
 COSMETICS ONLY
 
