@@ -4,6 +4,45 @@ Keep entries short: what changed, how it was verified, what needs a human. Durab
 knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
 "Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
 
+## 2026-08-30 — PR #4 review fixes: privacy text now matches the build (pr4-review session)
+
+Copilot raised six findings on PR #4; all six verified against the code, all six real.
+
+**Privacy copy — the one that mattered.** It claimed a player who never buys never contacts
+RevenueCat. The build has never worked that way: `GameBootstrap` configures the SDK at boot and
+`OnApplicationPause` refetches on every resume. Corrected the **text**, not the behaviour —
+`SkinService` needs entitlements at boot and the resume re-read is the judge promo-code path
+(REVENUECAT_PLAN §6.3). The claim sat in five places (policy ×2, support ×2, listing); terms §2 and
+the home page had softer versions. All fixed, policy and site page re-verified in sync, none deployed.
+→ **Data safety must now declare device/other IDs, not just purchase history** (an anonymous app user
+ID leaves the device every launch). `STORE_COMPLIANCE.md` + `PLAY_CONSOLE_SETUP.md` updated —
+**owner should read that wording before filling the Console form.**
+
+**Three correctness fixes** (owner committed as `b55e03c`): `RevenueCatStore` reported `AlreadyOwned`
+(and paywall success) before the entitlement refresh landed, breaking `IStore.Purchase`'s written
+guarantee — `RefreshCustomerInfo` now takes a completion callback. `StorePanel` callbacks touched
+`_status` with no liveness check → `MissingReferenceException` on close mid-call; now a `StillOpen`
+helper, with `Equip` outside it so a paid-for skin is worn even if the panel is gone. `BuildScript`
+mutated the project before entering its rollback `try`; all mutations moved inside.
+
+**Verified.** 166/166 EditMode tests, clean compile. Rollback measured with `VEYRO_KEYSTORE` unset:
+pre-fix leaked `VEYRO_STORE_BUILD` into the defines (and into the committed `ProjectSettings.asset`)
+and left `buildAppBundle` true; fixed leaves both untouched. Device (Nord 2, fresh dev APK): full
+store flow clean, zero game-side exceptions — prices, direct Play sheet, valid purchase →
+auto-**EQUIPPED** and skin persists into the next run, failed purchase, restore, close, resume re-read.
+
+**Not verified.** The `StillOpen` guard never fired: Test Store answers in ~90 ms, two `adb` taps
+can't land closer than ~60 ms, and the purchase dialog is modal — needs a throwaway build with a
+delayed callback. `AlreadyOwned` is unreachable via the UI (an owned row equips instead of buying);
+fold both into the versionCode-5 internal spot check.
+
+**Also:** T-020's backlog entry still claimed 162/162 tests and pending keys/device test (both done
+27–29 Aug) — rewritten so the next agent does not redo finished work.
+
+**Needs a human:** commit the docs/site changes (GPG prompts for a passphrase); then the atomic
+versionCode-5 flip — `wrangler deploy` from `site/` in the same window as the .aab upload, so the
+corrected policy is live before the build that talks to RevenueCat reaches testers.
+
 ## 2026-08-29 — store split in two: skins buy straight on the Google Play sheet, the pass keeps the paywall (t020-direct-purchase session)
 
 > **Owner device verification COMPLETE, 29 Aug evening (dev-store flavour, fresh
