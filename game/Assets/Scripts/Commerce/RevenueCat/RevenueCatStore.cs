@@ -197,9 +197,10 @@ namespace MotionRunner.Commerce.RevenueCat
                 if (code == ErrorProductAlreadyPurchased)
                 {
                     // Ownership, not failure - the promo-code-redeemed-outside-the-app path
-                    // lands here. Pull the fresh entitlements before reporting.
-                    RefreshCustomerInfo();
-                    done?.Invoke(PurchaseOutcome.AlreadyOwned());
+                    // lands here. This error carries no customer info, so the entitlement is
+                    // not applied yet: report only once the refresh lands, or the caller
+                    // equips a skin that is still locked and equipping never grants.
+                    RefreshCustomerInfo(() => done?.Invoke(PurchaseOutcome.AlreadyOwned()));
                     return;
                 }
 
@@ -281,18 +282,28 @@ namespace MotionRunner.Commerce.RevenueCat
                 outcome = PurchaseOutcome.Failed(new StoreError("paywall_exception", e.Message));
             }
 
-            // The paywall purchase happened outside our Purchase() path; pull the fresh
-            // entitlements before reporting, so the UI refresh that follows sees them.
-            if (outcome.Succeeded) RefreshCustomerInfo();
-            done?.Invoke(outcome);
+            // The paywall purchase happened outside our Purchase() path, so nothing has
+            // applied its entitlements yet. Report only once they are in, or the UI refresh
+            // that follows still draws the pass as locked.
+            if (outcome.Succeeded) RefreshCustomerInfo(() => done?.Invoke(outcome));
+            else done?.Invoke(outcome);
         }
 
-        void RefreshCustomerInfo()
+        /// `done` runs when the refresh has settled, applied or not. Callers that owe
+        /// IStore.Purchase's "entitlements are up to date by the time `done` runs" promise
+        /// wait on it rather than firing their own callback a frame early.
+        /// A failed refresh still completes: fail-open means the outcome is reported with
+        /// whatever entitlements we have, never withheld - the listener may deliver later.
+        void RefreshCustomerInfo(Action done = null)
         {
             _purchases.GetCustomerInfo((customerInfo, error) =>
             {
-                if (error != null || customerInfo == null) return; // stay fail-open; listener may still deliver later
-                ApplyCustomerInfo(customerInfo);
+                if (error != null || customerInfo == null)
+                    Debug.LogWarning("[Store] Could not refresh entitlements - reporting with what we have: " +
+                                     (error != null ? error.Message : "no customer info"));
+                else
+                    ApplyCustomerInfo(customerInfo);
+                done?.Invoke();
             });
         }
 

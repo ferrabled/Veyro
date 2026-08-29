@@ -68,36 +68,41 @@ namespace MotionRunner.EditorTools
             int previousVersionCode = PlayerSettings.Android.bundleVersionCode;
             string previousDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
 
-            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, packageName);
-            PlayerSettings.productName = productName;
-            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
-            PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
-            // Play's floor for new apps is API 36 from 31 Aug 2026. Pinned rather than left at
-            // "highest installed" so the store requirement can't drift with the local SDK.
-            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel36;
-
-            // No "Made with Unity" splash. Unity 6 Personal is allowed to turn it off
-            // (docs/LICENSING_REVENUE.md §2.12) — the attribution line only becomes
-            // required if the game ever shows a credits screen. Set here rather than left
-            // to the editor UI so a headless build can never quietly ship it again.
-            PlayerSettings.SplashScreen.show = false;
-            PlayerSettings.SplashScreen.showUnityLogo = false;
-
-            EditorUserBuildSettings.buildAppBundle = bundle;
-            ApplyStoreKeyPairing(bundle, development, previousDefines);
-            if (bundle)
-            {
-                ApplyUploadKeystoreFromEnv();
-                string versionCode = Env("VEYRO_VERSION_CODE");
-                if (versionCode != null) PlayerSettings.Android.bundleVersionCode = int.Parse(versionCode);
-            }
-
-            string outPath = Path.Combine(RepoRoot, "builds", outputName);
-            Directory.CreateDirectory(Path.GetDirectoryName(outPath));
-
+            // Everything that mutates the project goes inside the try, not before it: the
+            // setup itself throws (a missing Play key, an unset VEYRO_KEYSTORE, a malformed
+            // VEYRO_VERSION_CODE), and a throw before the try left the dev package name, the
+            // bundle flag, the store define and — worst — the local keystore path serialized
+            // into the committed ProjectSettings.asset. The finally is the only exit.
             try
             {
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, packageName);
+                PlayerSettings.productName = productName;
+                PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+                PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                // Play's floor for new apps is API 36 from 31 Aug 2026. Pinned rather than left at
+                // "highest installed" so the store requirement can't drift with the local SDK.
+                PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel36;
+
+                // No "Made with Unity" splash. Unity 6 Personal is allowed to turn it off
+                // (docs/LICENSING_REVENUE.md §2.12) — the attribution line only becomes
+                // required if the game ever shows a credits screen. Set here rather than left
+                // to the editor UI so a headless build can never quietly ship it again.
+                PlayerSettings.SplashScreen.show = false;
+                PlayerSettings.SplashScreen.showUnityLogo = false;
+
+                EditorUserBuildSettings.buildAppBundle = bundle;
+                ApplyStoreKeyPairing(bundle, development, previousDefines);
+                if (bundle)
+                {
+                    ApplyUploadKeystoreFromEnv();
+                    string versionCode = Env("VEYRO_VERSION_CODE");
+                    if (versionCode != null) PlayerSettings.Android.bundleVersionCode = int.Parse(versionCode);
+                }
+
+                string outPath = Path.Combine(RepoRoot, "builds", outputName);
+                Directory.CreateDirectory(Path.GetDirectoryName(outPath));
+
                 var options = new BuildPlayerOptions
                 {
                     scenes = new[] { ScenePath },

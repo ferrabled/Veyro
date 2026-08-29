@@ -70,6 +70,12 @@ namespace MotionRunner.Gameplay
             if (_store != null) _store.EntitlementsChanged -= RefreshRows;
         }
 
+        /// A store call outlives the panel whenever the player closes it with a purchase or
+        /// restore in flight - CLOSE stays live on purpose (rule 3: never trapped behind
+        /// commerce), so the SDK callback lands on destroyed UI. Every callback checks this
+        /// before touching anything Build() made.
+        bool StillOpen => this != null && _status != null;
+
         void Build()
         {
             var canvas = gameObject.AddComponent<Canvas>();
@@ -102,7 +108,8 @@ namespace MotionRunner.Gameplay
                 new Vector2(24f, -120f), new Vector2(-24f, -40f),
                 62, TextAnchor.UpperCenter, TextColor).text = "COSMETICS";
 
-            // Skin rows. Each is one tap: equip when owned, open the paywall when not.
+            // Skin rows. Each is one tap: equip when owned, straight to the Google Play
+            // sheet when not - the paywall is the pass's path, not theirs.
             float y = -170f;
             foreach (var item in CosmeticCatalog.Items)
             {
@@ -246,12 +253,16 @@ namespace MotionRunner.Gameplay
             _status.text = "opening Google Play…";
             _store.Purchase(packageId, outcome =>
             {
+                // The tap said "I want this skin", so a purchase that lands wears it - even
+                // if the player closed the panel while the Play sheet was up, because
+                // SkinService outlives the panel. The entitlement is already applied by the
+                // time this runs, so Equip succeeds; it silently does nothing if it somehow
+                // is not, because equipping never grants.
+                if (outcome.Succeeded) _skins.Equip(itemId);
+
+                if (!StillOpen) return;
                 _busy = false;
                 _status.text = Describe(outcome, "purchase");
-                // The tap said "I want this skin", so a purchase that lands wears it. The
-                // entitlement is already applied by the time this runs, so Equip succeeds;
-                // it silently does nothing if it somehow is not, because equipping never grants.
-                if (outcome.Succeeded) _skins.Equip(itemId);
                 RefreshRows();
             });
         }
@@ -264,6 +275,7 @@ namespace MotionRunner.Gameplay
             _status.text = "opening store…";
             _store.PresentPaywall(outcome =>
             {
+                if (!StillOpen) return;
                 _busy = false;
                 _status.text = Describe(outcome, "purchase");
                 RefreshRows();
@@ -277,6 +289,7 @@ namespace MotionRunner.Gameplay
             _status.text = "restoring…";
             _store.Restore(outcome =>
             {
+                if (!StillOpen) return;
                 _busy = false;
                 _status.text = outcome.Succeeded ? "purchases restored" : Describe(outcome, "restore");
                 RefreshRows();
@@ -302,7 +315,7 @@ namespace MotionRunner.Gameplay
 
         void RefreshRows()
         {
-            if (this == null || _status == null) return;
+            if (!StillOpen) return;
 
             foreach (var (itemId, packageId, state) in _rows)
             {
@@ -341,7 +354,7 @@ namespace MotionRunner.Gameplay
         {
             _store.FetchOffers((offers, error) =>
             {
-                if (this == null || _status == null || offers == null) return;
+                if (!StillOpen || offers == null) return;
                 foreach (var offer in offers)
                     if (!string.IsNullOrEmpty(offer.Id) && !string.IsNullOrEmpty(offer.LocalizedPrice))
                         _prices[offer.Id] = offer.LocalizedPrice;
