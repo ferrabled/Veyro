@@ -11,6 +11,11 @@ namespace MotionRunner.Gameplay
     ///
     /// Owns frame order on purpose - input, then the runner, then the world, then collisions,
     /// then the HUD - so what the player sees is what was tested against.
+    ///
+    /// Runs late (DefaultExecutionOrder) so the EventSystem has already dispatched this frame's
+    /// UI clicks: the tap that hits PAUSE has frozen the run before the run reads that same tap
+    /// as a jump. Both used to land in the same frame in whichever order Unity felt like.
+    [DefaultExecutionOrder(100)]
     public sealed class RunSession : MonoBehaviour
     {
         const string AllTimeBestKey = "veyro.best.alltime";
@@ -39,6 +44,12 @@ namespace MotionRunner.Gameplay
         public bool IsRunning { get; private set; }
         public RunSeed CurrentSeed { get; private set; }
 
+        /// Set by RunFlow while the pause menu is up. The world is already stopped by
+        /// Time.timeScale = 0; this stops the loop as well, because a frame stepped with
+        /// deltaTime 0 would still let a queued tap fire a jump. Input keeps being polled either
+        /// way, so nothing a player does at the pause menu survives into the resumed run.
+        public bool Frozen { get; set; }
+
         /// All-time best across every mode.
         public int AllTimeBest { get; private set; }
 
@@ -53,9 +64,11 @@ namespace MotionRunner.Gameplay
         float _elapsed;
         float _restartLockout;
         bool _pendingRestart;
+        bool _started;
 
         void Start()
         {
+            _started = true;
             AllTimeBest = PlayerPrefs.GetInt(AllTimeBestKey, 0);
 
             // Free mode needs a run-to-run seed source. The seed source may be arbitrary; the
@@ -70,6 +83,37 @@ namespace MotionRunner.Gameplay
         void OnDestroy()
         {
             if (Hud != null) Hud.RestartRequested -= RequestRestart;
+        }
+
+        /// Starts running with a control scheme. Unity calls Start() the first time the component
+        /// is enabled and never again, so the second visit from the mode picker has to kick the
+        /// run itself.
+        public void Begin(IGameInput input)
+        {
+            Input = input;
+            Frozen = false;
+            enabled = true;
+            if (_started) StartRun();
+        }
+
+        /// Leaves the run without finishing it: the loop stops, the world empties and the runner
+        /// goes back to its mark. Deliberately scores nothing - Crash() is the only thing that
+        /// writes a best, so quitting or restarting mid-run cannot touch the daily or all-time
+        /// bests on disk.
+        public void Stop()
+        {
+            IsRunning = false;
+            Frozen = false;
+            enabled = false;
+            Input = null;
+            _pendingRestart = false;
+            _restartLockout = 0f;
+            _elapsed = 0f;
+            Score.Reset();
+
+            if (Runner != null) Runner.ResetState();
+            if (Director != null) Director.EndRun();
+            if (Hud != null) Hud.Clear();
         }
 
         public void StartRun()
@@ -106,7 +150,11 @@ namespace MotionRunner.Gameplay
             if (Input == null) return;
 
             float deltaTime = Time.deltaTime;
+
+            // Ticked even while frozen, on purpose: a tap that lands on the pause menu is
+            // consumed here and cannot survive into the frame that resumes the run.
             Input.Tick();
+            if (Frozen) return;
 
             if (!IsRunning)
             {
