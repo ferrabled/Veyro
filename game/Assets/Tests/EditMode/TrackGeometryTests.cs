@@ -86,7 +86,9 @@ namespace MotionRunner.Tests
         [Test]
         public void SteeringOutOfALaneClearsItWellBeforeTheNextLaneCentre()
         {
-            // Steering is analog, so the player must not have to reach the exact lane centre.
+            // A lane change is animated, so safety must arrive before the slide finishes - the
+            // player must not have to be standing on the next lane centre to be out of this one.
+            // LaneSelectorTests pins when in the slide that happens.
             var block = Obstacle(ObstacleKind.FullBlock, 0, 0f);
             float halfwayOut = TrackMetrics.LaneWidth * 0.75f;
             Assert.IsFalse(GroundedRunner(halfwayOut).Intersects(block));
