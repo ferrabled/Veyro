@@ -89,25 +89,70 @@ namespace MotionRunner.Tests
         [Test]
         public void TheBestOfAllBadCandidatesStillWins()
         {
-            // Nobody in frame during startup: every score is low, but the probe must still settle
-            // on something and hand back a usable orientation rather than nothing.
+            // Nobody usefully in frame during startup: no candidate is convincing, but the probe
+            // must still settle on something and hand back a usable orientation rather than
+            // nothing. Each candidate here is *clearly* better than the one before — clearly
+            // meaning by more than ChallengerMargin — so the last one is the answer.
+            float step = OrientationProbe.ChallengerMargin + 0.02f;
             var probe = new OrientationProbe(180, false, 2);
-            var scores = new Dictionary<string, float>();
             float next = 0.01f;
             int guard = 0;
 
             while (!probe.IsComplete)
             {
-                scores[probe.Current.ToString()] = next;
                 probe.Submit(next);
                 probe.Submit(next);
-                next += 0.02f;
+                next += step;
                 if (++guard > 100) Assert.Fail("probe never completed");
             }
 
             Assert.IsTrue(probe.IsComplete);
             Assert.Less(probe.BestScore, OrientationProbe.GoodEnoughScore);
-            Assert.AreEqual(next - 0.02f, probe.BestScore, 1e-5f, "the last, highest candidate won");
+            Assert.AreEqual(next - step, probe.BestScore, 1e-5f, "the last, highest candidate won");
+        }
+
+        [Test]
+        public void TheMirrorTwinCannotUnseatTheDeviceReportOnNoise()
+        {
+            // Every candidate has a twin at (rotation + 180, !flip) that is upright but
+            // horizontally MIRRORED, and a face is symmetric enough that the detector scores the
+            // two within a hundredth of each other. Which of them wins decides whether leaning
+            // left steers left, so a coin flip is not an acceptable answer: the reported
+            // orientation is tried first and keeps its place unless something is genuinely better.
+            //
+            // This is the resume failure — the launch probe stops early on a clean 0.9+, but a
+            // player leaning over the phone they just unpaused puts every candidate in this
+            // contested band, and all eight then get compared.
+            var reported = new OrientationProbe.Candidate(90, false);
+            var twin = new OrientationProbe.Candidate(270, true);
+            var probe = new OrientationProbe(90, false, 2);
+            int guard = 0;
+
+            while (!probe.IsComplete)
+            {
+                float score = 0.05f;
+                if (probe.Current.Equals(reported)) score = 0.72f;
+                else if (probe.Current.Equals(twin)) score = 0.75f; // a hair better, on noise
+                probe.Submit(score);
+                probe.Submit(score);
+                if (++guard > 100) Assert.Fail("probe never completed");
+            }
+
+            Assert.AreEqual(reported, probe.Best, "the mirror twin won on noise");
+            Assert.IsTrue(probe.IsConfident, "0.72 is a real sighting, not a contest between noise");
+        }
+
+        [Test]
+        public void AGenuinelyBetterCandidateStillBeatsTheMargin()
+        {
+            // The margin must not turn into "always believe the device": a report that is a
+            // quarter turn out scores nothing like an upright face, and losing that correction
+            // would be worse than the mirror it prevents.
+            var truth = new OrientationProbe.Candidate(180, true);
+            var probe = RunAgainst(truth, 0, true, truthScore: 0.62f, wrongScore: 0.2f);
+
+            Assert.AreEqual(truth, probe.Best);
+            Assert.IsTrue(probe.IsConfident);
         }
 
         [Test]

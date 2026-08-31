@@ -54,6 +54,20 @@ namespace MotionRunner.Pose
         /// in favour of the device's own report and retried, never trusted.
         public const float MinimumConfidence = 0.5f;
 
+        /// How much better than the standing leader a later candidate has to score before it
+        /// takes over. Not cosmetic: every candidate has a twin at (rotation + 180, !flip) that
+        /// is upright but horizontally MIRRORED, and a face is symmetric enough that BlazeFace
+        /// scores the two within a few hundredths of each other. Without a margin the twin wins
+        /// on a coin flip whenever conditions are middling, and a mirrored frame steers the
+        /// player the wrong way (x inverted; y, so jump and slide, unaffected).
+        ///
+        /// 0.08 is well above that noise and far below the gap between an upright face and a
+        /// sideways or upside-down one (~0.9 vs ~0.1 in the T-010 sweep), so a genuinely wrong
+        /// device report is still overruled. The tie it cannot break — truth and twin both in
+        /// the contested band — now resolves toward whichever was tried first, and the reported
+        /// orientation is deliberately tried first, so "believe the device" is the tiebreak.
+        public const float ChallengerMargin = 0.08f;
+
         readonly Candidate[] _candidates;
         readonly int _samplesPerCandidate;
 
@@ -100,7 +114,9 @@ namespace MotionRunner.Pose
             if (_samplesTaken < _samplesPerCandidate) return;
 
             float mean = _scoreTotal / _samplesTaken;
-            if (mean > BestScore)
+            // The leader keeps its place unless a challenger is *meaningfully* better; the very
+            // first candidate always takes it, because BestScore starts below every real score.
+            if (mean > BestScore + ChallengerMargin)
             {
                 BestScore = mean;
                 Best = _candidates[_index];

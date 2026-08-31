@@ -10,6 +10,10 @@ namespace MotionRunner.CameraInput
 {
     /// One face observation in the upright frame's coordinates: normalized [0,1], origin
     /// top-left, y down — the PoseLandmark convention FaceSteering expects.
+    ///
+    /// X and Size are fractions of the frame's WIDTH, Y of its HEIGHT, which is why FrameAspect
+    /// travels with them: it is the only thing that puts a horizontal and a vertical displacement
+    /// in the same unit, and FaceSteering measures both in face widths.
     public readonly struct FaceObservation
     {
         public readonly float X;
@@ -17,14 +21,36 @@ namespace MotionRunner.CameraInput
         public readonly float Size;   // face box width, normalized to frame width
         public readonly float Score;
 
-        public FaceObservation(float x, float y, float size, float score)
+        /// Upright frame width / height — 0.75 for the 480x640 portrait frame a portrait-locked
+        /// phone turns the 640x480 request into. Measured, not assumed, so a driver that hands
+        /// back another shape scales correctly.
+        public readonly float FrameAspect;
+
+        /// The observation cleared FaceDetector.ScoreThreshold — a face the pipeline is sure of,
+        /// as opposed to one it is only sure enough of to keep following.
+        ///
+        /// The detector decides this rather than each consumer comparing Score against a threshold
+        /// of its own, so "confident" means one thing everywhere. Two consumers must demand it and
+        /// both would be actively dangerous without it: CameraStaging (handing a run over on a
+        /// marginal frame starts a run the detector cannot really see) and FaceTrackingRig's
+        /// first-confident-sighting rule (a mirrored orientation twin scores in exactly the
+        /// marginal band, which is the 30 Aug backwards-steering bug).
+        public readonly bool IsConfident;
+
+        public FaceObservation(float x, float y, float size, float score, float frameAspect,
+            bool isConfident)
         {
             X = x;
             Y = y;
             Size = size;
             Score = score;
+            FrameAspect = frameAspect;
+            IsConfident = isConfident;
         }
 
+        /// A decoded position exists — at whichever of the detector's two tiers. NOT the same
+        /// question as IsConfident: this one is "is there something to follow", which is what makes
+        /// a hop in a side lane survive the two or three frames of blur at its apex.
         public bool HasFace => Score > 0f;
     }
 
@@ -39,8 +65,28 @@ namespace MotionRunner.CameraInput
     {
         public const string ModelResourcePath = "CameraInput/blaze_face_short_range";
 
-        /// Below this the detector is reporting noise rather than a face.
-        public float ScoreThreshold { get; set; } = 0.65f;
+        /// At or above this the detector is sure: the observation comes back marked
+        /// FaceObservation.IsConfident, and everything that can act on its own — a gesture trigger,
+        /// the neutral calibration, the orientation decision, handing a run over — needs one.
+        ///
+        /// Defaulted from FaceSteering.DefaultMinScore rather than written out again, because the
+        /// number is only meaningful if the detector's "confident" and the gesture rules' "act on
+        /// it" are the same number.
+        public float ScoreThreshold { get; set; } = FaceSteering.DefaultMinScore;
+
+        /// Below this the detector is reporting noise rather than a face, and nothing is decoded at
+        /// all: the caller gets `default`, i.e. no face.
+        ///
+        /// Between the two thresholds the box IS decoded and returned with its real, low score —
+        /// which is the change that made a hop in a side lane fire. Returning `default` for every
+        /// sub-0.65 frame destroyed the position as well as the confidence, so the two or three
+        /// blurred frames at a hop's apex became "the player vanished" instead of "the player is
+        /// here, roughly, and moving fast". FaceSteering is where that distinction is spent (see its
+        /// two tiers); this class's only job is to stop throwing the position away.
+        ///
+        /// Measured on the Nord 2, 31 Aug: an empty ceiling scores 0.09-0.12, a real face at half a
+        /// metre to a metre scores 0.71-0.93. 0.45 is in the empty gap between them.
+        public float PositionThreshold { get; set; } = FaceSteering.DefaultMinPositionScore;
 
         /// Detector score of the most recent completed inference, thresholded or not — the
         /// orientation probe ranks candidate rotations by this.
@@ -162,7 +208,7 @@ namespace MotionRunner.CameraInput
             using Tensor<float> box = await boxA;
 
             LastScore = score[0];
-            if (LastScore < ScoreThreshold) return default;
+            if (LastScore < PositionThreshold) return default;
 
             float2 anchorPx = FaceAnchors.InputSize * _anchors[idx[0]];
             var centreTensor = new float2(anchorPx.x + box[0, 0, 0], anchorPx.y + box[0, 0, 1]);
@@ -170,12 +216,16 @@ namespace MotionRunner.CameraInput
 
             float sizeNorm = box[0, 0, 2] * (_letterbox[0][0]) / _frameWidth;
 
-            // Same flip as the pose landmarks: normalized, origin top-left, y down.
+            // Same flip as the pose landmarks: normalized, origin top-left, y down. The real score
+            // travels with the observation whichever tier it landed in — a consumer that needs
+            // certainty reads IsConfident, and one that needs continuity reads the position.
             return new FaceObservation(
                 centrePx.x / _frameWidth,
                 1f - centrePx.y / _frameHeight,
                 sizeNorm,
-                LastScore);
+                LastScore,
+                _frameWidth / _frameHeight,
+                LastScore >= ScoreThreshold);
         }
 
         public void Dispose()
