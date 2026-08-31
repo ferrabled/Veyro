@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace MotionRunner.Gameplay
 {
-    /// The cosmetics store, reached from the result screen (T-020). Code-first UGUI like
-    /// RunHud/ModeSelectMenu (CLAUDE.md rule 1). It lists the catalog with live lock state,
-    /// equips owned skins, and carries the visible Restore button judges need (§6.3).
+    /// The cosmetics store, reached from the result screen (T-020). Code-first UGUI on the
+    /// shared RuntimeUi plumbing like every other screen (CLAUDE.md rule 1). It lists the
+    /// catalog with live lock state, equips owned skins, and carries the visible Restore
+    /// button judges need (§6.3).
     ///
     /// Two purchase paths, split by product (owner call, 29 Aug):
     ///   * the two skins buy DIRECTLY - one tap raises the native Google Play sheet, because
@@ -48,8 +48,6 @@ namespace MotionRunner.Gameplay
         readonly Dictionary<string, string> _prices = new Dictionary<string, string>();
         bool _busy;
 
-        static Font _font;
-
         public static StorePanel Show(IStore store, SkinService skins)
         {
             var go = new GameObject("StorePanel");
@@ -78,32 +76,12 @@ namespace MotionRunner.Gameplay
 
         void Build()
         {
-            var canvas = gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 200; // above HUD and result screen
+            RuntimeUi.PortraitCanvas(gameObject, 200); // above HUD, result screen and pause menu
 
-            var scaler = gameObject.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080f, 1920f);
-            scaler.matchWidthOrHeight = 0.5f;
+            RuntimeUi.FullScreenPanel("Dim", transform, DimColor);
+            var card = RuntimeUi.Card("Card", transform, new Vector2(880f, 1280f), PanelColor);
 
-            gameObject.AddComponent<GraphicRaycaster>();
-            EnsureEventSystem();
-
-            var dim = new GameObject("Dim");
-            var dimRect = dim.AddComponent<RectTransform>();
-            dim.transform.SetParent(transform, false);
-            Stretch(dimRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            dim.AddComponent<Image>().color = DimColor;
-
-            var card = new GameObject("Card");
-            var cardRect = card.AddComponent<RectTransform>();
-            card.transform.SetParent(transform, false);
-            Stretch(cardRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            cardRect.sizeDelta = new Vector2(880f, 1280f);
-            card.AddComponent<Image>().color = PanelColor;
-
-            CreateText("Title", card.transform,
+            RuntimeUi.Label("Title", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(24f, -120f), new Vector2(-24f, -40f),
                 62, TextAnchor.UpperCenter, TextColor).text = "COSMETICS";
@@ -124,7 +102,7 @@ namespace MotionRunner.Gameplay
             // fine for Test Store verification but the row says what it is today.
             _passState = BuildRow(card.transform, ref y, "SEASON 1 PASS", AccentColor,
                 OnPassTapped);
-            CreateText("PassNote", card.transform,
+            RuntimeUi.Label("PassNote", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(48f, y - 50f), new Vector2(-48f, y),
                 28, TextAnchor.UpperLeft, StatusColor).text = "reward ladder arrives with the Season 1 update";
@@ -132,34 +110,22 @@ namespace MotionRunner.Gameplay
 
             BuildButton(card.transform, ref y, "RESTORE PURCHASES", RowColor, OnRestore);
 
-            _status = CreateText("Status", card.transform,
+            _status = RuntimeUi.Label("Status", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(32f, y - 130f), new Vector2(-32f, y - 8f),
                 30, TextAnchor.UpperCenter, StatusColor);
 
-            var close = new GameObject("Close");
-            var closeRect = close.AddComponent<RectTransform>();
-            close.transform.SetParent(card.transform, false);
-            Stretch(closeRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-            closeRect.anchoredPosition = new Vector2(0f, 100f);
-            closeRect.sizeDelta = new Vector2(480f, 120f);
-            var closeImage = close.AddComponent<Image>();
-            closeImage.color = AccentColor;
-            var closeButton = close.AddComponent<Button>();
-            closeButton.targetGraphic = closeImage;
-            closeButton.onClick.AddListener(() => Destroy(gameObject));
-            CreateText("Label", close.transform,
-                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
-                48, TextAnchor.MiddleCenter, new Color(0.08f, 0.06f, 0.04f)).text = "CLOSE";
+            RuntimeUi.TextButton("Close", card.transform,
+                new Vector2(0.5f, 0f), new Vector2(0f, 100f), new Vector2(480f, 120f),
+                AccentColor, "CLOSE", 48, new Color(0.08f, 0.06f, 0.04f),
+                () => Destroy(gameObject));
         }
 
         /// A row: colour swatch + name on the left, live state on the right, whole row tappable.
         Text BuildRow(Transform parent, ref float y, string label, Color swatch, Action onTap)
         {
-            var go = new GameObject(label);
-            var rect = go.AddComponent<RectTransform>();
-            go.transform.SetParent(parent, false);
-            Stretch(rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            var go = RuntimeUi.Element(label, parent, out var rect);
+            RuntimeUi.Stretch(rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(32f, y - 130f), new Vector2(-32f, y));
 
             var image = go.AddComponent<Image>();
@@ -168,20 +134,19 @@ namespace MotionRunner.Gameplay
             button.targetGraphic = image;
             button.onClick.AddListener(() => onTap());
 
-            var swatchGo = new GameObject("Swatch");
-            var swatchRect = swatchGo.AddComponent<RectTransform>();
-            swatchGo.transform.SetParent(go.transform, false);
-            Stretch(swatchRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
+            var swatchGo = RuntimeUi.Element("Swatch", go.transform, out var swatchRect);
+            swatchRect.anchorMin = new Vector2(0f, 0.5f);
+            swatchRect.anchorMax = new Vector2(0f, 0.5f);
             swatchRect.anchoredPosition = new Vector2(70f, 0f);
             swatchRect.sizeDelta = new Vector2(70f, 70f);
             swatchGo.AddComponent<Image>().color = swatch;
 
-            CreateText("Name", go.transform,
+            RuntimeUi.Label("Name", go.transform,
                 new Vector2(0f, 0f), new Vector2(0.55f, 1f),
                 new Vector2(130f, 0f), new Vector2(0f, 0f),
                 42, TextAnchor.MiddleLeft, TextColor).text = label;
 
-            var state = CreateText("State", go.transform,
+            var state = RuntimeUi.Label("State", go.transform,
                 new Vector2(0.45f, 0f), new Vector2(1f, 1f),
                 new Vector2(0f, 0f), new Vector2(-28f, 0f),
                 34, TextAnchor.MiddleRight, StatusColor);
@@ -192,10 +157,8 @@ namespace MotionRunner.Gameplay
 
         void BuildButton(Transform parent, ref float y, string label, Color color, Action onTap)
         {
-            var go = new GameObject(label);
-            var rect = go.AddComponent<RectTransform>();
-            go.transform.SetParent(parent, false);
-            Stretch(rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            var go = RuntimeUi.Element(label, parent, out var rect);
+            RuntimeUi.Stretch(rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(32f, y - 110f), new Vector2(-32f, y));
 
             var image = go.AddComponent<Image>();
@@ -204,7 +167,7 @@ namespace MotionRunner.Gameplay
             button.targetGraphic = image;
             button.onClick.AddListener(() => onTap());
 
-            CreateText("Label", go.transform,
+            RuntimeUi.Label("Label", go.transform,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 40, TextAnchor.MiddleCenter, TextColor).text = label;
 
@@ -360,53 +323,6 @@ namespace MotionRunner.Gameplay
                         _prices[offer.Id] = offer.LocalizedPrice;
                 RefreshRows();
             });
-        }
-
-        // ---- same UGUI plumbing as RunHud/ModeSelectMenu; third screen, still duplicated -
-        // extracting the shared helper is a cleanup for a quiet moment, not this change. ----
-
-        static Text CreateText(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax,
-            Vector2 offsetMin, Vector2 offsetMax, int fontSize, TextAnchor alignment, Color color)
-        {
-            var go = new GameObject(name);
-            var rect = go.AddComponent<RectTransform>();
-            go.transform.SetParent(parent, false);
-            Stretch(rect, anchorMin, anchorMax, offsetMin, offsetMax);
-
-            var text = go.AddComponent<Text>();
-            text.font = PanelFont();
-            text.fontSize = fontSize;
-            text.alignment = alignment;
-            text.color = color;
-            text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            return text;
-        }
-
-        static void Stretch(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax,
-            Vector2 offsetMin, Vector2 offsetMax)
-        {
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.offsetMin = offsetMin;
-            rect.offsetMax = offsetMax;
-        }
-
-        static void EnsureEventSystem()
-        {
-            if (EventSystem.current != null) return;
-            var go = new GameObject("EventSystem");
-            go.AddComponent<EventSystem>();
-            go.AddComponent<StandaloneInputModule>();
-        }
-
-        static Font PanelFont()
-        {
-            if (_font != null) return _font;
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (_font == null) _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            return _font;
         }
     }
 }
