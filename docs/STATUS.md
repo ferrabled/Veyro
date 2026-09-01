@@ -1,8 +1,46 @@
 # Status journal (newest at top)
 
-Keep entries short: what changed, how it was verified, what needs a human. Durable operational
-knowledge does **not** belong here — invariants go in code comments, recurring traps go in the
-"Known gotchas" list in CLAUDE.md. Old entries may be pruned once their content lives elsewhere.
+Keep entries short: what changed, how it was verified, what needs a human. **Hard cap ~40 lines
+per entry** — this file is read at the start of every session, so length here is context another
+session doesn't get. Durable operational knowledge does **not** belong here — invariants go in
+code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
+pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
+
+## 2026-08-30/31 — improve-ui session: pause/quit/guide, 3-lane steering, camera rework, face overlay
+
+PR #5. **EditMode 166 → 272 green; `RunSeedTests` untouched.** Device-verified on the Nord 2
+except the items needing a face (see the protocol in `docs/CAMERA_TUNING.md`). Dev APK 93.5 MiB;
+permissions byte-identical to the 26 Aug release.
+
+- `Core/RuntimeUi` replaces three duplicated UGUI copies. Sorting: HUD 0, overlay 50, picker 100,
+  guide 120, pause 150, store 200.
+- Pause/resume/restart/quit (`RunFlow` + engine-free `PauseState` back-table). Pause = `timeScale
+  0` **plus** `RunSession.Frozen`; `RunSession` runs at `[DefaultExecutionOrder(100)]` (after the
+  EventSystem) — the pause button, result-screen QUIT and store-tap guard all rest on that
+  ordering. Camera released while paused (`Suspend` + `_generation` guard); resume re-stages and
+  recalibrates neutral; camera-won't-return → run finishes on tilt+touch (rule 3).
+- Quit writes nothing (`Crash()` stays the only best-writer). Result card gained QUIT TO MENU.
+- First-run guide: 3 pages, `veyro.seen_guide` (any non-zero = seen), re-openable from the footer.
+- **3-lane steering** (owner call): `Track/LaneSelector`, absolute mapping, enter |0.5| / hold
+  |0.3|, smoothstep 0.14 s/lane (ceiling 0.152 — full sweep uses 92% of the tightest dodge
+  window). Collisions still read `transform.position` per frame.
+- **Camera rework** — all constants, units, dials, telemetry format, calibration protocol, open
+  decisions and risks live in **`docs/CAMERA_TUNING.md`**: orientation persists across pause
+  (mirror-twin inversion fixed); jump = windowed net rise (frame-rate independent); gestures in
+  face-widths so they cost the same centimetres at any distance (`BoxWidthsPerFace` 1.35 is an
+  **estimate** — calibrate first); loss holds the lane instead of recentring; three score tiers so
+  side-lane hops survive blur; `FaceOverlay` stickman panel (run + staging) and 1 Hz `[CAM]
+  telemetry` logcat line; back cancels picker staging; mode picks deferred one frame.
+- **Store "unavailable" was a doc bug**: `BuildAndroid` is deliberately keyless; device builds are
+  `BuildAndroidDev` (AGENTS.md corrected; keyless builds now log it).
+
+Verified on device: full pause/quit/restart/guide loops, store live on Test Store prices, staging
++ overlay + back-cancel, first-frame-jump fix (with positive control), logcat clean. Not verified
+(needs a person): every camera centimetre, the resume framing panel, gesture feel.
+
+Needs a human: run the `CAMERA_TUNING.md` calibration protocol (sign check → 25 cm measurement →
+distance sweep → false-positive watch), then the open decisions listed there (absolute-vs-latched
+lanes, slide no-op, back-at-picker, result hint wording, overlay placement).
 
 ## 2026-08-30 — PR #4 review fixes: privacy text now matches the build (pr4-review session)
 

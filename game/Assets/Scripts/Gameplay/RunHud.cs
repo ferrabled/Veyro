@@ -1,19 +1,21 @@
 using System;
+using MotionRunner.Core;
 using MotionRunner.Track;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace MotionRunner.Gameplay
 {
     /// Live readout plus the crash/result screen (T-005), built entirely from code so there is
-    /// no authored scene or prefab content to merge (CLAUDE.md rule 1).
+    /// no authored scene or prefab content to merge (CLAUDE.md rule 1). The UGUI plumbing itself
+    /// lives in RuntimeUi, shared with every other screen.
     public sealed class RunHud : MonoBehaviour
     {
         static readonly Color TextColor = new Color(0.94f, 0.96f, 1f);
         static readonly Color DimColor = new Color(0.04f, 0.05f, 0.09f, 0.82f);
         static readonly Color PanelColor = new Color(0.11f, 0.13f, 0.20f, 0.96f);
         static readonly Color ButtonColor = new Color(1f, 0.55f, 0.15f);
+        static readonly Color SecondaryColor = new Color(0.24f, 0.28f, 0.40f);
         static readonly Color ComboColor = new Color(1f, 0.86f, 0.22f);
         static readonly Color ModeColor = new Color(0.62f, 0.68f, 0.80f);
 
@@ -25,6 +27,14 @@ namespace MotionRunner.Gameplay
         /// GameBootstrap owns what opens; the HUD only announces the tap.
         public event Action StoreRequested;
 
+        /// Raised by the pause button. RunFlow owns what pausing means; the HUD only announces
+        /// the tap, exactly like the store button.
+        public event Action PauseRequested;
+
+        /// Raised by the QUIT TO MENU button on the result screen. Same shape again: RunFlow
+        /// owns what leaving costs, the HUD only announces the tap.
+        public event Action QuitRequested;
+
         Text _score;
         Text _coins;
         Text _combo;
@@ -32,12 +42,11 @@ namespace MotionRunner.Gameplay
         Text _resultScore;
         Text _resultBest;
         GameObject _resultPanel;
+        GameObject _pauseButton;
 
         int _shownScore = -1;
         int _shownCoins = -1;
         int _shownCombo = -1;
-
-        static Font _font;
 
         public static RunHud Create()
         {
@@ -88,193 +97,138 @@ namespace MotionRunner.Gameplay
             _resultBest.text = bestLine + "\n" + summary.Distance + "m   coins " + summary.Coins +
                                "   best combo " + summary.BestCombo;
             _resultPanel.SetActive(true);
+            _pauseButton.SetActive(false); // nothing to pause once the run is over
         }
 
         public void HideResult()
         {
             _resultPanel.SetActive(false);
+            _pauseButton.SetActive(true);
             _shownScore = -1;
             _shownCoins = -1;
             _shownCombo = -1;
         }
 
+        /// Wipes the readout when a run is abandoned. The mode menu that follows covers the
+        /// screen, but nothing behind it should still be showing a run that no longer exists.
+        public void Clear()
+        {
+            HideResult();
+            _pauseButton.SetActive(false);
+            _score.text = string.Empty;
+            _coins.text = string.Empty;
+            _combo.text = string.Empty;
+            _mode.text = string.Empty;
+        }
+
         void BuildCanvas()
         {
-            var canvas = gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            RuntimeUi.PortraitCanvas(gameObject);
 
-            var scaler = gameObject.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080f, 1920f);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            gameObject.AddComponent<GraphicRaycaster>();
-            EnsureEventSystem();
-
-            _score = CreateText("Score", transform,
+            _score = RuntimeUi.Label("Score", transform,
                 new Vector2(0f, 1f), new Vector2(0.55f, 1f),
                 new Vector2(32f, -140f), new Vector2(0f, -24f),
                 84, TextAnchor.UpperLeft, TextColor);
 
-            _coins = CreateText("Coins", transform,
+            _coins = RuntimeUi.Label("Coins", transform,
                 new Vector2(0.45f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -104f), new Vector2(-32f, -32f),
                 40, TextAnchor.UpperRight, TextColor);
 
-            _combo = CreateText("Combo", transform,
+            _combo = RuntimeUi.Label("Combo", transform,
                 new Vector2(0.45f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -156f), new Vector2(-32f, -104f),
                 40, TextAnchor.UpperRight, ComboColor);
 
-            _mode = CreateText("Mode", transform,
+            _mode = RuntimeUi.Label("Mode", transform,
                 new Vector2(0f, 1f), new Vector2(0.6f, 1f),
                 new Vector2(36f, -198f), new Vector2(0f, -148f),
                 34, TextAnchor.UpperLeft, ModeColor);
 
+            BuildPauseButton();
             BuildResultPanel();
             _resultPanel.SetActive(false);
         }
 
+        /// Bottom-left, small and dim: the run owns the screen, and the corner nearest the thumb
+        /// that is not already holding the phone up is the one a player can reach without
+        /// covering the track. RunSession runs after the EventSystem (its DefaultExecutionOrder),
+        /// so the tap that lands here is frozen before it can also be read as a jump.
+        void BuildPauseButton()
+        {
+            _pauseButton = RuntimeUi.TextButton("Pause", transform,
+                new Vector2(0f, 0f), new Vector2(120f, 120f), new Vector2(140f, 140f),
+                new Color(0.18f, 0.21f, 0.30f, 0.85f),
+                "II", 52, TextColor,
+                () => PauseRequested?.Invoke()).gameObject;
+
+            // Shown by HideResult, which is what starting a run calls: there is nothing to pause
+            // until there is a run.
+            _pauseButton.SetActive(false);
+        }
+
         void BuildResultPanel()
         {
-            _resultPanel = new GameObject("Result");
-            var panelRect = _resultPanel.AddComponent<RectTransform>();
-            _resultPanel.transform.SetParent(transform, false);
-            Stretch(panelRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            _resultPanel = RuntimeUi.FullScreenPanel("Result", transform, DimColor);
 
-            var dim = _resultPanel.AddComponent<Image>();
-            dim.color = DimColor;
+            // 1120 tall rather than 920: the buttons below are the pause menu's stack, and QUIT
+            // TO MENU is the third row it grew by. The card grew by exactly what the stack did
+            // (200), so the stats block keeps the 50px of clearance above the buttons it had
+            // when there were two of them.
+            var card = RuntimeUi.Card("Card", _resultPanel.transform, new Vector2(760f, 1120f), PanelColor);
 
-            var card = new GameObject("Card");
-            var cardRect = card.AddComponent<RectTransform>();
-            card.transform.SetParent(_resultPanel.transform, false);
-            Stretch(cardRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-            cardRect.sizeDelta = new Vector2(760f, 920f);
-            card.AddComponent<Image>().color = PanelColor;
-
-            CreateText("Title", card.transform,
+            RuntimeUi.Label("Title", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(24f, -140f), new Vector2(-24f, -48f),
                 56, TextAnchor.UpperCenter, TextColor).text = "RUN OVER";
 
-            _resultScore = CreateText("ResultScore", card.transform,
+            _resultScore = RuntimeUi.Label("ResultScore", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(24f, -350f), new Vector2(-24f, -160f),
                 140, TextAnchor.UpperCenter, TextColor);
 
-            _resultBest = CreateText("ResultBest", card.transform,
+            _resultBest = RuntimeUi.Label("ResultBest", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(24f, -570f), new Vector2(-24f, -355f),
                 38, TextAnchor.UpperCenter, TextColor);
 
-            BuildRestartButton(card.transform);
-            BuildSkinsButton(card.transform);
+            // One primary and two secondaries, at the pause menu's exact sizes and y positions
+            // (520x140 at 430, 480x110 at 270 and 130): the two screens offer the same kind of
+            // choice, so the thumb finds RUN AGAIN where it finds RESUME and QUIT TO MENU where
+            // it already is.
+            RuntimeUi.TextButton("Restart", card.transform,
+                new Vector2(0.5f, 0f), new Vector2(0f, 430f), new Vector2(520f, 140f),
+                ButtonColor, "RUN AGAIN", 52, new Color(0.08f, 0.06f, 0.04f),
+                () => RestartRequested?.Invoke());
+
+            // Secondary on purpose: RUN AGAIN keeps the primary colour and size, the store is
+            // one visible tap away from every crash - which is what a judge needs (§6.3).
+            RuntimeUi.TextButton("Skins", card.transform,
+                new Vector2(0.5f, 0f), new Vector2(0f, 270f), new Vector2(480f, 110f),
+                SecondaryColor, "SKINS & STORE", 42, TextColor,
+                () => StoreRequested?.Invoke());
+
+            // Leaving is a button here for the reason it is one on the pause menu: back is
+            // otherwise the only way off this card that is not another run, and back is not
+            // something a player is taught.
+            //
+            // It cannot double as the "tap anywhere" restart the rest of the screen is, and it
+            // does not need the store's StorePanel.IsOpen guard to say so: the tap runs
+            // RunFlow.QuitToMenu -> RunSession.Stop(), which nulls Input, clears the pending
+            // restart and disables the session - and RunSession's DefaultExecutionOrder(100)
+            // puts all of that strictly before the Update that would otherwise have read this
+            // same TouchPhase.Ended as a jump (the 27 Aug store-tap bug).
+            RuntimeUi.TextButton("Quit", card.transform,
+                new Vector2(0.5f, 0f), new Vector2(0f, 130f), new Vector2(480f, 110f),
+                SecondaryColor, "QUIT TO MENU", 42, TextColor,
+                () => QuitRequested?.Invoke());
 
             // Anchored to the screen, not the card: inside the card it would sit under the
             // button, which is exactly where it landed on the first device build.
-            CreateText("Hint", _resultPanel.transform,
+            RuntimeUi.Label("Hint", _resultPanel.transform,
                 new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(24f, 72f), new Vector2(-24f, 132f),
                 34, TextAnchor.LowerCenter, new Color(0.72f, 0.76f, 0.85f)).text = "tap anywhere or press space";
-        }
-
-        void BuildRestartButton(Transform parent)
-        {
-            var go = new GameObject("Restart");
-            var rect = go.AddComponent<RectTransform>();
-            go.transform.SetParent(parent, false);
-            Stretch(rect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-            rect.anchoredPosition = new Vector2(0f, 110f);
-            rect.sizeDelta = new Vector2(480f, 130f);
-
-            var image = go.AddComponent<Image>();
-            image.color = ButtonColor;
-
-            var button = go.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(() => RestartRequested?.Invoke());
-
-            CreateText("Label", go.transform,
-                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
-                52, TextAnchor.MiddleCenter, new Color(0.08f, 0.06f, 0.04f)).text = "RUN AGAIN";
-        }
-
-        /// Secondary on purpose: RUN AGAIN keeps the primary colour and size, the store is
-        /// one visible tap away from every crash - which is what a judge needs (§6.3).
-        void BuildSkinsButton(Transform parent)
-        {
-            var go = new GameObject("Skins");
-            var rect = go.AddComponent<RectTransform>();
-            go.transform.SetParent(parent, false);
-            Stretch(rect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
-            rect.anchoredPosition = new Vector2(0f, 250f);
-            rect.sizeDelta = new Vector2(480f, 100f);
-
-            var image = go.AddComponent<Image>();
-            image.color = new Color(0.24f, 0.28f, 0.40f);
-
-            var button = go.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(() => StoreRequested?.Invoke());
-
-            CreateText("Label", go.transform,
-                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
-                42, TextAnchor.MiddleCenter, TextColor).text = "SKINS & STORE";
-        }
-
-        static Text CreateText(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax,
-            Vector2 offsetMin, Vector2 offsetMax, int fontSize, TextAnchor alignment, Color color)
-        {
-            var go = new GameObject(name);
-            var rect = go.AddComponent<RectTransform>();
-            go.transform.SetParent(parent, false);
-            Stretch(rect, anchorMin, anchorMax, offsetMin, offsetMax);
-
-            var text = go.AddComponent<Text>();
-            text.font = HudFont();
-            text.fontSize = fontSize;
-            text.alignment = alignment;
-            text.color = color;
-            text.raycastTarget = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            return text;
-        }
-
-        static void Stretch(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
-        {
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.offsetMin = offsetMin;
-            rect.offsetMax = offsetMax;
-        }
-
-        static void EnsureEventSystem()
-        {
-            if (EventSystem.current != null) return;
-            var go = new GameObject("EventSystem");
-            go.AddComponent<EventSystem>();
-            go.AddComponent<StandaloneInputModule>();
-        }
-
-        /// Legacy UGUI Text needs a Font object. LegacyRuntime.ttf is the built-in one in
-        /// Unity 2022.2+; the fallbacks exist because a HUD that silently renders nothing is
-        /// the kind of bug that only shows up on the device.
-        static Font HudFont()
-        {
-            if (_font != null) return _font;
-
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (_font == null) _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-            if (_font == null) _font = Resources.Load<Font>("Fonts/HudFont");
-            if (_font == null)
-            {
-                var installed = Font.GetOSInstalledFontNames();
-                if (installed != null && installed.Length > 0)
-                    _font = Font.CreateDynamicFontFromOSFont(installed[0], 48);
-            }
-            if (_font == null) Debug.LogError("RunHud: no font could be resolved - HUD text will not render.");
-            return _font;
         }
     }
 }

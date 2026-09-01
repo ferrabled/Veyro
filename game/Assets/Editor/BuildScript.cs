@@ -175,6 +175,22 @@ namespace MotionRunner.EditorTools
                         "RevenueCatKeys.TestStoreKey (starts with 'test_') before BuildAndroidDev.");
                 defines.Add(DevStoreDefine);
             }
+            else
+            {
+                // The keyless flavour, and the one a store device-test lands in by accident:
+                // AGENTS.md's "On device" loop USED to say BuildAndroid, so "build it and check
+                // the store" produced an APK that boots with the store disabled — logcat says
+                // "[Store] No RevenueCat API key in this build flavour", the panel says "store
+                // unavailable right now", and nothing in the build output hinted why (cost a
+                // debugging session, 31 Aug; the doc line now says BuildAndroidDev). Say it here
+                // too, where the build log is already being read — the doc is one fix, this is
+                // the one that survives the next person not reading it.
+                Debug.Log(
+                    "Build flavour ships NO RevenueCat key: the store will be disabled on device " +
+                    "(a release APK must not carry the test_ key — the SDK force-closes it). " +
+                    "To test the store use BuildAndroidDev (debuggable, Test Store key) or " +
+                    "BuildAndroidBundle (.aab, Play key).");
+            }
 
             PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
         }

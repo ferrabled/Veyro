@@ -52,6 +52,17 @@ namespace MotionRunner.Gameplay
             FillAhead();
         }
 
+        /// Empties the road when a run is left without finishing it. Views go back to the pool
+        /// they came from rather than being destroyed: they are this director's, not the run's,
+        /// and a chunk's geometry is built once per chunkId per session by design.
+        public void EndRun()
+        {
+            for (int i = _active.Count - 1; i >= 0; i--) Release(_active[i]);
+            _active.Clear();
+            _nextChunkZ = FirstChunkZ;
+            ChunksSpawned = 0;
+        }
+
         /// Moves the world toward the camera and tops the track up. Returns the distance the
         /// world travelled this frame, which is also the distance the player "ran".
         public float Advance(float deltaTime, float elapsedSeconds)

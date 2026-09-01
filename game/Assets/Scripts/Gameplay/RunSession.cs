@@ -11,15 +11,16 @@ namespace MotionRunner.Gameplay
     ///
     /// Owns frame order on purpose - input, then the runner, then the world, then collisions,
     /// then the HUD - so what the player sees is what was tested against.
+    ///
+    /// Runs late (DefaultExecutionOrder) so the EventSystem has already dispatched this frame's
+    /// UI clicks: the tap that hits PAUSE has frozen the run before the run reads that same tap
+    /// as a jump. Both used to land in the same frame in whichever order Unity felt like.
+    [DefaultExecutionOrder(100)]
     public sealed class RunSession : MonoBehaviour
     {
         const string AllTimeBestKey = "veyro.best.alltime";
         const string DailyBestKey = "veyro.best.daily";
         const string DailyBestDateKey = "veyro.best.daily.date";
-
-        /// Ignore restart input for a moment after a crash, so the tap that killed the player
-        /// does not also skip the result screen.
-        const float RestartLockoutSeconds = 0.5f;
 
         /// Only chunks overlapping this z window around the runner are tested.
         const float NearZMin = -4f;
@@ -39,6 +40,12 @@ namespace MotionRunner.Gameplay
         public bool IsRunning { get; private set; }
         public RunSeed CurrentSeed { get; private set; }
 
+        /// Set by RunFlow while the pause menu is up. The world is already stopped by
+        /// Time.timeScale = 0; this stops the loop as well, because a frame stepped with
+        /// deltaTime 0 would still let a queued tap fire a jump. Input keeps being polled either
+        /// way, so nothing a player does at the pause menu survives into the resumed run.
+        public bool Frozen { get; set; }
+
         /// All-time best across every mode.
         public int AllTimeBest { get; private set; }
 
@@ -48,14 +55,20 @@ namespace MotionRunner.Gameplay
         /// "2026-08-21" — the UTC date the current run belongs to.
         public string DailyLabel { get; private set; } = string.Empty;
 
+        /// When another run may start, and on which frame. Every way of asking for one - the tap
+        /// anywhere, the RUN AGAIN button - goes through it, so "a restart never begins on the
+        /// frame its own tap arrived" is one rule in one engine-free place rather than a habit
+        /// each call site has to remember. See RestartGate.
+        readonly RestartGate _restart = new RestartGate();
+
         int _runIndex;
         int _sessionSalt;
         float _elapsed;
-        float _restartLockout;
-        bool _pendingRestart;
+        bool _started;
 
         void Start()
         {
+            _started = true;
             AllTimeBest = PlayerPrefs.GetInt(AllTimeBestKey, 0);
 
             // Free mode needs a run-to-run seed source. The seed source may be arbitrary; the
@@ -70,6 +83,36 @@ namespace MotionRunner.Gameplay
         void OnDestroy()
         {
             if (Hud != null) Hud.RestartRequested -= RequestRestart;
+        }
+
+        /// Starts running with a control scheme. Unity calls Start() the first time the component
+        /// is enabled and never again, so the second visit from the mode picker has to kick the
+        /// run itself.
+        public void Begin(IGameInput input)
+        {
+            Input = input;
+            Frozen = false;
+            enabled = true;
+            if (_started) StartRun();
+        }
+
+        /// Leaves the run without finishing it: the loop stops, the world empties and the runner
+        /// goes back to its mark. Deliberately scores nothing - Crash() is the only thing that
+        /// writes a best, so quitting or restarting mid-run cannot touch the daily or all-time
+        /// bests on disk.
+        public void Stop()
+        {
+            IsRunning = false;
+            Frozen = false;
+            enabled = false;
+            Input = null;
+            _restart.Clear();
+            _elapsed = 0f;
+            Score.Reset();
+
+            if (Runner != null) Runner.ResetState();
+            if (Director != null) Director.EndRun();
+            if (Hud != null) Hud.Clear();
         }
 
         public void StartRun()
@@ -106,27 +149,24 @@ namespace MotionRunner.Gameplay
             if (Input == null) return;
 
             float deltaTime = Time.deltaTime;
+
+            // Ticked even while frozen, on purpose: a tap that lands on the pause menu is
+            // consumed here and cannot survive into the frame that resumes the run.
             Input.Tick();
+            if (Frozen) return;
 
             if (!IsRunning)
             {
-                _restartLockout -= deltaTime;
-
-                // A jump restarts the run one frame LATER, and only if that same tap did not
-                // open the store: TouchTapInput reports jump on the same TouchPhase.Ended that
-                // fires a UI button's click, so the SKINS & STORE tap would otherwise also
-                // restart the run behind the panel (found on device, 27 Aug). While the store
-                // is open, restart input is ignored entirely.
-                if (_pendingRestart)
-                {
-                    _pendingRestart = false;
-                    if (!StorePanel.IsOpen) StartRun();
-                }
-                else if (_restartLockout <= 0f && !StorePanel.IsOpen &&
-                         (Input.IsJumpPressed() || Input.IsSpecialPressed()))
-                {
-                    _pendingRestart = true;
-                }
+                // A restart never begins on the frame it was asked for, whether the ask was a tap
+                // anywhere or the RUN AGAIN button, and never at all while the store is up: the
+                // release that asks is the same TouchPhase.Ended that TouchTapInput reads as a jump
+                // and that the EventSystem turns into a click, so this frame's input has to be
+                // spent first. The gate holds that rule; this call site's job is that the run is
+                // started HERE - after Input.Tick above, and returning before Runner.Step - so the
+                // ask can never also be the new run's first jump.
+                if (_restart.Tick(deltaTime, Input.IsJumpPressed() || Input.IsSpecialPressed(),
+                        StorePanel.IsOpen))
+                    StartRun();
                 return;
             }
 
@@ -175,7 +215,7 @@ namespace MotionRunner.Gameplay
         void Crash()
         {
             IsRunning = false;
-            _restartLockout = RestartLockoutSeconds;
+            _restart.LockOut();
 
             int score = Score.Score;
             bool dirty = false;
@@ -214,12 +254,16 @@ namespace MotionRunner.Gameplay
             return PlayerPrefs.GetInt(DailyBestKey, 0);
         }
 
+        /// The RUN AGAIN button. QUEUED, not started: this runs inside the EventSystem's dispatch,
+        /// and DefaultExecutionOrder(100) puts this component's own Update strictly AFTER that in
+        /// the same frame - so starting the run here handed the click's own TouchPhase.Ended to a
+        /// freshly reset runner as a first-frame jump (PR #5 review). The tap-anywhere path has
+        /// always deferred, which is why only the button showed it. The gate's lockout covers the
+        /// click that arrives on the frame of the crash, exactly as it does for a tap.
         void RequestRestart()
         {
-            // Same lockout as the tap path: the click that arrives on the frame of the crash
-            // is the crash input, not a request for another run.
-            if (IsRunning || _restartLockout > 0f) return;
-            StartRun();
+            if (IsRunning) return;
+            _restart.RequestFromButton();
         }
     }
 }

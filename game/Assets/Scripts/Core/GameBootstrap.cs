@@ -1,7 +1,6 @@
 using MotionRunner.Commerce;
 using MotionRunner.Commerce.RevenueCat;
 using MotionRunner.Gameplay;
-using MotionRunner.Inputs;
 using MotionRunner.Track;
 using UnityEngine;
 
@@ -58,30 +57,16 @@ namespace MotionRunner.Core
             hud.StoreRequested += () => StorePanel.Show(store, skins);
 
             // Session last: it drives everything above in a fixed order. Disabled until the
-            // player has picked a control scheme — enabling it is what starts the first run.
+            // player has picked a control scheme.
             var session = new GameObject("RunSession").AddComponent<RunSession>();
             session.enabled = false;
             session.Runner = controller;
             session.Director = director;
             session.Hud = hud;
 
-            var menu = ModeSelectMenu.Create();
-            menu.Chosen += (cameraMode, rig) =>
-            {
-                // Touch and keyboard stay in the mix in camera mode: they cost nothing, keep the
-                // result screen restartable if tracking drops, and are how a bystander pauses the
-                // hands-free demo without standing in frame.
-                session.Input = cameraMode
-                    ? new CompositeInput(
-                        new CameraFaceInput(rig),
-                        new TouchTapInput(),
-                        new KeyboardInput())
-                    : new CompositeInput(
-                        new GyroTiltInput(),
-                        new TouchTapInput(),
-                        new KeyboardInput());
-                session.enabled = true;
-            };
+            // Everything from here is transitions rather than construction: which screen is up,
+            // which control scheme the run uses, and when the camera is allowed to be on.
+            RunFlow.Create(session, hud);
         }
 
         /// The RevenueCat SDK cannot run in the Editor (it NREs - REVENUECAT_PLAN §2.5), so
