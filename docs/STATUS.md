@@ -8,100 +8,39 @@ pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was co
 
 ## 2026-08-30/31 — improve-ui session: pause/quit/guide, 3-lane steering, camera rework, face overlay
 
-Consolidated from five entries on 31 Aug (they ran ~690 lines; details now live in code comments
-per the header rule). Branch `improve-ui`. **EditMode 166 → 272 green; `RunSeedTests` untouched.**
-Everything device-verified on the Nord 2 except items in the owner protocol. Dev APK 93.5 MiB;
-permissions byte-identical to the 26 Aug release (`aapt2` diff — no gotcha-10 drift).
+PR #5. **EditMode 166 → 272 green; `RunSeedTests` untouched.** Device-verified on the Nord 2
+except the items needing a face (see the protocol in `docs/CAMERA_TUNING.md`). Dev APK 93.5 MiB;
+permissions byte-identical to the 26 Aug release.
 
-**Shipped**
+- `Core/RuntimeUi` replaces three duplicated UGUI copies. Sorting: HUD 0, overlay 50, picker 100,
+  guide 120, pause 150, store 200.
+- Pause/resume/restart/quit (`RunFlow` + engine-free `PauseState` back-table). Pause = `timeScale
+  0` **plus** `RunSession.Frozen`; `RunSession` runs at `[DefaultExecutionOrder(100)]` (after the
+  EventSystem) — the pause button, result-screen QUIT and store-tap guard all rest on that
+  ordering. Camera released while paused (`Suspend` + `_generation` guard); resume re-stages and
+  recalibrates neutral; camera-won't-return → run finishes on tilt+touch (rule 3).
+- Quit writes nothing (`Crash()` stays the only best-writer). Result card gained QUIT TO MENU.
+- First-run guide: 3 pages, `veyro.seen_guide` (any non-zero = seen), re-openable from the footer.
+- **3-lane steering** (owner call): `Track/LaneSelector`, absolute mapping, enter |0.5| / hold
+  |0.3|, smoothstep 0.14 s/lane (ceiling 0.152 — full sweep uses 92% of the tightest dodge
+  window). Collisions still read `transform.position` per frame.
+- **Camera rework** — all constants, units, dials, telemetry format, calibration protocol, open
+  decisions and risks live in **`docs/CAMERA_TUNING.md`**: orientation persists across pause
+  (mirror-twin inversion fixed); jump = windowed net rise (frame-rate independent); gestures in
+  face-widths so they cost the same centimetres at any distance (`BoxWidthsPerFace` 1.35 is an
+  **estimate** — calibrate first); loss holds the lane instead of recentring; three score tiers so
+  side-lane hops survive blur; `FaceOverlay` stickman panel (run + staging) and 1 Hz `[CAM]
+  telemetry` logcat line; back cancels picker staging; mode picks deferred one frame.
+- **Store "unavailable" was a doc bug**: `BuildAndroid` is deliberately keyless; device builds are
+  `BuildAndroidDev` (AGENTS.md corrected; keyless builds now log it).
 
-- `Core/RuntimeUi` replaces three duplicated UGUI copies. Sorting orders: HUD 0, overlay 50,
-  picker 100 (framing overlay 110), guide 120, pause 150 (framing overlay 160), store 200.
-- Pause/resume/restart/quit (`RunFlow`, `PauseMenu`, engine-free `PauseState` back-table). Pause =
-  `timeScale 0` **plus** `RunSession.Frozen` (a queued tap must not jump on resume). `RunSession`
-  runs at `[DefaultExecutionOrder(100)]` — after the EventSystem — and the pause button, the
-  result-screen QUIT and the store-tap guard all rest on that ordering; lowering it disarms all
-  three. Camera released while paused (`FaceTrackingRig.Suspend`, `_generation` guard vs in-flight
-  inference); resume re-stages minus gate/model-load and recalibrates neutral; camera-won't-return
-  → run finishes on tilt+touch (rule 3).
-- Quit writes nothing — `Crash()` stays the only best-writer. Result card 760×1120 with the pause
-  menu's exact stack (RUN AGAIN / SKINS & STORE / QUIT TO MENU).
-- First-run guide: 3 pages over the picker, `veyro.seen_guide` (any non-zero = seen), re-openable
-  via the "how to play" footer link. Copy/paging in `Track/GuideState`.
-- **3-lane steering** (owner call): `Track/LaneSelector` maps the axis absolutely — enter |0.5|,
-  hold |0.3| — and the runner smoothstep-tweens at 0.14 s/lane (0.152 is the ceiling: a full sweep
-  uses 92% of the tightest 0.3046 s dodge window; a test guards it). `Bounds` still reads
-  `transform.position` per frame, so a late dodge still dies. `SteerSpeed`/`MaxX` gone.
-- **Camera rework:**
-  - Orientation persists across Suspend/Begin + `OrientationProbe.ChallengerMargin` 0.08 — the
-    mirror twin (rot+180, !flip) can no longer win a resume re-probe and invert steering. One
-    `settled` per run; resumes log `orientation reused`.
-  - Jump = net rise ≥ 0.40 face-widths within 0.25 s, ending ≥ 0.15 fw above baseline (the old
-    per-frame velocity rule was frame-rate dependent). Refractory 0.5 s, deliberately under the
-    runner's 0.68 s air time — **retuning `JumpVelocity`/`Gravity` silently retunes the gesture.**
-  - Gestures in **face widths** (distance-invariant): fw = (cm/15) × Size ÷ `BoxWidthsPerFace`.
-    `HalfRangeX` 1.1 fw → lane enter ≈9.5 cm, direct crossing ≈19 cm, hop ≈6 cm, crouch ≈12.8 cm at
-    any distance. `FaceObservation.FrameAspect` is measured from the upright texture (480×640 →
-    0.75), not assumed. Handheld now deliberately asks ~2–2.5× more movement than the first tuning.
-  - `Pose/FaceSizeFilter`: low-pass 3/s, trusted band [0.02, 0.9] (drop, never clamp — a clamped
-    divisor is full-lock steering), `MinPlayableSize` 0.06 drives the "step a bit closer…" staging
-    state (≈3.4 m in box units — deliberately long; a false "too far" is the expensive direction).
-  - **`BoxWidthsPerFace` = 1.35 IS AN ESTIMATE** (BlazeFace regresses its training box, not a
-    face; the factor silently multiplied every cm threshold — the "side-step at 1 m fails" bug).
-    One constant in `FaceSizeFilter`; calibration protocol below.
-  - **Loss holds the lane** (owner call): on loss the axis freezes indefinitely; reacquisition
-    resumes absolute mapping from wherever the player stands. `Lift` still decays (grace 0.28 s).
-    Stepping out of frame keeps a lane — uncapped on purpose; a cap is one constant. Score tiers:
-    < 0.45 loss / 0.45–0.65 position-only, honoured within 0.30 s `PositionCarrySeconds` of a
-    confident frame (an empty **room** scores up to 0.47 — never trust a floor alone) / ≥ 0.65
-    confident. Jumps **arm** on any tier, **fire** only on a confident frame — side-lane hops
-    survive blur; confirmation is 2–4 frames late, inside the dodge window. `HasFace` now means "a
-    position was decoded"; `IsConfident` is the strict flag — `CameraStaging` and the rig's
-    orientation-settle stay strict (a noise frame settling orientation re-arms the mirror bug).
-  - `CameraFaceInput` ticks on `unscaledDeltaTime` (scaled dt is 0 at the pause menu; timers
-    stalled and latched a phantom jump into the resume).
-  - **`Gameplay/FaceOverlay`**: stickman over the three lane zones drawn to scale (57.5 / 21.25 /
-    21.25 of deflection), enter/hold ticks, lift, tracking-state colours, held lane highlighted.
-    HUD mode 440×180 top-centre during camera runs; framing mode 700×280 during picker/pause
-    staging. Draws deflection with **no flip of its own** — `MirrorForSelfie` already mirrors once
-    upstream. Placement is provisional; both call sites take position params.
-  - `CameraTelemetry`, ~1 Hz + on lane change, tag Unity: `[CAM] telemetry why= ctx= size= x= nx=
-    defl= lift= axis= lane= score= raw= track= pos= toofar=` (`raw` = pre-threshold detector
-    score; `size` = smoothed **box** width in frame widths; `defl` in `HalfRangeX` units).
-- Back cancels camera staging at the picker (`CancelStaging` — closes the force-quit-only soft
-  lock); mode picks act one frame late (the pick tap used to double as a first-frame jump).
-- **Store "unavailable" was a doc bug, not a store bug**: `BuildAndroid` is deliberately keyless
-  (a `test_` key in a non-debuggable build force-closes the app — 27 Aug). Device builds =
-  `BuildAndroidDev` (Test Store key, watermark). AGENTS.md corrected; keyless builds now log it.
+Verified on device: full pause/quit/restart/guide loops, store live on Test Store prices, staging
++ overlay + back-cancel, first-frame-jump fix (with positive control), logcat clean. Not verified
+(needs a person): every camera centimetre, the resume framing panel, gesture feel.
 
-**Device-loop notes** (Nord 2): `pm clear` blocked by OxygenOS; a stalled `adb install -r` → push
-to `/data/local/tmp` + `pm install -r`; `screencap` lags a frame — drive sequences with device-side
-sleeps; exactly one `E/Unity` line per cold launch is normal (AssetPackManager boot probe,
-pre-existing). One earlier entry claimed the picker footer renders twice at the top — pixel
-analysis of the raw PNGs shows pure background there; it was a preview-scaling artifact, not UI.
-
-**Owner protocol (camera, in order):** (1) step LEFT at the framing panel — the glyph must go
-left; (2) find the movement that reaches the bright tick (~9.5 cm; `HalfRangeX` is the dial);
-(3) **calibrate `BoxWidthsPerFace`**: stand 20 s, step exactly 25 cm sideways, stand 20 s → from
-telemetry `box_cm = 25 × size / Δx`, factor = `box_cm / 15`; (4) cross-check at 1.00 m:
-`box_cm ≈ size × 100`; (5) re-run the failing side-step and read `defl` / `raw` / `why=lane`;
-(6) **decide absolute vs latched** — step-and-stay holds a lane, step-and-return recenters; design
-call, not a constant; (7) the same lane change at 1–2.5 m should cost the same centimetres;
-(8) 60 s standing still fires nothing; (9) a side-lane hop fires (a couple of frames late is
-expected), and stepping out of frame in a side lane keeps the runner there; (10) pause/resume
-framing panel (never yet on screen) + handheld regression.
-
-**Open owner decisions:** absolute vs latched lanes; SLIDE is a no-op (nothing consumes
-`IsSlidePressed`, no obstacle needs it; the guide says so — drop the row or build it); back at the
-picker does nothing (exit the app?); the result hint "tap anywhere or press space" is half-true;
-overlay placement.
-
-**Live risks:** `BoxWidthsPerFace` unmeasured — every camera centimetre scales with it; how far a
-blurred *real* face scores has never been measured — below 0.45 the position tier never engages;
-noise can be followed for ≤ 0.3 s after leaving frame (next dial: a per-frame continuity limit);
-`CompositeInput` takes the largest-magnitude axis with the camera first, so a frozen
-full-deflection camera axis beats keyboard (Editor-only in practice); the 2.5 cm dead zone vs box
-jitter at 2 m+.
+Needs a human: run the `CAMERA_TUNING.md` calibration protocol (sign check → 25 cm measurement →
+distance sweep → false-positive watch), then the open decisions listed there (absolute-vs-latched
+lanes, slide no-op, back-at-picker, result hint wording, overlay placement).
 
 ## 2026-08-30 — PR #4 review fixes: privacy text now matches the build (pr4-review session)
 
