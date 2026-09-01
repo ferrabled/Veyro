@@ -22,10 +22,6 @@ namespace MotionRunner.Gameplay
         const string DailyBestKey = "veyro.best.daily";
         const string DailyBestDateKey = "veyro.best.daily.date";
 
-        /// Ignore restart input for a moment after a crash, so the tap that killed the player
-        /// does not also skip the result screen.
-        const float RestartLockoutSeconds = 0.5f;
-
         /// Only chunks overlapping this z window around the runner are tested.
         const float NearZMin = -4f;
         const float NearZMax = 10f;
@@ -59,11 +55,15 @@ namespace MotionRunner.Gameplay
         /// "2026-08-21" — the UTC date the current run belongs to.
         public string DailyLabel { get; private set; } = string.Empty;
 
+        /// When another run may start, and on which frame. Every way of asking for one - the tap
+        /// anywhere, the RUN AGAIN button - goes through it, so "a restart never begins on the
+        /// frame its own tap arrived" is one rule in one engine-free place rather than a habit
+        /// each call site has to remember. See RestartGate.
+        readonly RestartGate _restart = new RestartGate();
+
         int _runIndex;
         int _sessionSalt;
         float _elapsed;
-        float _restartLockout;
-        bool _pendingRestart;
         bool _started;
 
         void Start()
@@ -106,8 +106,7 @@ namespace MotionRunner.Gameplay
             Frozen = false;
             enabled = false;
             Input = null;
-            _pendingRestart = false;
-            _restartLockout = 0f;
+            _restart.Clear();
             _elapsed = 0f;
             Score.Reset();
 
@@ -158,23 +157,16 @@ namespace MotionRunner.Gameplay
 
             if (!IsRunning)
             {
-                _restartLockout -= deltaTime;
-
-                // A jump restarts the run one frame LATER, and only if that same tap did not
-                // open the store: TouchTapInput reports jump on the same TouchPhase.Ended that
-                // fires a UI button's click, so the SKINS & STORE tap would otherwise also
-                // restart the run behind the panel (found on device, 27 Aug). While the store
-                // is open, restart input is ignored entirely.
-                if (_pendingRestart)
-                {
-                    _pendingRestart = false;
-                    if (!StorePanel.IsOpen) StartRun();
-                }
-                else if (_restartLockout <= 0f && !StorePanel.IsOpen &&
-                         (Input.IsJumpPressed() || Input.IsSpecialPressed()))
-                {
-                    _pendingRestart = true;
-                }
+                // A restart never begins on the frame it was asked for, whether the ask was a tap
+                // anywhere or the RUN AGAIN button, and never at all while the store is up: the
+                // release that asks is the same TouchPhase.Ended that TouchTapInput reads as a jump
+                // and that the EventSystem turns into a click, so this frame's input has to be
+                // spent first. The gate holds that rule; this call site's job is that the run is
+                // started HERE - after Input.Tick above, and returning before Runner.Step - so the
+                // ask can never also be the new run's first jump.
+                if (_restart.Tick(deltaTime, Input.IsJumpPressed() || Input.IsSpecialPressed(),
+                        StorePanel.IsOpen))
+                    StartRun();
                 return;
             }
 
@@ -223,7 +215,7 @@ namespace MotionRunner.Gameplay
         void Crash()
         {
             IsRunning = false;
-            _restartLockout = RestartLockoutSeconds;
+            _restart.LockOut();
 
             int score = Score.Score;
             bool dirty = false;
@@ -262,12 +254,16 @@ namespace MotionRunner.Gameplay
             return PlayerPrefs.GetInt(DailyBestKey, 0);
         }
 
+        /// The RUN AGAIN button. QUEUED, not started: this runs inside the EventSystem's dispatch,
+        /// and DefaultExecutionOrder(100) puts this component's own Update strictly AFTER that in
+        /// the same frame - so starting the run here handed the click's own TouchPhase.Ended to a
+        /// freshly reset runner as a first-frame jump (PR #5 review). The tap-anywhere path has
+        /// always deferred, which is why only the button showed it. The gate's lockout covers the
+        /// click that arrives on the frame of the crash, exactly as it does for a tap.
         void RequestRestart()
         {
-            // Same lockout as the tap path: the click that arrives on the frame of the crash
-            // is the crash input, not a request for another run.
-            if (IsRunning || _restartLockout > 0f) return;
-            StartRun();
+            if (IsRunning) return;
+            _restart.RequestFromButton();
         }
     }
 }

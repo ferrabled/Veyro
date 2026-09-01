@@ -14,10 +14,14 @@ namespace MotionRunner.Gameplay
     /// The camera lives here rather than in RunSession on purpose: gameplay code never touches
     /// sensors (CLAUDE.md rule 2), and every way out of camera mode - pause, restart, quit, a rig
     /// that will not come back - has to land the player on tilt+touch instead of stranding them
-    /// (rule 3).
+    /// (rule 3). That includes the camera going away without anybody asking: see
+    /// TickCameraOutage.
     public sealed class RunFlow : MonoBehaviour
     {
         readonly PauseState _pause = new PauseState();
+
+        /// Watches for a camera that has stopped answering during a live run. See TickCameraOutage.
+        readonly CameraOutage _outage = new CameraOutage();
 
         RunSession _session;
         RunHud _hud;
@@ -147,6 +151,18 @@ namespace MotionRunner.Gameplay
             ApplyPhase();
         }
 
+        /// RESTART RUN from the pause menu. StartRun is called straight out, deliberately, and does
+        /// NOT go through RunSession's RestartGate: that gate releases a run that has ENDED, and
+        /// this run is still IsRunning - it is only frozen.
+        ///
+        /// What keeps the tap off the restarted run's first frame is the pause menu's own frame
+        /// counter plus the fact that RunSession keeps ticking input while Frozen. The tap lands on
+        /// frame N; RunSession's Update - order 100, so after the EventSystem and after PauseMenu -
+        /// reads and discards it that same frame because the session is frozen; PauseMenu only
+        /// invokes this on frame N+1 or later, by which time TouchPhase.Ended is gone. In camera
+        /// mode the wait is seconds long and ends on an arbitrary frame, so PauseMenu re-arms the
+        /// same counter when staging completes rather than firing on the frame it happens to land
+        /// on - see the Ready case there.
         void RestartRun()
         {
             if (!_pause.FinishResume()) return;
@@ -212,6 +228,8 @@ namespace MotionRunner.Gameplay
 
         void Update()
         {
+            TickCameraOutage();
+
             // Android delivers the back button as Escape (and so does the Editor, which is how
             // this gets exercised without a phone).
             //
@@ -243,12 +261,75 @@ namespace MotionRunner.Gameplay
             }
         }
 
+        // ---- the camera going away mid-run ----
+
+        /// A camera-mode run whose camera has stopped answering PAUSES ITSELF, and the pause menu
+        /// takes it from there: its resume staging is already the "stand where the phone can see
+        /// you…" prompt over the framing overlay, and its CameraGaveUp path already finishes the
+        /// run on tilt+touch when the camera genuinely will not come back (rule 3). So this is only
+        /// the trigger; nothing new is on screen because of it.
+        ///
+        /// Before it, a rig that reached Failed - or a player who walked out of shot - left the
+        /// steering axis frozen at its last value for the rest of the run (the loss contract on
+        /// FaceSteering holds the lane rather than recentring, which is right for a blur gap and
+        /// wrong for an outage), with nothing to recover it. It also bounds the quirk that
+        /// documented that hold as uncapped: a lane now survives at most one outage window.
+        ///
+        /// Three facts, one decision, all of the arithmetic engine-free in CameraOutage:
+        ///   * live - a camera run that is actually moving. Not frozen (the pause menu re-acquires
+        ///     the camera itself and must not be pause-spammed), not the result screen, and never a
+        ///     tilt run;
+        ///   * hasPosition - FaceSteering's own answer, so there is one definition of "lost" in the
+        ///     build. It already covers the rig not tracking and the stale-observation cutoff,
+        ///     because CameraFaceInput submits score 0 in both cases;
+        ///   * Failed - terminal, so it does not wait out the window.
+        /// Read one frame behind the session (this Update is order 0, RunSession's is 100), which
+        /// costs a frame out of 1.75 s.
+        void TickCameraOutage()
+        {
+            bool live = _pause.CameraMode && !_pause.IsFrozen &&
+                        _session.enabled && _session.IsRunning;
+            bool failed = _rig != null && _rig.State == FaceTrackingRig.RigState.Failed;
+            bool hasPosition = _faceInput != null && _faceInput.Steering.HasPosition;
+
+            if (!_outage.Tick(Time.unscaledDeltaTime, live, hasPosition, failed)) return;
+
+            Debug.Log("[CAM] auto-pause: " + (failed
+                ? "rig failed — " + (_rig != null ? _rig.FailReason : "unknown")
+                : "no usable face position for " + CameraOutage.PauseAfterSeconds + "s"));
+            RequestPause();
+        }
+
         /// The overlay's one piece of plumbing: which lane the runner is actually committed to.
         /// Everything else it shows comes from the input adapter it was handed.
         void LateUpdate()
         {
-            if (_overlay == null || _session.Runner == null) return;
+            if (!SyncOverlay()) return;
+            if (_session.Runner == null) return;
             _overlay.ReportLane(_session.Runner.Lane);
+        }
+
+        /// Whether the face panel should be on screen at all, checked every frame rather than only
+        /// when the phase changes. Returns true while it is up.
+        ///
+        /// Two states hide it, and only one of them is a phase:
+        ///   * frozen - the pause menu puts up its own, larger copy of the panel while it
+        ///     re-acquires the camera, so the HUD one steps aside rather than sitting there showing
+        ///     a lost face;
+        ///   * the session not running - the crash/result screen. Nothing calls ApplyPhase on a
+        ///     crash (the phase is still Running: a run that ended is not a run that paused), so a
+        ///     visibility rule that lived only there left the stickman floating over the result card
+        ///     - the overlay canvas is sortingOrder 50 and the result card is on the HUD's own
+        ///     canvas at 0, so it drew on top of the score the player had just earned (PR #5
+        ///     review). Checking it here is what makes the rule hold for every way a run can stop.
+        /// It comes back by itself when the next run starts, including a RUN AGAIN restart, which
+        /// goes straight to RunSession and never reaches this class.
+        bool SyncOverlay()
+        {
+            if (_overlay == null) return false;
+            bool visible = _session.IsRunning && !_pause.IsFrozen;
+            if (_overlay.gameObject.activeSelf != visible) _overlay.gameObject.SetActive(visible);
+            return visible;
         }
 
         // ---- one place that acts on the phase ----
@@ -261,9 +342,10 @@ namespace MotionRunner.Gameplay
             Time.timeScale = _pause.IsFrozen ? 0f : 1f;
             _session.Frozen = _pause.IsFrozen;
 
-            // The pause menu puts up its own, larger copy of the panel while it re-acquires the
-            // camera, so the HUD one steps aside rather than sitting there showing a lost face.
-            if (_overlay != null) _overlay.gameObject.SetActive(!_pause.IsFrozen);
+            // Applied here as well as every frame in LateUpdate, so a phase change lands on the
+            // same frame it happens rather than one later. SyncOverlay is the only place that
+            // decides this.
+            SyncOverlay();
 
             if (_rig == null) return;
             if (_pause.HoldsCamera) _rig.Begin(); // no-op unless the rig is idle

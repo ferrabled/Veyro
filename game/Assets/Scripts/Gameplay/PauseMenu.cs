@@ -122,6 +122,10 @@ namespace MotionRunner.Gameplay
         /// that tap straight to the runner (the bug that made the store tap restart the run,
         /// found on device 27 Aug). The frame check is what makes that a rule rather than a
         /// hope - Update and the EventSystem run in the same phase, in no fixed order.
+        ///
+        /// In camera mode the tap is only half of it: the wait then runs for seconds and ends on an
+        /// arbitrary frame, which is a second chance to land on somebody's tap. The counter is
+        /// re-armed when staging completes for exactly that reason - see the Ready case in Update.
         void Begin(Pending pending)
         {
             if (_pending != Pending.None) return;
@@ -164,6 +168,19 @@ namespace MotionRunner.Gameplay
                         DismissOverlay();
                         SetButtonsInteractable(true);
                         CameraGaveUp?.Invoke();
+                        return;
+
+                    case CameraStaging.Stage.Ready:
+                        // The camera is back - but re-arm the frame counter rather than resuming on
+                        // this frame. The tap that started the wait is seconds old, so the frame
+                        // staging lands on is arbitrary and can be the frame of any other tap the
+                        // player happens to make; resuming here unfreezes the run before
+                        // RunSession's own Update (order 100) has read that tap, and hands it over
+                        // as a first-frame jump. Exactly the hazard ModeSelectMenu.BeginPick closes
+                        // for the picker's camera handover, and the reason _pendingFrame cannot
+                        // just be the tap's frame.
+                        _staging = null;
+                        _pendingFrame = Time.frameCount;
                         return;
                 }
             }
