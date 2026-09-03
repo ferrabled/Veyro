@@ -37,6 +37,37 @@ Overlay (`FaceOverlay`): zones drawn to scale (57.5 / 21.25 / 21.25 of deflectio
 deflection with **no flip of its own** — `CameraFeed.MirrorForSelfie` already mirrors once
 upstream; placement params live at the two creation sites (RunFlow / menus).
 
+## Resume gesture (raise your right hand) — 2026-09-01
+
+Pause-resume in camera mode: camera back → face held 0.5 s (`CameraStaging`) → raise your RIGHT
+hand → 3-2-1 → run. A camera-outage auto-pause begins this staging BY ITSELF (reason line on
+top) so the loop is touch-free end to end; manual and app-background pauses wait on the idle
+card. Touch RESUME and back work at every step (rule 3 — the gesture augments). The card HIDES
+during the count (owner call, 2 Sep device session): what's on screen is the frozen run, the
+framing overlay and the numeral; back and the HUD pause button cancel back to the card.
+BlazePose (detector + lite landmarker, CPU) runs ONLY while `timeScale == 0`: `PoseGestureProbe`
+logs `[CAM] pose probe up/down`, self-stops with an error if it ever finds the world unfrozen,
+and is disposed the moment the countdown starts. A full cycle is ~334 ms on the Nord 2 (T-010),
+so the probe answers at ~3 Hz; a floor of 0.25 s/sample keeps Editor rates honest.
+
+| constant | value | means | move it when |
+|---|---|---|---|
+| `RaisedHand.HeadUnitsAboveNose` | 0.5 | wrist must clear the crown (~10–12 cm above the nose); head unit = nose→shoulder-line span | hair-pushback/wave false-confirms (raise) / real raises missed (lower) |
+| `RaisedHand` wrist gate | visibility ≥ 0.5 only | an overhead wrist rides the crop edge: presence collapses while visibility holds (2 Sep device), so presence is NOT required for the wrist | overhead false-confirms appear (re-add presence + rely on the elbow) |
+| `RaisedHand` elbow fallback | elbow strictly above nose, full `IsTracked` | vouches when the hand left the frame entirely; no near-face fidget puts an elbow overhead | |
+| `RaisedHandConfirm.RequiredSamples` | 3 | ~1 s hold at 3 Hz; NET evidence — a miss winds back one sample, alternating noise never confirms (a hard reset flip-flopped the prompt against a held arm, 2 Sep) | hold feels laggy / twitchy |
+| `PoseGestureProbe.MinSampleIntervalSeconds` | 0.25 s | sample cadence floor, device-independent hold | |
+| `PauseMenu.CountdownFaceGraceSeconds` | 0.75 s | staging may lose the face this long mid-count before cancelling to the paused card | countdown cancels on blur (raise) |
+| `ResumeCountdown.DefaultDurationSeconds` | 3 s | numerals + still-player window for `FaceSteering` recalibration | owner call (OPEN_QUESTIONS 13) |
+
+**Mirror rule (pinned in `RaisedHandTests`):** the upright frame is selfie-mirrored once, and
+BlazePose labels anatomy as if it never was — so the player's right hand is `PoseJoint.LeftWrist`
+on the mirrored frame (`RaisedHand.WristFor`). The overlay's raised-arm hint draws on the glyph's
+screen-right, which is the same side; never flip either independently.
+
+**Mid-run pause gesture:** deliberately none — leaving the frame *is* the gesture (auto-pause,
+`CameraOutage`, 1.75 s). Pose during gameplay stays abandoned (118 ms vs 30 ms budget, T-010).
+
 ## Telemetry
 
 ~1 Hz + on lane change, tag Unity: `[CAM] telemetry why= ctx= size= x= nx= defl= lift= axis= lane=
@@ -60,8 +91,9 @@ width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | g
 
 ## Open owner decisions
 
-- **Absolute vs latched lanes**: step-and-stay holds a lane, step-and-return recenters. Design
-  call, superseded if the gesture-resume spec (see the shared implementation artifact) lands.
+- **Absolute vs latched lanes**: step-and-stay holds a lane, step-and-return recenters. The
+  gesture-resume spec landed 2026-09-01 (countdown + recalibration on every resume) — re-ask
+  with that in hand.
 - SLIDE is a no-op: nothing consumes `IsSlidePressed`, no obstacle needs it; guide says so.
 - Back at the picker does nothing (exit the app?).
 - Result hint "tap anywhere or press space" is half-true with three buttons on the card.

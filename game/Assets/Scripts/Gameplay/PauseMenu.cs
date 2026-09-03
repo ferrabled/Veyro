@@ -1,6 +1,7 @@
 using System;
 using MotionRunner.CameraInput;
 using MotionRunner.Core;
+using MotionRunner.Track;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,8 +16,20 @@ namespace MotionRunner.Gameplay
     /// launch. If it never gets there, the run drops to tilt+touch instead of stranding the
     /// player behind a camera that will not come back (CLAUDE.md rule 3).
     ///
+    /// Since the hands-free flow (2026-09-01) a camera resume is three waits, not one:
+    ///   camera back -> raise your right hand (or tap RESUME) -> 3-2-1 -> run.
+    /// The gesture is the whole point of the mode - the player walked away from the phone, so
+    /// asking them to walk back and tap it defeats hands-free - but it AUGMENTS, never gates
+    /// (rule 3): both buttons come back the moment the face is found, so a player whose pose
+    /// never detects resumes by touch, and Android back cancels at every step. The countdown
+    /// exists for FaceSteering as much as for the player: its neutral was reset at BeginResume,
+    /// and three seconds of standing still is what it calibrates on, so the run resumes aimed
+    /// straight instead of leaning into a wall.
+    ///
     /// The menu is up while the game is frozen at Time.timeScale = 0, so everything here counts
-    /// in unscaled time and nothing here waits on a coroutine.
+    /// in unscaled time and nothing here waits on a coroutine. The BlazePose probe behind the
+    /// gesture lives on the rig and is affordable for exactly the same reason - see
+    /// PoseGestureProbe; it is disposed the moment the countdown starts.
     public sealed class PauseMenu : MonoBehaviour
     {
         static readonly Color TextColor = new Color(0.94f, 0.96f, 1f);
@@ -27,9 +40,22 @@ namespace MotionRunner.Gameplay
         static readonly Color StatusColor = new Color(0.72f, 0.76f, 0.85f);
 
         const string IdleHint = "back button resumes";
+        const string GesturePrompt = "raise your right hand when ready\n— or tap RESUME";
+        const string GestureHoldHint = "hold it…";
+        const string TouchOnlyPrompt = "tap RESUME when ready";
+        const string CountdownHint = "get ready…";
+        const string FaceLostReason = "couldn't see you — paused";
+
+        /// How long the countdown tolerates the staging losing the face before it cancels back to
+        /// the paused card. CameraStaging demands a fresh CONFIDENT observation, and a single
+        /// blurred frame fails that bar - a player settling into their lane must not have the
+        /// countdown yanked away by one soft frame. 0.75 s is a couple of real detector losses,
+        /// well past the blur regime (FaceSteering carries positions for 0.30 s) and still short
+        /// enough that a player who genuinely walked off does not get an unattended unfreeze.
+        const float CountdownFaceGraceSeconds = 0.75f;
 
         /// What the player asked for. Raised one frame after the tap at the earliest, and only
-        /// once the camera (if any) is back.
+        /// once the camera (if any) is back and the countdown has run out.
         public event Action ResumeRequested;
         public event Action RestartRequested;
         public event Action QuitRequested;
@@ -37,6 +63,11 @@ namespace MotionRunner.Gameplay
         /// Raised the moment a resume or restart is asked for, before anything is ready: RunFlow
         /// turns the camera back on off the back of this.
         public event Action ResumeStarted;
+
+        /// The countdown lost the player mid-count. RunFlow routes it through RequestPause - the
+        /// same path as the back button - so the phase walks back to Paused through the one
+        /// place that owns it (ApplyPhase stays the only timeScale writer).
+        public event Action ResumeCancelled;
 
         /// The camera did not come back. RunFlow rebuilds the run on tilt+touch; the menu stays
         /// up so the player chooses when to go.
@@ -49,13 +80,33 @@ namespace MotionRunner.Gameplay
             Restart
         }
 
+        /// Which of the camera resume's three waits is on screen. None for tilt, and for the
+        /// one-frame gap between the countdown finishing and the resume firing.
+        enum Wait
+        {
+            None,
+            Camera,
+            Gesture,
+            Countdown
+        }
+
         Text _status;
+        Text _countdownDigits;
+        GameObject _panel;
         Button _resumeButton;
         Button _restartButton;
         FaceTrackingRig _rig;
         CameraStaging _staging;
         FaceOverlay _overlay;
         Pending _pending;
+        Wait _wait;
+
+        /// Why the game paused itself, prefixed onto whatever the card says next. Cleared the
+        /// moment the face is found again — a resolved reason narrating a live staging is stale
+        /// news over the line that matters.
+        string _reason;
+        readonly ResumeCountdown _countdown = new ResumeCountdown();
+        float _faceUnseenFor;
         int _pendingFrame = -1;
 
         /// rig is null in tilt mode, and is dropped here when camera mode gives up.
@@ -72,21 +123,63 @@ namespace MotionRunner.Gameplay
         public void RequestResume() => Begin(Pending.Resume);
 
         /// Back out of a re-acquisition: the camera goes off again and the menu returns to rest.
+        /// Every wait ends here - the probe, the countdown and the staging all go, whichever of
+        /// them was up. An auto-pause reason survives the cancel: backing out of the recovery
+        /// does not change why the game stopped.
         public void CancelResume()
         {
+            _rig?.EndGestureProbe();
+            _countdown.Cancel();
+            _countdownDigits.gameObject.SetActive(false);
+            _panel.SetActive(true); // the card comes back from wherever the count had put it
             _pending = Pending.None;
+            _wait = Wait.None;
             _staging = null;
+            _faceUnseenFor = 0f;
             DismissOverlay();
             SetButtonsInteractable(true);
-            _status.text = IdleHint;
+            _status.text = WithReason(IdleHint);
         }
+
+        /// Why the game paused itself, written where the player is already looking. The card
+        /// otherwise says nothing after an auto-pause, and "the game stopped and will not say
+        /// why" is the wrong first impression for a mode that already asks a lot (Feature A's
+        /// missing status line).
+        public void ShowAutoPauseReason(string reason)
+        {
+            _reason = reason;
+            if (_pending != Pending.None) return; // a wait is already narrating the screen
+            _status.text = WithReason(IdleHint);
+        }
+
+        /// A camera outage paused the run: go straight back into the resume staging rather than
+        /// sitting on an idle card. The player is by definition away from the phone — that is
+        /// what an outage IS — so asking them to walk over and tap RESUME before the camera even
+        /// starts looking for them defeats the hands-free loop (acceptance criterion 1:
+        /// auto-pause → framing overlay → re-enter → raise your hand, no touch anywhere). The
+        /// reason rides along on top of the staging copy, and every existing way out still works:
+        /// back cancels to the idle card, QUIT leaves, a camera that will not come back drops to
+        /// tilt through the same Failed path.
+        ///
+        /// Deliberately NOT used for app-background pauses (RunFlow.OnApplicationPause): those
+        /// land on the idle card, because auto-starting a camera the moment the app comes back is
+        /// presumptuous where the player pressed home, and plain wrong where the run is a tilt
+        /// one — an auto-begun tilt resume would unfreeze the run the instant the app returned.
+        public void BeginAutoResume(string reason)
+        {
+            _reason = reason;
+            Begin(Pending.Resume);
+        }
+
+        /// The line the card shows, with the auto-pause reason above it while one is standing.
+        string WithReason(string text) => _reason == null ? text : _reason + "\n" + text;
 
         void Build()
         {
             RuntimeUi.PortraitCanvas(gameObject, 150); // above the HUD, below the store
 
-            var panel = RuntimeUi.FullScreenPanel("Panel", transform, DimColor);
-            var card = RuntimeUi.Card("Card", panel.transform, new Vector2(760f, 900f), PanelColor);
+            _panel = RuntimeUi.FullScreenPanel("Panel", transform, DimColor);
+            var card = RuntimeUi.Card("Card", _panel.transform, new Vector2(760f, 900f), PanelColor);
 
             RuntimeUi.Label("Title", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -115,6 +208,16 @@ namespace MotionRunner.Gameplay
                 new Vector2(0.5f, 0f), new Vector2(0f, 130f), new Vector2(480f, 110f),
                 SecondaryColor, "QUIT TO MENU", 42, TextColor,
                 () => QuitRequested?.Invoke());
+
+            // The 3-2-1 numeral, dead centre where no phone bezel or thumb hides it. A sibling of
+            // the panel, NOT a child: the whole card steps aside for the count (owner call,
+            // 2026-09-02 device session) so the player is looking at the frozen run they are
+            // about to rejoin, and the numeral has to survive the panel being hidden.
+            _countdownDigits = RuntimeUi.Label("Countdown", transform,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(-300f, -300f), new Vector2(300f, 300f),
+                400, TextAnchor.MiddleCenter, AccentColor);
+            _countdownDigits.gameObject.SetActive(false);
         }
 
         /// A tap on RESUME or RESTART never acts on the frame it arrives: TouchTapInput reports a
@@ -123,11 +226,23 @@ namespace MotionRunner.Gameplay
         /// found on device 27 Aug). The frame check is what makes that a rule rather than a
         /// hope - Update and the EventSystem run in the same phase, in no fixed order.
         ///
-        /// In camera mode the tap is only half of it: the wait then runs for seconds and ends on an
-        /// arbitrary frame, which is a second chance to land on somebody's tap. The counter is
-        /// re-armed when staging completes for exactly that reason - see the Ready case in Update.
+        /// In camera mode the tap is only half of it: the waits then run for seconds and end on
+        /// arbitrary frames, which are each a second chance to land on somebody's tap. The
+        /// counter is re-armed whenever a wait hands over - staging to gesture, countdown to
+        /// done - for exactly that reason.
+        ///
+        /// While the gesture wait is up, this same method IS the touch confirm: both buttons are
+        /// deliberately live there (rule 3 - the gesture augments, it never gates), and a tap
+        /// skips the hand-raise and goes straight to the countdown.
         void Begin(Pending pending)
         {
+            if (_wait == Wait.Gesture)
+            {
+                _pending = pending;
+                StartCountdown();
+                return;
+            }
+
             if (_pending != Pending.None) return;
             _pending = pending;
             _pendingFrame = Time.frameCount;
@@ -135,8 +250,9 @@ namespace MotionRunner.Gameplay
             if (_rig != null)
             {
                 _staging = new CameraStaging(_rig);
+                _wait = Wait.Camera;
                 SetButtonsInteractable(false);
-                _status.text = "getting the camera back…";
+                _status.text = WithReason("getting the camera back…");
 
                 // Above the card, because the card's own rows are full. Standing back in front of
                 // the phone is the whole of this wait, so the panel that shows where the camera
@@ -152,37 +268,17 @@ namespace MotionRunner.Gameplay
         {
             if (_pending == Pending.None || Time.frameCount == _pendingFrame) return;
 
-            if (_staging != null)
+            switch (_wait)
             {
-                switch (_staging.Poll())
-                {
-                    case CameraStaging.Stage.Waiting:
-                        _status.text = _staging.Status;
-                        return;
-
-                    case CameraStaging.Stage.Failed:
-                        _status.text = _staging.Status + "\n— finishing this run on tilt & touch";
-                        _staging = null;
-                        _rig = null;
-                        _pending = Pending.None;
-                        DismissOverlay();
-                        SetButtonsInteractable(true);
-                        CameraGaveUp?.Invoke();
-                        return;
-
-                    case CameraStaging.Stage.Ready:
-                        // The camera is back - but re-arm the frame counter rather than resuming on
-                        // this frame. The tap that started the wait is seconds old, so the frame
-                        // staging lands on is arbitrary and can be the frame of any other tap the
-                        // player happens to make; resuming here unfreezes the run before
-                        // RunSession's own Update (order 100) has read that tap, and hands it over
-                        // as a first-frame jump. Exactly the hazard ModeSelectMenu.BeginPick closes
-                        // for the picker's camera handover, and the reason _pendingFrame cannot
-                        // just be the tap's frame.
-                        _staging = null;
-                        _pendingFrame = Time.frameCount;
-                        return;
-                }
+                case Wait.Camera:
+                    TickCameraWait();
+                    return;
+                case Wait.Gesture:
+                    TickGestureWait();
+                    return;
+                case Wait.Countdown:
+                    TickCountdown();
+                    return;
             }
 
             Pending done = _pending;
@@ -190,8 +286,182 @@ namespace MotionRunner.Gameplay
             _staging = null;
             DismissOverlay();
 
+            // Back on before the handover: RunFlow.Resume ASKS the phase (FinishResume can refuse
+            // under a late callback), and a refused resume leaves this menu up - which must not be
+            // an invisible card because a countdown hid it. The normal path destroys the whole
+            // menu this same frame, so the restore is never seen.
+            _panel.SetActive(true);
+
             if (done == Pending.Resume) ResumeRequested?.Invoke();
             else RestartRequested?.Invoke();
+        }
+
+        void TickCameraWait()
+        {
+            switch (_staging.Poll())
+            {
+                case CameraStaging.Stage.Waiting:
+                    _status.text = WithReason(_staging.Status);
+                    return;
+
+                case CameraStaging.Stage.Failed:
+                    HandleCameraFailure();
+                    return;
+
+                case CameraStaging.Stage.Ready:
+                    // The face is found again — whatever reason paused the run is resolved, and
+                    // from here the gesture prompt is the only line that matters.
+                    _reason = null;
+
+                    // The camera is back and the face is held. Not a resume yet: the gesture
+                    // wait takes it from here, and a probe that cannot load (assets missing, a
+                    // model that will not run) skips straight to the countdown - the flow never
+                    // has fewer ways forward than it had before the gesture existed.
+                    if (_rig.BeginGestureProbe())
+                    {
+                        _wait = Wait.Gesture;
+                        _pendingFrame = Time.frameCount;
+                        SetButtonsInteractable(true);
+                        _status.text = GesturePrompt;
+                        _overlay?.ShowRaiseHandHint(true);
+                    }
+                    else
+                    {
+                        StartCountdown();
+                    }
+                    return;
+            }
+        }
+
+        /// The staging keeps being polled underneath the gesture: it is the one definition of
+        /// "the camera can see you", and walking out of shot mid-gesture walks this wait back to
+        /// the camera one, probe and all.
+        void TickGestureWait()
+        {
+            switch (_staging.Poll())
+            {
+                case CameraStaging.Stage.Waiting:
+                    _rig.EndGestureProbe();
+                    _overlay?.ShowRaiseHandHint(false);
+                    _wait = Wait.Camera;
+                    SetButtonsInteractable(false);
+                    _status.text = WithReason(_staging.Status);
+                    return;
+
+                case CameraStaging.Stage.Failed:
+                    HandleCameraFailure();
+                    return;
+            }
+
+            PoseGestureProbe probe = _rig.GestureProbe;
+            if (probe == null || !probe.IsRunning)
+            {
+                // The probe died mid-wait (it logs why). The touch path carries on alone -
+                // nothing auto-resumes, because a confirm the player never gave is not one.
+                _status.text = TouchOnlyPrompt;
+                return;
+            }
+
+            if (probe.Confirmed)
+            {
+                StartCountdown();
+                return;
+            }
+
+            // "hold it…" for as long as any evidence is standing, not only on frames the rule
+            // agreed: the lite landmarker drops the overhead wrist for the odd sample, and a
+            // prompt that flips back to "raise your right hand" against an arm that never moved
+            // reads as a broken gesture (the 2026-09-02 device complaint). The streak now winds
+            // down through misses instead of resetting, so streak > 0 is exactly "a hold is in
+            // progress".
+            _status.text = probe.HandRaisedNow || probe.Streak > 0 ? GestureHoldHint : GesturePrompt;
+        }
+
+        /// Confirmed - by hand or by tap. The probe goes FIRST (the design rule: the heavy model
+        /// is disposed the moment the countdown starts, so it is provably never alive when the
+        /// world unfreezes), then three seconds of numerals while FaceSteering calibrates on a
+        /// player standing still.
+        ///
+        /// The card steps ASIDE for the count (owner call from the 2026-09-02 device session):
+        /// the countdown belongs to the run the player is about to rejoin, so what is on screen
+        /// is the frozen playground, the framing overlay they are settling into a lane with, and
+        /// the numeral - not a menu. Hiding the card takes QUIT with it, so the touch cancels
+        /// mid-count are Android back and the HUD's own pause button (both land on
+        /// RunFlow.RequestPause -> CancelResume, which puts the card back); face loss cancels the
+        /// same way on its own.
+        void StartCountdown()
+        {
+            _rig.EndGestureProbe();
+            _overlay?.ShowRaiseHandHint(false);
+            _wait = Wait.Countdown;
+            _faceUnseenFor = 0f;
+            SetButtonsInteractable(false);
+            _countdown.Begin();
+            _status.text = CountdownHint; // waiting on the card if the count is cancelled back to it
+            _panel.SetActive(false);
+            _countdownDigits.text = _countdown.DisplayDigit.ToString();
+            _countdownDigits.gameObject.SetActive(true);
+        }
+
+        void TickCountdown()
+        {
+            CameraStaging.Stage stage = _staging.Poll();
+            if (stage == CameraStaging.Stage.Failed)
+            {
+                HandleCameraFailure();
+                return;
+            }
+
+            // Losing the face mid-count cancels back to the paused card rather than regressing
+            // to the camera wait: a countdown that silently re-arms itself can unfreeze the run
+            // while nobody is standing in frame, which is the auto-pause's bug re-introduced at
+            // the worst moment. Through ResumeCancelled -> RunFlow.RequestPause, the same road
+            // the back button takes, so the phase and the camera are wound back by the one
+            // place that owns them.
+            _faceUnseenFor = stage == CameraStaging.Stage.Ready
+                ? 0f
+                : _faceUnseenFor + Time.unscaledDeltaTime;
+            if (_faceUnseenFor > CountdownFaceGraceSeconds)
+            {
+                _countdown.Cancel();
+                _countdownDigits.gameObject.SetActive(false);
+                ResumeCancelled?.Invoke(); // -> RequestPause -> CancelResume resets this menu
+                ShowAutoPauseReason(FaceLostReason);
+                return;
+            }
+
+            if (_countdown.Tick(Time.unscaledDeltaTime))
+            {
+                // Done - but never fire on the frame the count happens to end on: the re-armed
+                // counter gives RunSession one frozen frame to swallow any tap in flight,
+                // exactly like the staging handover above.
+                _countdownDigits.gameObject.SetActive(false);
+                _wait = Wait.None;
+                _pendingFrame = Time.frameCount;
+                return;
+            }
+
+            _countdownDigits.text = _countdown.DisplayDigit.ToString();
+        }
+
+        /// The camera is not coming back (CameraStaging.Stage.Failed is the rig's own terminal
+        /// verdict). Reached from any of the three waits, so everything any of them put up is
+        /// taken down before the run is handed to tilt+touch.
+        void HandleCameraFailure()
+        {
+            _rig.EndGestureProbe();
+            _countdown.Cancel();
+            _countdownDigits.gameObject.SetActive(false);
+            _panel.SetActive(true);
+            _reason = null; // the failure line below is the whole story now
+            _status.text = _staging.Status + "\n— finishing this run on tilt & touch";
+            _staging = null;
+            _rig = null;
+            _pending = Pending.None;
+            _wait = Wait.None;
+            DismissOverlay();
+            SetButtonsInteractable(true);
+            CameraGaveUp?.Invoke();
         }
 
         void SetButtonsInteractable(bool on)
@@ -209,6 +479,13 @@ namespace MotionRunner.Gameplay
             _overlay = null;
         }
 
-        void OnDestroy() => DismissOverlay();
+        /// The probe dies with the menu, not with the rig: quitting mid-wait destroys the rig
+        /// (which also ends it), but a menu closed any other way must not leave a pose model
+        /// running behind an unfrozen run.
+        void OnDestroy()
+        {
+            _rig?.EndGestureProbe();
+            DismissOverlay();
+        }
     }
 }

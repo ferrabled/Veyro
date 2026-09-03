@@ -18,10 +18,6 @@ namespace MotionRunner.Gameplay
     [DefaultExecutionOrder(100)]
     public sealed class RunSession : MonoBehaviour
     {
-        const string AllTimeBestKey = "veyro.best.alltime";
-        const string DailyBestKey = "veyro.best.daily";
-        const string DailyBestDateKey = "veyro.best.daily.date";
-
         /// Only chunks overlapping this z window around the runner are tested.
         const float NearZMin = -4f;
         const float NearZMax = 10f;
@@ -32,6 +28,13 @@ namespace MotionRunner.Gameplay
         public RunHud Hud;
 
         public RunMode Mode = RunMode.Daily;
+
+        /// Who steers this run - camera or tilt. Set at Begin (RunFlow knows what the player
+        /// picked) and deliberately NOT changed by DropCameraMode: a camera run that finishes on
+        /// the tilt fallback still scores as the camera run it was chosen to be. The boards
+        /// split on this (Feature D, owner call: camera and tilt are separate games), while the
+        /// seed does not - the same daily track drives both schemes.
+        public ControlScheme Scheme { get; private set; } = ControlScheme.Tilt;
 
         /// Which content set the seed refers to (handoff 3.3).
         public string WorldId = RunSeed.DefaultWorldId;
@@ -46,10 +49,13 @@ namespace MotionRunner.Gameplay
         /// way, so nothing a player does at the pause menu survives into the resumed run.
         public bool Frozen { get; set; }
 
-        /// All-time best across every mode.
+        /// All-time best on the CURRENT SCHEME's board. Loaded per run rather than once at
+        /// startup, because the player can quit to the picker and come back on the other scheme
+        /// within one session.
         public int AllTimeBest { get; private set; }
 
-        /// Best on the current UTC date's Daily Run. Resets by itself when the date rolls over.
+        /// Best on the current UTC date's Daily Run, on the current scheme's board. Resets by
+        /// itself when the date rolls over.
         public int DailyBest { get; private set; }
 
         /// "2026-08-21" — the UTC date the current run belongs to.
@@ -61,6 +67,10 @@ namespace MotionRunner.Gameplay
         /// each call site has to remember. See RestartGate.
         readonly RestartGate _restart = new RestartGate();
 
+        /// The per-scheme best boards (engine-free; the PlayerPrefs adapter is the only Unity in
+        /// the path). Owns the key shapes and the one-time legacy migration.
+        readonly BestBoard _board = new BestBoard(new PlayerPrefsScoreStore());
+
         int _runIndex;
         int _sessionSalt;
         float _elapsed;
@@ -69,7 +79,10 @@ namespace MotionRunner.Gameplay
         void Start()
         {
             _started = true;
-            AllTimeBest = PlayerPrefs.GetInt(AllTimeBestKey, 0);
+
+            // Legacy single-board scores become tilt's history, exactly once (idempotent, and
+            // the legacy keys stay on disk untouched). Before any board is read.
+            _board.Migrate();
 
             // Free mode needs a run-to-run seed source. The seed source may be arbitrary; the
             // generation it drives may not be (CLAUDE.md rule 4), which is why the tick count is
@@ -88,9 +101,10 @@ namespace MotionRunner.Gameplay
         /// Starts running with a control scheme. Unity calls Start() the first time the component
         /// is enabled and never again, so the second visit from the mode picker has to kick the
         /// run itself.
-        public void Begin(IGameInput input)
+        public void Begin(IGameInput input, ControlScheme scheme)
         {
             Input = input;
+            Scheme = scheme;
             Frozen = false;
             enabled = true;
             if (_started) StartRun();
@@ -122,10 +136,13 @@ namespace MotionRunner.Gameplay
             Score.Reset();
 
             // Sampled per run, not once at startup: a session left open across UTC midnight rolls
-            // onto the new day's track and the new day's best-score bucket.
+            // onto the new day's track and the new day's best-score bucket. The bests come off
+            // the current scheme's board for the same per-run reason - the scheme can change
+            // between two runs of one session.
             var utcNow = DateTime.UtcNow;
             DailyLabel = DailySeed.LabelForDate(utcNow);
-            DailyBest = LoadDailyBest(DailyLabel);
+            DailyBest = _board.DailyBest(Scheme, DailyLabel);
+            AllTimeBest = _board.AllTimeBest(Scheme);
 
             CurrentSeed = Mode == RunMode.Daily
                 ? DailySeed.ForUtcDate(utcNow, WorldId)
@@ -137,7 +154,7 @@ namespace MotionRunner.Gameplay
             if (Hud != null)
             {
                 Hud.HideResult();
-                Hud.SetMode(Mode, DailyLabel);
+                Hud.SetMode(Mode, DailyLabel, Scheme);
                 Hud.SetLive(Score, Director.Difficulty);
             }
 
@@ -217,41 +234,32 @@ namespace MotionRunner.Gameplay
             IsRunning = false;
             _restart.LockOut();
 
+            // The board owns which keys a scheme may touch (unit-tested there); this method only
+            // decides WHEN a run scores, which is unchanged: crashes score, quits do not.
             int score = Score.Score;
             bool dirty = false;
 
-            if (score > AllTimeBest)
+            if (_board.RecordAllTime(Scheme, score))
             {
                 AllTimeBest = score;
-                PlayerPrefs.SetInt(AllTimeBestKey, AllTimeBest);
                 dirty = true;
             }
 
-            if (Mode == RunMode.Daily && score > DailyBest)
+            if (Mode == RunMode.Daily && _board.RecordDaily(Scheme, DailyLabel, score))
             {
                 DailyBest = score;
-                PlayerPrefs.SetInt(DailyBestKey, DailyBest);
-                PlayerPrefs.SetString(DailyBestDateKey, DailyLabel);
                 dirty = true;
             }
 
             if (dirty) PlayerPrefs.Save();
 
-            Debug.Log("Run over. mode=" + Mode + " seed=" + CurrentSeed + " score=" + score +
-                      " coins=" + Score.Coins + " distance=" + (int)Score.Distance +
-                      "m chunks=" + Director.ChunksSpawned);
+            Debug.Log("Run over. mode=" + Mode + " scheme=" + Scheme + " seed=" + CurrentSeed +
+                      " score=" + score + " coins=" + Score.Coins +
+                      " distance=" + (int)Score.Distance + "m chunks=" + Director.ChunksSpawned);
 
             if (Hud != null)
-                Hud.ShowResult(new RunSummary(Mode, score, Score.Coins, Score.BestCombo,
+                Hud.ShowResult(new RunSummary(Mode, Scheme, score, Score.Coins, Score.BestCombo,
                     (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel));
-        }
-
-        /// Today's daily best, or zero if what is stored belongs to an earlier date. Keeps exactly
-        /// one daily bucket on disk instead of one key per day, for ever.
-        static int LoadDailyBest(string todayLabel)
-        {
-            if (PlayerPrefs.GetString(DailyBestDateKey, string.Empty) != todayLabel) return 0;
-            return PlayerPrefs.GetInt(DailyBestKey, 0);
         }
 
         /// The RUN AGAIN button. QUEUED, not started: this runs inside the EventSystem's dispatch,

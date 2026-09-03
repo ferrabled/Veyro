@@ -113,3 +113,23 @@ the question. Keep this file short; it is read every session.
     the T-031 Data safety answers describe the camera as on-device-only; store description must
     mention camera mode (T-030). *(Was numbered 10 on `main`; renumbered 12 in the 24 Aug merge —
     judge mode keeps 10, which REVENUECAT_PLAN §6.4 references.)*
+
+13. **Hands-free flow defaults (2026-09-01, `pause-game-feature`).** The resume flow shipped with
+    the spec's defaults; each is one constant. Confirm or retune on device:
+    - Raise-hand hold: 3 consecutive probe samples (`RaisedHandConfirm.RequiredSamples`, ~1 s at
+      the probe's ~3 Hz); margin 0.5 head units above the nose (`RaisedHand.HeadUnitsAboveNose`).
+    - Countdown: 3 s (`ResumeCountdown.DefaultDurationSeconds`), camera resumes only. **Show it on
+      tilt resumes too, for consistency?** *Default taken: no — tilt resumes stay instant.*
+    - **Should the picker's initial "I can see you!" staging also use the gesture + countdown?**
+      The spec recommends it (one mechanic, taught once; pairs with the deferred T-015 setup
+      card) but lists it as an owner decision, so it is NOT built. *Recommended: yes, post-device
+      test of the pause-resume version.* Camera runs currently still start right after the face
+      hold, with no countdown — the run's initial calibration happens during staging as before.
+    - **Picker shows both boards or only the selected mode's?** Bests split tilt/camera
+      (`BestBoard`); the picker currently shows neither. *Default taken: neither (unchanged) —
+      result screen + HUD show the active board.*
+    - **Pose model size:** the shipped detector + lite landmarker are **20.6 MB on disk**
+      (15.1 + 5.5), not the 5–10 MB the brief estimated. APK diff in STATUS. If that is too much:
+      Inference Engine can serialize fp16-quantized assets (~half), or the gesture could drop the
+      detector stage and crop from the face box (unproven). *Recommended default: ship as-is for
+      closed testing, quantize before v1.0 if the .aab budget minds.*

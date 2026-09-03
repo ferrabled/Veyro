@@ -68,7 +68,13 @@ namespace MotionRunner.Gameplay
             _rig = rig;
             _pause.BeginRun(cameraMode);
             ApplyPhase();
-            _session.Begin(BuildInput(cameraMode));
+
+            // The control scheme travels into the session because the boards split on it
+            // (Feature D, owner call: camera and tilt are separate games). It is fixed at
+            // Begin on purpose - a camera run that DropCameraMode lands on tilt+touch still
+            // scores as the camera run the player chose to start.
+            _session.Begin(BuildInput(cameraMode),
+                cameraMode ? ControlScheme.Camera : ControlScheme.Tilt);
             ShowOverlay(cameraMode);
         }
 
@@ -126,6 +132,11 @@ namespace MotionRunner.Gameplay
             _pauseMenu.RestartRequested += RestartRun;
             _pauseMenu.QuitRequested += QuitToMenu;
             _pauseMenu.CameraGaveUp += DropCameraMode;
+
+            // The countdown losing the face cancels through the same door the back button uses:
+            // RequestPause walks Resuming back to Paused via ApplyPhase (the one timeScale
+            // writer) and CancelResume above puts the menu back to rest.
+            _pauseMenu.ResumeCancelled += RequestPause;
         }
 
         /// The player asked to come back. The world stays frozen until the camera is ready -
@@ -298,6 +309,29 @@ namespace MotionRunner.Gameplay
                 ? "rig failed — " + (_rig != null ? _rig.FailReason : "unknown")
                 : "no usable face position for " + CameraOutage.PauseAfterSeconds + "s"));
             RequestPause();
+
+            // Straight back into the resume staging, reason on top: the player is away from the
+            // phone (that is what the outage means), so the framing overlay goes up and the
+            // camera starts looking for them without anyone touching anything — walk back in,
+            // raise your hand, 3-2-1 (acceptance criterion 1). A rig that is terminally Failed
+            // fails that staging immediately and drops the run to tilt through the existing
+            // CameraGaveUp path, which is the fastest honest recovery for that case too.
+            if (_pauseMenu != null)
+                _pauseMenu.BeginAutoResume(failed
+                    ? "camera stopped working — paused"
+                    : "couldn't see you — paused");
+        }
+
+        /// The app going to the background takes the same path as every other interruption: the
+        /// run pauses and the pause menu owns the way back (Feature A). RequestPause's own guards
+        /// make this free everywhere it means nothing - no session, mode picker, result screen -
+        /// and a background hop DURING a resume wait cancels the wait exactly like the back
+        /// button, because Pause() walks Resuming back to Paused. Android also fires this for
+        /// the camera-permission dialog, which is the picker's staging (no running session) and
+        /// falls through the guards.
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) RequestPause();
         }
 
         /// The overlay's one piece of plumbing: which lane the runner is actually committed to.
