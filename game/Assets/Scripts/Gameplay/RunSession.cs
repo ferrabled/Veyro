@@ -1,5 +1,7 @@
 using System;
 using MotionRunner.Core;
+using MotionRunner.Menu;
+using MotionRunner.Progression;
 using MotionRunner.Track;
 using UnityEngine;
 
@@ -76,6 +78,11 @@ namespace MotionRunner.Gameplay
         float _elapsed;
         bool _started;
 
+        /// The UTC day the current run belongs to, sampled with DailyLabel in StartRun. The streak
+        /// card counts days, not labels, so the conversion happens once per run rather than being
+        /// re-parsed out of the label at the moment of a crash.
+        int _dayNumber;
+
         void Start()
         {
             _started = true;
@@ -141,6 +148,7 @@ namespace MotionRunner.Gameplay
             // between two runs of one session.
             var utcNow = DateTime.UtcNow;
             DailyLabel = DailySeed.LabelForDate(utcNow);
+            _dayNumber = ProgressStore.DayNumberFor(utcNow);
             DailyBest = _board.DailyBest(Scheme, DailyLabel);
             AllTimeBest = _board.AllTimeBest(Scheme);
 
@@ -175,14 +183,19 @@ namespace MotionRunner.Gameplay
             if (!IsRunning)
             {
                 // A restart never begins on the frame it was asked for, whether the ask was a tap
-                // anywhere or the RUN AGAIN button, and never at all while the store is up: the
-                // release that asks is the same TouchPhase.Ended that TouchTapInput reads as a jump
-                // and that the EventSystem turns into a click, so this frame's input has to be
+                // anywhere or the RUN AGAIN button, and never at all while the main menu is up:
+                // the release that asks is the same TouchPhase.Ended that TouchTapInput reads as a
+                // jump and that the EventSystem turns into a click, so this frame's input has to be
                 // spent first. The gate holds that rule; this call site's job is that the run is
                 // started HERE - after Input.Tick above, and returning before Runner.Step - so the
                 // ask can never also be the new run's first jump.
+                //
+                // The overlay used to be StorePanel, which opened ON TOP of the result screen (the
+                // 27 Aug store-tap bug). The store is a menu tab now, so the screen that owns the
+                // taps is the menu itself - and QuitToMenu disables this component in the same
+                // frame the button fires, which makes this the belt to that braces.
                 if (_restart.Tick(deltaTime, Input.IsJumpPressed() || Input.IsSpecialPressed(),
-                        StorePanel.IsOpen))
+                        MainMenu.IsOpen))
                     StartRun();
                 return;
             }
@@ -237,21 +250,29 @@ namespace MotionRunner.Gameplay
             // The board owns which keys a scheme may touch (unit-tested there); this method only
             // decides WHEN a run scores, which is unchanged: crashes score, quits do not.
             int score = Score.Score;
-            bool dirty = false;
 
-            if (_board.RecordAllTime(Scheme, score))
-            {
-                AllTimeBest = score;
-                dirty = true;
-            }
-
+            if (_board.RecordAllTime(Scheme, score)) AllTimeBest = score;
             if (Mode == RunMode.Daily && _board.RecordDaily(Scheme, DailyLabel, score))
-            {
                 DailyBest = score;
-                dirty = true;
-            }
 
-            if (dirty) PlayerPrefs.Save();
+            // A FINISHED run is what earns the day's stamp and a row in the profile's history -
+            // the same bar Crash already sets for a best score. Quitting or restarting mid-run
+            // goes through Stop(), which writes nothing, so a streak cannot be farmed by starting
+            // runs and leaving them.
+            //
+            // Only the Daily Run stamps a day: the card is the daily loop made visible, and a free
+            // run is not a day's run. It still lands in the history list, which is a log of what
+            // was played rather than a record of what counted.
+            if (Mode == RunMode.Daily) ProgressStore.StampDay(_dayNumber);
+
+            ProgressStore.AppendRun(new RunRecord(DailyLabel, Mode == RunMode.Daily,
+                score, Score.Coins, (int)Score.Distance));
+
+            // Unconditional, where the pre-menu version flushed only on a new best: every finished
+            // run now writes a history row whether or not it beat anything, so there is always
+            // something to flush. One Save for the boards, the streak and the row together - the
+            // batching BestBoard's Save-free contract asks for.
+            ProgressStore.Flush();
 
             Debug.Log("Run over. mode=" + Mode + " scheme=" + Scheme + " seed=" + CurrentSeed +
                       " score=" + score + " coins=" + Score.Coins +

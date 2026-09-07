@@ -52,9 +52,10 @@ namespace MotionRunner.Core
 
             // Commerce (T-020): configured at boot, fail-open - a store that never answers
             // leaves every entitlement locked and the game fully playable (rule 3's shape).
+            // The store UI itself lives on the main menu's shop tab now, so what is built here is
+            // only the seam; RunFlow hands both to the menu.
             var store = CreateStore();
             var skins = new SkinService(store, runner.GetComponent<Renderer>());
-            hud.StoreRequested += () => StorePanel.Show(store, skins);
 
             // Session last: it drives everything above in a fixed order. Disabled until the
             // player has picked a control scheme.
@@ -65,8 +66,9 @@ namespace MotionRunner.Core
             session.Hud = hud;
 
             // Everything from here is transitions rather than construction: which screen is up,
-            // which control scheme the run uses, and when the camera is allowed to be on.
-            RunFlow.Create(session, hud);
+            // which control scheme the run uses, when the camera is allowed to be on, and whether
+            // the track is being driven by a run or by the menu's attract loop.
+            RunFlow.Create(session, hud, store, skins);
         }
 
         /// The RevenueCat SDK cannot run in the Editor (it NREs - REVENUECAT_PLAN §2.5), so

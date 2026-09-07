@@ -21,7 +21,15 @@ namespace MotionRunner.Track
         /// force-quitting it. That is CLAUDE.md rule 3 broken at the one screen whose whole job is
         /// to always offer tilt, and it was confirmed on the device. Cancelling is not a "quit":
         /// nothing has started, so back simply undoes the tap that began staging.
-        CancelStaging
+        CancelStaging,
+
+        /// Back while the main menu is on its shop or profile tab: come home to the run tab.
+        ///
+        /// The alternative is Ignore, which on Android means back falls through to the launcher -
+        /// so a player who opened the shop and pressed back would leave the game rather than
+        /// return to the screen with the RUN buttons on it. Every tab is one tap from home; back
+        /// should be too.
+        MenuHome
     }
 
     /// Running, paused, or on the way back from paused. Resuming exists because camera mode has
@@ -116,16 +124,24 @@ namespace MotionRunner.Track
         ///     picker, and back closes it;
         ///   * inSession - false at the mode picker, where there is no run to go back from and
         ///     back must fall through to Android rather than quit a run that does not exist;
-        ///   * stagingCamera - the picker is waiting on the camera with both mode buttons
+        ///   * stagingCamera - the mode picker is waiting on the camera with both mode buttons
         ///     disabled, which is the one thing back has to be able to undo there (see
         ///     BackAction.CancelStaging). Only consulted outside a session: the pause menu's copy
         ///     of the same wait is cancelled by the Resuming row below, which already lands on
-        ///     Pause -> RunFlow.RequestPause -> PauseMenu.CancelResume.
+        ///     Pause -> RunFlow.RequestPause -> PauseMenu.CancelResume;
+        ///   * menuAwayFromHome - the main menu is showing the shop or the profile rather than the
+        ///     run tab, so back has somewhere to go without leaving the app. Ranked BELOW staging
+        ///     because staging can only happen on the run tab, so the two are never both true.
         public static BackAction BackFor(PausePhase phase, bool runLive, bool overlayOpen,
-            bool guideOpen = false, bool inSession = true, bool stagingCamera = false)
+            bool guideOpen = false, bool inSession = true, bool stagingCamera = false,
+            bool menuAwayFromHome = false)
         {
             if (guideOpen) return BackAction.CloseGuide;
-            if (!inSession) return stagingCamera ? BackAction.CancelStaging : BackAction.Ignore;
+            if (!inSession)
+            {
+                if (stagingCamera) return BackAction.CancelStaging;
+                return menuAwayFromHome ? BackAction.MenuHome : BackAction.Ignore;
+            }
             if (overlayOpen) return BackAction.Ignore;
             if (phase == PausePhase.Paused) return BackAction.Resume;
             if (phase == PausePhase.Resuming) return BackAction.Pause; // cancels the re-acquisition

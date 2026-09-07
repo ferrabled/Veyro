@@ -10,9 +10,11 @@ namespace MotionRunner.Core
     /// with the pause menu that was about to be the fourth copy, which is where the duplication
     /// stopped paying for itself.
     ///
-    /// Deliberately not a framework: this is exactly what RunHud, ModeSelectMenu and StorePanel
-    /// were already doing, with the conventions they already agreed on - one portrait
-    /// 1080x1920 reference resolution, one font resolution chain, one EventSystem.
+    /// Deliberately not a framework: this is exactly what RunHud, the mode picker and the store
+    /// screen were already doing, with the conventions they already agreed on - one portrait
+    /// 1080x1920 reference resolution, one font resolution chain, one EventSystem. The main menu
+    /// adds its own layer on top (MenuTheme, MenuStack, MenuPage) rather than growing this one:
+    /// the run screens do not need a tab bar and should not pay for one.
     public static class RuntimeUi
     {
         /// Portrait design canvas. Every screen is laid out against these numbers, so a value
@@ -81,6 +83,46 @@ namespace MotionRunner.Core
             rect.sizeDelta = size;
             go.AddComponent<Image>().color = color;
             return go;
+        }
+
+        /// A coloured rectangle filling its parent - the backdrop of a card that has already been
+        /// placed, so the placement and the paint stay separate concerns.
+        public static Image Panel(string name, Transform parent, Color color)
+        {
+            var go = Element(name, parent, out var rect);
+            Stretch(rect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var image = go.AddComponent<Image>();
+            image.color = color;
+            return image;
+        }
+
+        /// A horizontal progress bar: a track with a fill pinned to its left edge. Returns the
+        /// fill, whose anchorMax.x the caller sets between 0 and 1 - that is the whole API,
+        /// because a bar that is resized rather than re-anchored stops lining up with its track
+        /// the moment the canvas scales.
+        public static RectTransform Bar(string name, Transform parent,
+            Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax,
+            Color trackColor, Color fillColor)
+        {
+            var track = Element(name, parent, out var trackRect);
+            Stretch(trackRect, anchorMin, anchorMax, offsetMin, offsetMax);
+            track.AddComponent<Image>().color = trackColor;
+
+            var fill = Element("Fill", track.transform, out var fillRect);
+            Stretch(fillRect, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
+            fill.AddComponent<Image>().color = fillColor;
+            return fillRect;
+        }
+
+        /// Moves a bar's fill. Clamped, because a fraction out of range is a data bug that should
+        /// not become a fill hanging past the end of its track.
+        public static void SetBarFill(RectTransform fill, float fraction)
+        {
+            if (fill == null) return;
+            float clamped = fraction < 0f ? 0f : fraction > 1f ? 1f : fraction;
+            fill.anchorMax = new Vector2(clamped, 1f);
+            fill.offsetMax = Vector2.zero;
+            fill.offsetMin = Vector2.zero;
         }
 
         /// A text element positioned by anchors + offsets, which is how every screen here places
