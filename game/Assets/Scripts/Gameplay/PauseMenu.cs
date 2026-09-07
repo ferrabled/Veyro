@@ -26,6 +26,12 @@ namespace MotionRunner.Gameplay
     /// and three seconds of standing still is what it calibrates on, so the run resumes aimed
     /// straight instead of leaning into a wall.
     ///
+    /// One asymmetry runs through all of it: a resume the player asked for has already been
+    /// confirmed by the tap that asked, while a resume the GAME asked for (BeginAutoResume, off a
+    /// camera outage) has been confirmed by nobody. So when the gesture is unavailable the first
+    /// may count down on the strength of that tap and the second may not - it comes back to the
+    /// card and asks. ResumeConfirm is that rule, engine-free and pinned in tests.
+    ///
     /// The menu is up while the game is frozen at Time.timeScale = 0, so everything here counts
     /// in unscaled time and nothing here waits on a coroutine. The BlazePose probe behind the
     /// gesture lives on the rig and is affordable for exactly the same reason - see
@@ -86,6 +92,10 @@ namespace MotionRunner.Gameplay
         {
             None,
             Camera,
+
+            /// Waiting to be confirmed. Usually "raise your right hand — or tap RESUME"; with no
+            /// working probe (it never loaded, or it died mid-wait) the same wait runs on touch
+            /// alone, which is why this is the confirm step and not literally the gesture.
             Gesture,
             Countdown
         }
@@ -100,6 +110,11 @@ namespace MotionRunner.Gameplay
         FaceOverlay _overlay;
         Pending _pending;
         Wait _wait;
+
+        /// Whether the pending resume was asked for by the player or by the game. It decides one
+        /// thing only, and it is the one thing that must never be got wrong: what happens at the
+        /// end of the camera wait when there is no working gesture probe. See ResumeConfirm.
+        ResumeOrigin _origin;
 
         /// Why the game paused itself, prefixed onto whatever the card says next. Cleared the
         /// moment the face is found again — a resolved reason narrating a live staging is stale
@@ -119,8 +134,9 @@ namespace MotionRunner.Gameplay
             return menu;
         }
 
-        /// The back button, routed here so it does exactly what the RESUME button does.
-        public void RequestResume() => Begin(Pending.Resume);
+        /// The back button, routed here so it does exactly what the RESUME button does — a
+        /// deliberate player action, so it confirms the resume like the button does.
+        public void RequestResume() => Begin(Pending.Resume, ResumeOrigin.User);
 
         /// Back out of a re-acquisition: the camera goes off again and the menu returns to rest.
         /// Every wait ends here - the probe, the countdown and the staging all go, whichever of
@@ -165,10 +181,16 @@ namespace MotionRunner.Gameplay
         /// land on the idle card, because auto-starting a camera the moment the app comes back is
         /// presumptuous where the player pressed home, and plain wrong where the run is a tilt
         /// one — an auto-begun tilt resume would unfreeze the run the instant the app returned.
+        ///
+        /// What separates this from the button, all the way through the staging, is that NOBODY
+        /// HAS CONFIRMED ANYTHING yet: the tap that normally starts a resume is the confirmation,
+        /// and there was no tap. So a resume begun here may only ever be finished by an explicit
+        /// confirm — the raised hand, or a RESUME tap — never by the staging simply reaching
+        /// "I can see you". That is ResumeOrigin.Auto, and TickCameraWait is where it pays off.
         public void BeginAutoResume(string reason)
         {
             _reason = reason;
-            Begin(Pending.Resume);
+            Begin(Pending.Resume, ResumeOrigin.Auto);
         }
 
         /// The line the card shows, with the auto-pause reason above it while one is standing.
@@ -195,12 +217,12 @@ namespace MotionRunner.Gameplay
             _resumeButton = RuntimeUi.TextButton("Resume", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 430f), new Vector2(520f, 140f),
                 AccentColor, "RESUME", 52, new Color(0.08f, 0.06f, 0.04f),
-                () => Begin(Pending.Resume));
+                () => Begin(Pending.Resume, ResumeOrigin.User));
 
             _restartButton = RuntimeUi.TextButton("Restart", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 270f), new Vector2(480f, 110f),
                 SecondaryColor, "RESTART RUN", 42, TextColor,
-                () => Begin(Pending.Restart));
+                () => Begin(Pending.Restart, ResumeOrigin.User));
 
             // Quit never waits on the camera: getting out is the one thing that must always
             // work on the first tap.
@@ -233,18 +255,22 @@ namespace MotionRunner.Gameplay
         ///
         /// While the gesture wait is up, this same method IS the touch confirm: both buttons are
         /// deliberately live there (rule 3 - the gesture augments, it never gates), and a tap
-        /// skips the hand-raise and goes straight to the countdown.
-        void Begin(Pending pending)
+        /// skips the hand-raise and goes straight to the countdown. Only a USER origin may do
+        /// that: the shortcut's whole justification is that a tap just happened, so an auto-resume
+        /// arriving on top of a confirm wait must not be allowed to spend it as a confirmation.
+        void Begin(Pending pending, ResumeOrigin origin)
         {
-            if (_wait == Wait.Gesture)
+            if (_wait == Wait.Gesture && origin == ResumeOrigin.User)
             {
                 _pending = pending;
+                _origin = origin;
                 StartCountdown();
                 return;
             }
 
             if (_pending != Pending.None) return;
             _pending = pending;
+            _origin = origin;
             _pendingFrame = Time.frameCount;
 
             if (_rig != null)
@@ -309,27 +335,53 @@ namespace MotionRunner.Gameplay
                     return;
 
                 case CameraStaging.Stage.Ready:
-                    // The face is found again — whatever reason paused the run is resolved, and
-                    // from here the gesture prompt is the only line that matters.
-                    _reason = null;
+                    // The camera is back and the face is held. Never a resume by itself: what
+                    // takes it from here is whoever still owes a confirmation, which is exactly
+                    // ResumeConfirm's table.
+                    //
+                    // The probe is asked for FIRST because loading it is the only way to know
+                    // whether the gesture is on the table at all (assets missing, a model that
+                    // will not run, a load that throws - all answer false, all leave the touch
+                    // path untouched: rule 3, the gesture augments and never gates).
+                    switch (ResumeConfirm.For(_origin, _rig.BeginGestureProbe()))
+                    {
+                        case ResumeConfirmStep.Gesture:
+                            // The face is found — whatever reason paused the run is resolved, and
+                            // from here the gesture prompt is the only line that matters.
+                            _reason = null;
+                            _wait = Wait.Gesture;
+                            _pendingFrame = Time.frameCount;
+                            SetButtonsInteractable(true);
+                            _status.text = GesturePrompt;
+                            _overlay?.ShowRaiseHandHint(true);
+                            return;
 
-                    // The camera is back and the face is held. Not a resume yet: the gesture
-                    // wait takes it from here, and a probe that cannot load (assets missing, a
-                    // model that will not run) skips straight to the countdown - the flow never
-                    // has fewer ways forward than it had before the gesture existed.
-                    if (_rig.BeginGestureProbe())
-                    {
-                        _wait = Wait.Gesture;
-                        _pendingFrame = Time.frameCount;
-                        SetButtonsInteractable(true);
-                        _status.text = GesturePrompt;
-                        _overlay?.ShowRaiseHandHint(true);
+                        case ResumeConfirmStep.Countdown:
+                            // No gesture available, but the player tapped RESUME (or back) to get
+                            // here, and that tap was the confirmation. Standing in frame is all
+                            // that was left to wait for, so the count runs - the flow never has
+                            // fewer ways forward than it had before the gesture existed.
+                            _reason = null;
+                            StartCountdown();
+                            return;
+
+                        default:
+                            // No gesture AND no confirmation: the game paused itself and the
+                            // probe is not there to be raised at. Counting down here would
+                            // unfreeze a run because the player walked back into shot - which is
+                            // not a thing anybody asked for. So the card comes back with its
+                            // buttons live and asks, and the reason stays on top of the ask
+                            // because this player has not read it yet: they were out of frame
+                            // for the whole auto-pause. Everything else still works from here -
+                            // a tap counts down, back cancels, a camera that dies drops to tilt,
+                            // and losing the face walks back to the camera wait, which gives the
+                            // probe another chance at the gesture prompt on the way through here.
+                            _wait = Wait.Gesture;
+                            _pendingFrame = Time.frameCount;
+                            SetButtonsInteractable(true);
+                            _status.text = WithReason(TouchOnlyPrompt);
+                            return;
                     }
-                    else
-                    {
-                        StartCountdown();
-                    }
-                    return;
             }
         }
 
@@ -356,9 +408,15 @@ namespace MotionRunner.Gameplay
             PoseGestureProbe probe = _rig.GestureProbe;
             if (probe == null || !probe.IsRunning)
             {
-                // The probe died mid-wait (it logs why). The touch path carries on alone -
-                // nothing auto-resumes, because a confirm the player never gave is not one.
-                _status.text = TouchOnlyPrompt;
+                // Either the probe died mid-wait (it logs why) or it never loaded and this wait
+                // is the auto-resume's touch confirm. Both mean the same thing: the touch path
+                // carries on alone, and nothing auto-resumes, because a confirm the player never
+                // gave is not one. Note this is the ONE rule that does not split on
+                // ResumeOrigin - a user-initiated resume does not fall through to a countdown
+                // here either, because the player is standing in front of the phone watching a
+                // prompt, and pulling the count out from under them mid-hold reads as the game
+                // resuming by itself. The reason line only exists on the auto path.
+                _status.text = WithReason(TouchOnlyPrompt);
                 return;
             }
 

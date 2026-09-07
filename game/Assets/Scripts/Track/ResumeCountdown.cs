@@ -30,7 +30,7 @@ namespace MotionRunner.Track
         /// the same beat every game the player already knows uses, so nothing has to be taught. The
         /// cost is three seconds added to every recovery, which is why it is a constant with a
         /// parameter override rather than a number typed into the menu — the owner may yet want it
-        /// shorter, or want tilt resumes to skip it (HANDSFREE_FLOW, open decisions).
+        /// shorter, or want tilt resumes to skip it (CAMERA_TUNING.md, open owner decisions).
         public const float DefaultDurationSeconds = 3f;
 
         /// The most one frame may contribute — the same 0.1 s clamp CameraOutage and FaceSteering

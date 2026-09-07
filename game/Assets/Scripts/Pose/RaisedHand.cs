@@ -1,7 +1,8 @@
 namespace MotionRunner.Pose
 {
     /// "I'm ready" — the player's RIGHT hand held above their head, which is how a paused camera
-    /// run gets resumed without anyone reaching for the phone (docs/HANDSFREE_FLOW.md, Feature B).
+    /// run gets resumed without anyone reaching for the phone (docs/CAMERA_TUNING.md §Resume
+    /// gesture carries the dials and the mirror rule).
     ///
     /// Engine-free and clock-free like the rest of this assembly, for the same reason FaceSteering
     /// is: a gesture whose false positives cost something has to be measurable headlessly against

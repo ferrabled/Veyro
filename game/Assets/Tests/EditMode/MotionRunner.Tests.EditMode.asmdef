@@ -5,6 +5,7 @@
         "MotionRunner.Track",
         "MotionRunner.Pose",
         "MotionRunner.Commerce",
+        "MotionRunner.CameraInput",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

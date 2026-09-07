@@ -189,7 +189,7 @@ namespace MotionRunner.Tests
         public void ACustomDurationIsHonoured()
         {
             // The override exists because the owner may still shorten this, or skip it on tilt
-            // resumes (HANDSFREE_FLOW, open decisions).
+            // resumes (CAMERA_TUNING.md, open owner decisions).
             _countdown.Begin(1f);
             Assert.AreEqual(1, _countdown.DisplayDigit, "one second is one numeral");
             Assert.AreEqual(0, Run(0.8f));

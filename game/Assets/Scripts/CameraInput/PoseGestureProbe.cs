@@ -79,9 +79,20 @@ namespace MotionRunner.CameraInput
 
         /// Loads both models from Resources on the CPU backend (2.5-25x faster than either GPU
         /// backend on the Mali target — T-010b, same reasoning as FaceDetector). A few hundred
-        /// milliseconds of load are invisible behind a frozen frame. Returns false with the
-        /// reason logged when an asset is missing — the caller falls back to touch confirm, which
-        /// must always work anyway (rule 3: gestures augment, never gate).
+        /// milliseconds of load are invisible behind a frozen frame.
+        ///
+        /// FALSE IS THE ONLY FAILURE THIS METHOD HAS, and that is a contract, not tidiness. It is
+        /// called synchronously out of PauseMenu.Update (via FaceTrackingRig.BeginGestureProbe)
+        /// at the one moment the pause card's buttons are disabled, waiting to be re-enabled by
+        /// the branch this return value picks. An exception escaping here would skip that branch
+        /// entirely and leave the player frozen behind a dead card with no way back in — the
+        /// stranding rule 3 exists to forbid (PR #6 review). So everything fallible is inside the
+        /// catch: a malformed anchors CSV (LoadAnchors parses and indexes without checking),
+        /// ModelLoader on a truncated or re-exported .onnx, the functional graph compile, Worker
+        /// construction on a backend that will not come up, and the self-check's own
+        /// schedule/readback. Every one of them ends the same way — the reason in the log, the
+        /// partial state disposed, false to the caller, touch resume unaffected (rule 3: gestures
+        /// augment, never gate).
         public bool Load()
         {
             var detectorAsset = Resources.Load<ModelAsset>(DetectorResourcePath);
@@ -94,33 +105,47 @@ namespace MotionRunner.CameraInput
                 return false;
             }
 
-            _anchors = BlazeAffine.LoadAnchors(anchorsCsv.text, AnchorCount);
-
-            // Argmax over the 2254 anchors folded into the detector graph, exactly like the face
-            // detector and the spike: one box crosses the tensor boundary, not the anchor grid.
-            Model detectorModel = ModelLoader.Load(detectorAsset);
-            var graph = new FunctionalGraph();
-            FunctionalTensor input = graph.AddInput(detectorModel, 0);
-            FunctionalTensor[] outputs = Functional.Forward(detectorModel, input);
-            (FunctionalTensor idx, FunctionalTensor score, FunctionalTensor box) =
-                BlazeAffine.ArgMaxFiltering(outputs[0], outputs[1]);
-            detectorModel = graph.Compile(idx, score, box);
-
-            _detectorWorker = new Worker(detectorModel, BackendType.CPU);
-            _landmarkerWorker = new Worker(ModelLoader.Load(landmarkerAsset), BackendType.CPU);
-            _detectorInput = new Tensor<float>(
-                new TensorShape(1, DetectorInputSize, DetectorInputSize, 3));
-            _landmarkerInput = new Tensor<float>(
-                new TensorShape(1, LandmarkerInputSize, LandmarkerInputSize, 3));
-
-            if (!SelfCheck())
+            try
             {
-                Debug.LogError("[CAM] pose detector self-check failed — raise-hand confirm disabled.");
+                _anchors = BlazeAffine.LoadAnchors(anchorsCsv.text, AnchorCount);
+
+                // Argmax over the 2254 anchors folded into the detector graph, exactly like the
+                // face detector and the spike: one box crosses the tensor boundary, not the
+                // anchor grid.
+                Model detectorModel = ModelLoader.Load(detectorAsset);
+                var graph = new FunctionalGraph();
+                FunctionalTensor input = graph.AddInput(detectorModel, 0);
+                FunctionalTensor[] outputs = Functional.Forward(detectorModel, input);
+                (FunctionalTensor idx, FunctionalTensor score, FunctionalTensor box) =
+                    BlazeAffine.ArgMaxFiltering(outputs[0], outputs[1]);
+                detectorModel = graph.Compile(idx, score, box);
+
+                _detectorWorker = new Worker(detectorModel, BackendType.CPU);
+                _landmarkerWorker = new Worker(ModelLoader.Load(landmarkerAsset), BackendType.CPU);
+                _detectorInput = new Tensor<float>(
+                    new TensorShape(1, DetectorInputSize, DetectorInputSize, 3));
+                _landmarkerInput = new Tensor<float>(
+                    new TensorShape(1, LandmarkerInputSize, LandmarkerInputSize, 3));
+
+                if (!SelfCheck())
+                {
+                    Debug.LogError("[CAM] pose detector self-check failed — raise-hand confirm disabled.");
+                    Dispose();
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                // Dispose is safe on however far the load got: every field it touches is
+                // null-conditional and it is idempotent, so a throw between the two Workers
+                // releases the one that exists and nothing else.
+                Debug.LogError("[CAM] pose probe failed to load: " + e +
+                               " — raise-hand confirm disabled, touch resume unaffected.");
                 Dispose();
                 return false;
             }
-
-            return true;
         }
 
         /// The pose detector's box row must be 12 wide (4 box values + 4 keypoints x 2). Same

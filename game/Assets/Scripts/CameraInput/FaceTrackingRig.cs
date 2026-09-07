@@ -340,25 +340,46 @@ namespace MotionRunner.CameraInput
         /// the camera is delivering frames — a rig that is still staging has nothing to sample —
         /// and false is a normal answer (assets missing, model failed): the caller's touch path
         /// carries the resume regardless (rule 3: gestures augment, never gate).
+        ///
+        /// This runs inside PauseMenu.Update while the pause card's buttons are disabled, and the
+        /// caller re-enables them off the branch this bool picks — so a throw escaping here would
+        /// leave the player frozen behind a card they cannot use (PR #6 review). Load() already
+        /// owns that contract for itself; the belt to its braces is here, covering the rest of
+        /// the method too, because "false is the only failure" has to be true of the whole entry
+        /// point and not just of the part that happens to be careful today.
         public bool BeginGestureProbe()
         {
             if (GestureProbe != null) return true;
             if (State != RigState.Tracking || _feed == null || _feed.UprightTexture == null)
                 return false;
 
-            var probe = new PoseGestureProbe();
-            if (!probe.Load())
+            PoseGestureProbe probe = null;
+            try
             {
-                probe.Dispose();
+                probe = new PoseGestureProbe();
+                if (!probe.Load())
+                {
+                    probe.Dispose();
+                    return false;
+                }
+
+                GestureProbe = probe;
+                // The provider re-reads the feed each cycle: a Suspend between two samples nulls
+                // it, and the probe idles rather than sampling a destroyed texture.
+                probe.Run(() => _feed?.UprightTexture, _feed.IsSelfieMirrored);
+                Debug.Log("[CAM] pose probe up (raise-hand confirm, lite landmarker, CPU)");
+                return true;
+            }
+            catch (Exception e)
+            {
+                // Published or not, the probe goes: GestureProbe must never name one that is not
+                // running, or the pause menu waits on a gesture nothing is sampling for.
+                Debug.LogError("[CAM] pose probe would not start: " + e +
+                               " — raise-hand confirm disabled, touch resume unaffected.");
+                GestureProbe = null;
+                probe?.Dispose();
                 return false;
             }
-
-            GestureProbe = probe;
-            // The provider re-reads the feed each cycle: a Suspend between two samples nulls it,
-            // and the probe idles rather than sampling a destroyed texture.
-            probe.Run(() => _feed?.UprightTexture, _feed.IsSelfieMirrored);
-            Debug.Log("[CAM] pose probe up (raise-hand confirm, lite landmarker, CPU)");
-            return true;
         }
 
         /// Idempotent, and called from every way the wait can end: the countdown starting, the
