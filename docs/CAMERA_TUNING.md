@@ -98,6 +98,9 @@ width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | g
 - Back at the picker does nothing (exit the app?).
 - Result hint "tap anywhere or press space" is half-true with three buttons on the card.
 - Overlay placement (provisional; modular).
+- Raise-hand confirm at the picker's **initial** staging too, replacing the 0.5 s face hold — one
+  mechanic taught once, pairs with the Wii-style setup card (BACKLOG T-015).
+- Picker: show both schemes' boards, or only the selected one's?
 
 ## Live risks
 

@@ -8,8 +8,8 @@ pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was co
 
 ## 2026-09-01 — hands-free flow: raise-hand resume, 3-2-1 countdown, per-scheme boards (pause-game-feature)
 
-Implements `docs/HANDSFREE_FLOW.md` (A/B/D; C stays "leaving the frame IS the pause gesture", now
-taught in guide page 3). **EditMode 292 → 340 green** (`RaisedHandTests` 22, `ResumeCountdownTests`
+Implements the hands-free flow handoff (auto-pause fold-in, raise-hand resume, per-scheme boards;
+the "pause gesture" stays "leaving the frame IS the pause", now taught in guide page 3). **EditMode 292 → 340 green** (`RaisedHandTests` 22, `ResumeCountdownTests`
 13, `BestBoardTests` 13); pinned `RunSeedTests` untouched. **Release APK 55.5 → 67.5 MiB
 (+11.9 MiB = the two pose models); permissions byte-identical** (aapt2, gotcha #10).
 
