@@ -135,10 +135,13 @@ namespace MotionRunner.Gameplay
         Image[] _glyphParts;
         Image[] _bands;
         Text _caption;
+        GameObject _hintArm;
+        string _captionOverride;
 
         float _innerHalfWidth;
         float _stripCenterY;
         float _liftRange;
+        float _glyphHeight;
 
         // ---- shown state, so nothing is written twice ----
 
@@ -198,6 +201,31 @@ namespace MotionRunner.Gameplay
         {
             gameObject.SetActive(false);
             Destroy(gameObject);
+        }
+
+        /// The raised-hand affordance for the resume gesture: the stickman grows a raised arm and
+        /// the caption says what to do. Drawn on the glyph's SCREEN-RIGHT side, which - because
+        /// the whole pipeline below the once-mirrored upright frame works in the player's own
+        /// left/right (see the mirroring note on this class) - is the side the player's actual
+        /// right hand appears on in this mirror-like view. Same side as the wrist the rule reads:
+        /// RaisedHand.WristFor pins the landmark half of that, this pins the picture half.
+        public void ShowRaiseHandHint(bool on)
+        {
+            if (on && _hintArm == null)
+            {
+                // Built like the glyph's own parts, but kept out of _glyphParts: the hint keeps
+                // its instructional colour instead of turning red with a lost face - the caption
+                // already narrates loss, and a red "raise your hand" reads as "stop".
+                Image arm = Part("RaisedArm",
+                    new Vector2(_glyphHeight * 0.075f, _glyphHeight * 0.165f),
+                    new Vector2(_glyphHeight * 0.026f, _glyphHeight * 0.13f), -30f);
+                arm.color = EnterTickColor;
+                _hintArm = arm.gameObject;
+            }
+
+            if (_hintArm != null) _hintArm.SetActive(on);
+            _captionOverride = on ? "raise your right hand" : null;
+            _shownCaption = null; // force the caption redraw either way
         }
 
         // ---- per frame -----------------------------------------------------------------------
@@ -296,6 +324,12 @@ namespace MotionRunner.Gameplay
         {
             if (health == Health.TooFar) return "too far — step closer";
             if (health == Health.Lost) return _framing ? "can't see you" : "no face";
+
+            // The gesture prompt only replaces the idle chatter: a health problem above always
+            // outranks it, because "raise your right hand" is bad advice to someone the camera
+            // cannot see.
+            if (_captionOverride != null) return _captionOverride;
+
             if (steering.IsSlideActive) return "crouch";
             if (steering.IsJumpActive) return "hop";
             return _framing ? "step left or right to try a lane" : string.Empty;
@@ -415,6 +449,7 @@ namespace MotionRunner.Gameplay
         /// player costs exactly one transform write per frame however many pieces the glyph has.
         void BuildGlyph(Transform parent, float height)
         {
+            _glyphHeight = height; // the raise-hand hint is built lazily, to the same scale
             GameObject go = RuntimeUi.Element("Glyph", parent, out RectTransform rect);
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = rect.anchorMin;

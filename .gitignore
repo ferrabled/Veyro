@@ -55,3 +55,5 @@ site/.wrangler/
 # builds/test runs (debris, regenerated every session; a few hundred bytes if shipped).
 game/Assets/Resources/PerformanceTestRunInfo.json*
 game/Assets/Resources/PerformanceTestRunSettings.json*
+
+screenshots/2026-*

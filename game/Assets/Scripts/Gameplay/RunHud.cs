@@ -78,27 +78,36 @@ namespace MotionRunner.Gameplay
             }
         }
 
-        /// Which mode and which UTC day this run belongs to. Shown live, because "the same run on
-        /// two devices" is exactly T-008's acceptance test and it should be visible in a screenshot.
-        public void SetMode(RunMode mode, string dailyLabel)
+        /// Which mode, which UTC day and which control scheme this run belongs to. Shown live,
+        /// because "the same run on two devices" is exactly T-008's acceptance test and it should
+        /// be visible in a screenshot - and since the boards split by scheme (Feature D), which
+        /// board a run is playing for should be visible the same way.
+        public void SetMode(RunMode mode, string dailyLabel, ControlScheme scheme)
         {
-            _mode.text = mode == RunMode.Daily ? "DAILY · " + dailyLabel : "FREE RUN";
+            _mode.text = (mode == RunMode.Daily ? "DAILY · " + dailyLabel : "FREE RUN")
+                         + " · " + SchemeName(scheme);
         }
 
         public void ShowResult(in RunSummary summary)
         {
             _resultScore.text = summary.Score.ToString();
 
+            // The bests are the active scheme's board and say so: a camera personal best is not
+            // a claim about tilt runs (owner call - the two are separate games).
+            string scheme = SchemeName(summary.Scheme);
             string bestLine = summary.IsDaily
-                ? "DAILY · " + summary.DailyLabel + "\nbest today " + summary.DailyBest +
-                  "   all-time " + summary.AllTimeBest
-                : "all-time best " + summary.AllTimeBest;
+                ? "DAILY · " + summary.DailyLabel + " · " + scheme +
+                  "\nbest today " + summary.DailyBest + "   all-time " + summary.AllTimeBest
+                : "all-time best " + summary.AllTimeBest + " · " + scheme;
 
             _resultBest.text = bestLine + "\n" + summary.Distance + "m   coins " + summary.Coins +
                                "   best combo " + summary.BestCombo;
             _resultPanel.SetActive(true);
             _pauseButton.SetActive(false); // nothing to pause once the run is over
         }
+
+        static string SchemeName(ControlScheme scheme) =>
+            scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
 
         public void HideResult()
         {

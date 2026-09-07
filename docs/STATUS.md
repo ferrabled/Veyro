@@ -6,6 +6,51 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-01 — hands-free flow: raise-hand resume, 3-2-1 countdown, per-scheme boards (pause-game-feature)
+
+Implements the hands-free flow handoff (auto-pause fold-in, raise-hand resume, per-scheme boards;
+the "pause gesture" stays "leaving the frame IS the pause", now taught in guide page 3). **EditMode 292 → 340 green** (`RaisedHandTests` 22, `ResumeCountdownTests`
+13, `BestBoardTests` 13); pinned `RunSeedTests` untouched. **Release APK 55.5 → 67.5 MiB
+(+11.9 MiB = the two pose models); permissions byte-identical** (aapt2, gotcha #10).
+
+- **A (verify + fold-in)**: auto-pause confirmed landed. New: `RunFlow.OnApplicationPause(true)` →
+  same `RequestPause` path (also cancels an in-flight resume wait); an outage auto-pause now goes
+  **straight back into resume staging** — framing overlay up, camera looking, reason line on top
+  ("couldn't see you — paused" / "camera stopped working — paused") — so the whole recovery loop
+  is touch-free (criterion 1). Manual/background pauses still land on the idle card.
+- **B — raise-hand resume**: camera resume = camera back → face held → "raise your right hand when
+  ready — or tap RESUME" → 3-2-1 → run. `CameraInput/PoseGestureProbe` (BlazePose detector + LITE
+  landmarker, CPU, ported from the T-010 spike): owned by `FaceTrackingRig`, reads the rig's own
+  upright texture (never a second camera client), **alive only at `timeScale == 0`** — it logs
+  `[CAM] pose probe up/down`, self-stops with an error if unfrozen, and is disposed the moment the
+  countdown starts. Rule engine-free in `Pose/RaisedHand`, retuned on device 2 Sep: wrist
+  (visibility-only — presence collapses at the crop edge mid-hold) above nose by 0.5 head units,
+  OR the same arm's elbow strictly above the nose (hand out of frame); 3 NET ~3 Hz samples — a
+  miss winds back one, a hard reset flip-flopped the prompt against a held arm. **The
+  selfie-mirror mapping (player's right = model's `LeftWrist`) is pinned in tests**, and the
+  overlay's raised-arm hint draws on the matching side. Touch + back work at every step (rule 3);
+  a probe that can't load degrades to touch + countdown. Countdown engine-free in
+  `Track/ResumeCountdown` (unscaled, hitch-clamped); the CARD HIDES for the count (2 Sep owner
+  call) — frozen run + overlay + numeral on screen; cancels — back, face lost > 0.75 s, the HUD
+  pause button — land back on the paused card; `ApplyPhase` stays the only `timeScale` writer.
+  Dials + mirror rule: `docs/CAMERA_TUNING.md` §Resume gesture.
+- **D — per-scheme boards** (owner call: camera and tilt are separate games): `Track/ControlScheme`
+  + `Track/BestBoard` behind an `IScoreStore` seam. Keys
+  `veyro.best.{alltime,daily,daily.date}.{tilt,camera}`; legacy keys → tilt once, idempotent,
+  never deleted/rewritten — keys and migration pinned in `BestBoardTests`. `RunSession.Begin`
+  learns the scheme; a camera run that drops to tilt still scores camera; bests reload per run so
+  a mid-session scheme switch shows the right board. HUD mode line + result best line name the
+  board. Daily seed untouched — only the boards split. T-009 note added (two leaderboard IDs).
+- **Models**: 20.6 MB on disk under `CameraInput/Resources` — the brief estimated 5–10 MB.
+  fp16 quantization is the fallback if the budget minds (OPEN_QUESTIONS 13).
+
+Needs a human (Nord 2): the full acceptance loop — walk out mid-run → lane holds ≤ 2 s →
+auto-pause + reason line → re-enter → raise RIGHT hand ~1 s → 3-2-1 → resumes at same score,
+aimed straight; touch RESUME at every step; wrong hand must NOT confirm (mirror check); logcat
+`pose probe up/down` exactly bracketing the wait; tilt + camera frame-time unchanged; per-scheme
+bests on result + HUD. Then the OPEN_QUESTIONS 13 defaults (picker gesture, tilt countdown,
+picker boards, hold/countdown feel, model size).
+
 ## 2026-08-30/31 — improve-ui session: pause/quit/guide, 3-lane steering, camera rework, face overlay
 
 PR #5. **EditMode 166 → 272 green; `RunSeedTests` untouched.** Device-verified on the Nord 2

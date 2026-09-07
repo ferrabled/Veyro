@@ -51,6 +51,14 @@ namespace MotionRunner.CameraInput
         /// right floor.
         public float DetectorScore => _detector != null ? _detector.LastScore : 0f;
 
+        /// The raised-hand confirm for the pause-resume flow, alive only between
+        /// BeginGestureProbe and EndGestureProbe — which in practice means only while the game
+        /// is frozen and a resume is waiting on the player (the probe itself asserts that; see
+        /// PoseGestureProbe.TickLifecycle). Owned here because the probe reads this rig's
+        /// upright texture and rule 2 keeps sensors and models out of gameplay code: PauseMenu
+        /// only ever polls the published Confirmed/HandRaisedNow state.
+        public PoseGestureProbe GestureProbe { get; private set; }
+
         CameraFeed _feed;
         FaceDetector _detector;
         OrientationProbe _probe;
@@ -97,6 +105,10 @@ namespace MotionRunner.CameraInput
             if (State == RigState.Idle) return;
             _running = false;
             _generation++;
+
+            // Before the feed goes: the probe holds a provider onto the feed's texture, and a
+            // suspended camera is by definition not a resume wait.
+            EndGestureProbe();
 
             _feed?.Dispose();
             _feed = null;
@@ -324,10 +336,68 @@ namespace MotionRunner.CameraInput
             TearDown();
         }
 
+        /// Loads BlazePose and starts sampling for the raised-hand confirm. Only meaningful once
+        /// the camera is delivering frames — a rig that is still staging has nothing to sample —
+        /// and false is a normal answer (assets missing, model failed): the caller's touch path
+        /// carries the resume regardless (rule 3: gestures augment, never gate).
+        ///
+        /// This runs inside PauseMenu.Update while the pause card's buttons are disabled, and the
+        /// caller re-enables them off the branch this bool picks — so a throw escaping here would
+        /// leave the player frozen behind a card they cannot use (PR #6 review). Load() already
+        /// owns that contract for itself; the belt to its braces is here, covering the rest of
+        /// the method too, because "false is the only failure" has to be true of the whole entry
+        /// point and not just of the part that happens to be careful today.
+        public bool BeginGestureProbe()
+        {
+            if (GestureProbe != null) return true;
+            if (State != RigState.Tracking || _feed == null || _feed.UprightTexture == null)
+                return false;
+
+            PoseGestureProbe probe = null;
+            try
+            {
+                probe = new PoseGestureProbe();
+                if (!probe.Load())
+                {
+                    probe.Dispose();
+                    return false;
+                }
+
+                GestureProbe = probe;
+                // The provider re-reads the feed each cycle: a Suspend between two samples nulls
+                // it, and the probe idles rather than sampling a destroyed texture.
+                probe.Run(() => _feed?.UprightTexture, _feed.IsSelfieMirrored);
+                Debug.Log("[CAM] pose probe up (raise-hand confirm, lite landmarker, CPU)");
+                return true;
+            }
+            catch (Exception e)
+            {
+                // Published or not, the probe goes: GestureProbe must never name one that is not
+                // running, or the pause menu waits on a gesture nothing is sampling for.
+                Debug.LogError("[CAM] pose probe would not start: " + e +
+                               " — raise-hand confirm disabled, touch resume unaffected.");
+                GestureProbe = null;
+                probe?.Dispose();
+                return false;
+            }
+        }
+
+        /// Idempotent, and called from every way the wait can end: the countdown starting, the
+        /// resume being cancelled, the rig suspending, the rig dying. The probe must never
+        /// outlive the frozen state it is affordable in.
+        public void EndGestureProbe()
+        {
+            if (GestureProbe == null) return;
+            GestureProbe.Dispose();
+            GestureProbe = null;
+            Debug.Log("[CAM] pose probe down");
+        }
+
         void TearDown()
         {
             _running = false;
             _generation++;
+            EndGestureProbe();
             _detector?.Dispose();
             _feed?.Dispose();
             _detector = null;

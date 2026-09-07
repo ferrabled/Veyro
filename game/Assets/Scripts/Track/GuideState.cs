@@ -94,8 +94,11 @@ namespace MotionRunner.Track
                 "the combo starts over.\n" +
                 "\n" +
                 "The II button, bottom left, pauses.\n" +
-                "So does the back button. From the\n" +
-                "pause screen you can resume,\n" +
+                "So does the back button — and in\n" +
+                "camera mode, stepping out of\n" +
+                "frame. Raise your right hand to\n" +
+                "come back: 3, 2, 1, run. From the\n" +
+                "pause screen you can also resume,\n" +
                 "restart, or leave for this menu.")
         };
 
