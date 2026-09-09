@@ -1,15 +1,22 @@
 using MotionRunner.CameraInput;
+using MotionRunner.Commerce;
 using MotionRunner.Core;
 using MotionRunner.Inputs;
+using MotionRunner.Menu;
 using MotionRunner.Track;
 using UnityEngine;
 
 namespace MotionRunner.Gameplay
 {
-    /// Everything either side of the run loop: the mode picker, the pause menu, the road back to
-    /// the picker, and the camera's lifetime across all of it. GameBootstrap builds the world
+    /// Everything either side of the run loop: the main menu, the pause menu, the road back to
+    /// the menu, and the camera's lifetime across all of it. GameBootstrap builds the world
     /// once and hands it here, so there is exactly one place that knows what starting, pausing
     /// and leaving a run costs.
+    ///
+    /// It also owns the attract run - the game playing itself behind the menu - for the same
+    /// reason it owns the camera: both are things that must be off during a real run and on
+    /// outside one, and having two owners of "is the track being driven right now" is how the
+    /// menu ends up fighting RunSession for the TrackDirector.
     ///
     /// The camera lives here rather than in RunSession on purpose: gameplay code never touches
     /// sensors (CLAUDE.md rule 2), and every way out of camera mode - pause, restart, quit, a rig
@@ -25,37 +32,67 @@ namespace MotionRunner.Gameplay
 
         RunSession _session;
         RunHud _hud;
+        IStore _store;
+        SkinService _skins;
         FaceTrackingRig _rig;
         CameraFaceInput _faceInput;
         PauseMenu _pauseMenu;
         FirstRunGuide _guide;
-        ModeSelectMenu _menu;
+        MainMenu _menu;
+        AttractRun _attract;
         FaceOverlay _overlay;
 
-        public static RunFlow Create(RunSession session, RunHud hud)
+        public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins)
         {
             var go = new GameObject("RunFlow");
             var flow = go.AddComponent<RunFlow>();
             flow._session = session;
             flow._hud = hud;
+            flow._store = store;
+            flow._skins = skins;
             hud.PauseRequested += flow.RequestPause;
             hud.QuitRequested += flow.QuitToMenu;
-            flow.ShowMenu();
+
+            // The result screen's store button leaves the run and lands on the shop tab, rather
+            // than stacking a modal over a finished run. That reuses the QUIT path, which is the
+            // one already proven safe against the tap that opened it also restarting the run
+            // behind it (RunHud's note on the Quit button, and the 27 Aug store-tap bug).
+            hud.StoreRequested += flow.QuitToShop;
+
+            flow.ShowMenu(MenuTab.Run);
             return flow;
         }
 
         // ---- menu -> run ----
 
-        void ShowMenu()
+        void ShowMenu(MenuTab tab)
         {
-            _menu = ModeSelectMenu.Create();
+            _menu = MainMenu.Create(_store, _skins, tab);
             _menu.Chosen += StartRun;
             _menu.GuideRequested += ShowGuide;
 
-            // First launch only. It goes up over the picker rather than before it, so the mode
-            // choice is made with the controls already explained and the picker is the first
+            BeginAttract();
+
+            // First launch only. It goes up over the menu rather than before it, so the mode
+            // choice is made with the controls already explained and the menu is the first
             // thing the player sees behind it.
             if (FirstRunGuide.IsDue) ShowGuide();
+        }
+
+        /// The game playing itself behind the menu. Only ever alive while the menu is: it drives
+        /// the same TrackDirector and RunnerController a run does, so the two must never overlap.
+        void BeginAttract()
+        {
+            StopAttract();
+            if (_session == null) return;
+            _attract = AttractRun.Begin(_session.Director, _session.Runner, Camera.main);
+        }
+
+        void StopAttract()
+        {
+            if (_attract == null) return;
+            _attract.Stop();
+            _attract = null;
         }
 
         void StartRun(bool cameraMode, FaceTrackingRig rig)
@@ -63,6 +100,11 @@ namespace MotionRunner.Gameplay
             // A guide left open never survives into a run: camera staging finishes on its own
             // clock, so the run can start while the player is still reading.
             if (_guide != null) _guide.Dismiss();
+
+            // Before the session touches the track: the attract run hands the world back (empty
+            // road, runner on its mark, camera at the gameplay framing) and RunSession.StartRun
+            // then lays the real seed over it.
+            StopAttract();
 
             _menu = null; // it destroys itself on the way out of the pick
             _rig = rig;
@@ -201,17 +243,22 @@ namespace MotionRunner.Gameplay
         /// that reached the result screen has already been scored by Crash(), so leaving from
         /// there keeps the best it just set.)
         ///
-        /// Three ways in, all landing here: the pause menu's QUIT TO MENU, the result screen's,
-        /// and back on the result screen. Stop() is what makes the result screen's button safe -
-        /// see the comment on it in RunHud.
-        void QuitToMenu()
+        /// Four ways in, all landing here: the pause menu's QUIT TO MENU, the result screen's, the
+        /// result screen's SHOP (which only differs in which tab comes up), and back on the result
+        /// screen. Stop() is what makes the result screen's buttons safe - see the comment on it
+        /// in RunHud.
+        void QuitToMenu() => QuitToMenu(MenuTab.Run);
+
+        void QuitToShop() => QuitToMenu(MenuTab.Shop);
+
+        void QuitToMenu(MenuTab tab)
         {
             ClosePauseMenu();
             DestroyRig();
             _pause.BeginRun(false);
             ApplyPhase();
             _session.Stop();
-            ShowMenu();
+            ShowMenu(tab);
         }
 
         // ---- first-run guide ----
@@ -245,14 +292,16 @@ namespace MotionRunner.Gameplay
             // this gets exercised without a phone).
             //
             // Everything back can mean is decided by one table, including the two screens that
-            // are not a run: the guide (which back closes) and the mode picker (where there is
-            // no run to go back from). The early return that used to live here would have made
-            // back fall through the guide whenever it was opened from the picker.
+            // are not a run: the guide (which back closes) and the main menu (where there is
+            // no run to go back from, but there may be a tab to come home from). The early return
+            // that used to live here would have made back fall through the guide whenever it was
+            // opened from the menu.
             if (!UnityEngine.Input.GetKeyDown(KeyCode.Escape)) return;
 
-            switch (PauseState.BackFor(_pause.Phase, _session.IsRunning, StorePanel.IsOpen,
+            switch (PauseState.BackFor(_pause.Phase, _session.IsRunning, MainMenu.IsOpen,
                         _guide != null, _session.enabled,
-                        _menu != null && _menu.IsStagingCamera))
+                        _menu != null && _menu.IsStagingCamera,
+                        _menu != null && _menu.IsAwayFromHome))
             {
                 case BackAction.CloseGuide:
                     _guide.Dismiss();
@@ -268,6 +317,9 @@ namespace MotionRunner.Gameplay
                     break;
                 case BackAction.CancelStaging:
                     _menu.CancelStaging();
+                    break;
+                case BackAction.MenuHome:
+                    _menu.GoHome();
                     break;
             }
         }
@@ -408,10 +460,12 @@ namespace MotionRunner.Gameplay
         void OnDestroy()
         {
             DismissOverlay();
+            StopAttract();
             if (_hud != null)
             {
                 _hud.PauseRequested -= RequestPause;
                 _hud.QuitRequested -= QuitToMenu;
+                _hud.StoreRequested -= QuitToShop;
             }
             Time.timeScale = 1f;
         }

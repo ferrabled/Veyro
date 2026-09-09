@@ -273,6 +273,52 @@ namespace MotionRunner.Tests
         }
 
         [Test]
+        public void Back_ComesHomeFromAMenuTabRatherThanLeavingTheApp()
+        {
+            // On the shop or the profile there is no run to go back from, but there IS somewhere
+            // to go: Ignore means Android's back leaves the game, and a player who opened the shop
+            // and pressed back would find themselves on the launcher.
+            Assert.AreEqual(BackAction.MenuHome,
+                PauseState.BackFor(PausePhase.Running, false, true,
+                    guideOpen: false, inSession: false, stagingCamera: false,
+                    menuAwayFromHome: true));
+        }
+
+        [Test]
+        public void Back_DoesNothingOnTheMenusOwnHomeTab()
+        {
+            // Home is where back has run out of screens to undo, so it falls through to Android -
+            // which is the one place leaving the app is the right answer.
+            Assert.AreEqual(BackAction.Ignore,
+                PauseState.BackFor(PausePhase.Running, false, true,
+                    guideOpen: false, inSession: false, stagingCamera: false,
+                    menuAwayFromHome: false));
+        }
+
+        [Test]
+        public void Back_CancelsCameraStagingBeforeComingHome()
+        {
+            // The two cannot actually both be true - staging only runs on the home tab - but the
+            // ordering is what makes that a property of the table rather than of the caller.
+            Assert.AreEqual(BackAction.CancelStaging,
+                PauseState.BackFor(PausePhase.Running, false, false,
+                    guideOpen: false, inSession: false, stagingCamera: true,
+                    menuAwayFromHome: true));
+        }
+
+        [Test]
+        public void Back_TheMenuTabFlagCannotChangeAnythingInsideASession()
+        {
+            foreach (PausePhase phase in System.Enum.GetValues(typeof(PausePhase)))
+                foreach (bool runLive in new[] { true, false })
+                    foreach (bool overlayOpen in new[] { true, false })
+                        Assert.AreEqual(
+                            PauseState.BackFor(phase, runLive, overlayOpen, false, true, false, false),
+                            PauseState.BackFor(phase, runLive, overlayOpen, false, true, false, true),
+                            "the menu-tab flag changed back's meaning in phase " + phase);
+        }
+
+        [Test]
         public void Back_NeverLeavesALiveRun()
         {
             // The one rule that must hold in every phase: while there is a run going, back can

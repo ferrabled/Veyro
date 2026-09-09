@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using MotionRunner.Commerce.RevenueCat;
@@ -6,6 +8,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace MotionRunner.EditorTools
 {
@@ -66,6 +69,7 @@ namespace MotionRunner.EditorTools
             string previousProduct = PlayerSettings.productName;
             bool previousBundle = EditorUserBuildSettings.buildAppBundle;
             int previousVersionCode = PlayerSettings.Android.bundleVersionCode;
+            string previousVersion = PlayerSettings.bundleVersion;
             string previousDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
 
             // Everything that mutates the project goes inside the try, not before it: the
@@ -92,6 +96,7 @@ namespace MotionRunner.EditorTools
                 PlayerSettings.SplashScreen.showUnityLogo = false;
 
                 EditorUserBuildSettings.buildAppBundle = bundle;
+                if (development) PlayerSettings.bundleVersion = DevVersion(previousVersion);
                 ApplyStoreKeyPairing(bundle, development, previousDefines);
                 if (bundle)
                 {
@@ -127,6 +132,10 @@ namespace MotionRunner.EditorTools
                 PlayerSettings.productName = previousProduct;
                 EditorUserBuildSettings.buildAppBundle = previousBundle;
                 PlayerSettings.Android.bundleVersionCode = previousVersionCode;
+                // The dev stamp is a property of one artifact, never of the project: bundleVersion
+                // serializes into the committed ProjectSettings.asset, and a build timestamp left
+                // there would ride into the next .aab as the version name Play shows.
+                PlayerSettings.bundleVersion = previousVersion;
                 PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, previousDefines);
                 if (bundle)
                 {
@@ -140,6 +149,62 @@ namespace MotionRunner.EditorTools
                     PlayerSettings.Android.keyaliasName = "";
                     PlayerSettings.Android.keyaliasPass = "";
                 }
+            }
+        }
+
+        /// The version name a DEVELOPMENT artifact carries, and the string BuildInfo puts under
+        /// the menu title: `1.0.0-dev.20260902-1422.5aeab74`. Three questions, one line —
+        /// which release line (semver, straight from ProjectSettings), when it was built, and
+        /// from which commit.
+        ///
+        /// It is a semver pre-release suffix on purpose: `1.0.0-dev.…` sorts *below* `1.0.0`, so a
+        /// dev build can never be mistaken for the release it was cut from. It also lands in
+        /// android:versionName, which is what makes "what is actually installed on this phone?"
+        /// answerable over adb without launching the app.
+        ///
+        /// Never applied to the .aab or the release APK: only Build(development: true) reaches
+        /// here, and the finally restores ProjectSettings either way.
+        static string DevVersion(string baseVersion)
+        {
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture);
+            return baseVersion + "-dev." + stamp + "." + GitShortSha();
+        }
+
+        /// The commit the working tree is on, `nogit` when git cannot answer (a source zip, a
+        /// scratch copy made without .git — see CLAUDE.md gotcha #4). A build must never fail
+        /// because of a label, so every failure path returns a placeholder rather than throwing;
+        /// the date half of the stamp still identifies the artifact.
+        static string GitShortSha()
+        {
+            try
+            {
+                var info = new ProcessStartInfo("git", "rev-parse --short HEAD")
+                {
+                    WorkingDirectory = RepoRoot,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (var process = Process.Start(info))
+                {
+                    if (process == null) return "nogit";
+                    // Wait before reading: ReadToEnd blocks until git closes stdout, which would
+                    // make the timeout unreachable if git hangs. Reading after exit is safe here —
+                    // a short SHA is a few bytes, nowhere near filling the pipe buffer.
+                    if (!process.WaitForExit(5000))
+                    {
+                        try { process.Kill(); } catch { /* may have exited already */ }
+                        return "nogit";
+                    }
+                    string output = process.StandardOutput.ReadToEnd().Trim();
+                    return process.ExitCode == 0 && output.Length > 0 ? output : "nogit";
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("Build stamp: git short SHA unavailable (" + e.Message + ")");
+                return "nogit";
             }
         }
 

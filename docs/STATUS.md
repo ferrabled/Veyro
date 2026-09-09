@@ -6,6 +6,53 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-02 — feat/main-menu: three-tab menu, attract run, dev version line (T-016, T-017)
+
+**EditMode 272 → 327 green** (Unity 6000.5.9f1 batchmode); `RunSeedTests` untouched.
+**Device-verified on the Nord 2** — dev APK 69.9 MB, `versionName=1.0.0-dev.20260902-1634.5aeab74`,
+full loop walked: menu → tilt run → crash → SKINS & SHOP → shop tab, and the finished run stamped
+the day (streak 1, W filled) and wrote its history row. Owner-requested rework of the front screen.
+
+- **`ModeSelectMenu` → `MainMenu`** (`Assets/Scripts/Menu/`, Assembly-CSharp, canvas 100 as
+  before). Three tabs, Clash-Royale shaped: SHOP · **RUN** · PROFILE. The shell owns only the
+  frame; every card is its own class placed by `MenuStack`, themed by `MenuTheme`, so reordering
+  or restyling the screen is one call each. Adding a tab is a subclass + one table row.
+- **Home tab:** season-pass banner (level + XP bar; XP is honestly labelled *not live* until
+  T-025, the OWNED/LOCKED half is real today) · 7-day stamp card wired to a real local streak ·
+  a transparent window · the two mode buttons.
+- **Attract run** shows through that window: the real `TrackDirector` + `RunnerController`, a fixed
+  showcase seed, difficulty pinned at ~2, steered by engine-free `AutoPilot` (Track asmdef, 14
+  tests incl. "every library chunk is drivable"). Scores nothing, resolves no collisions, writes
+  nothing. `RunFlow` owns its lifetime alongside the camera's — one owner of "is the track being
+  driven". Camera pulls back to (0, 5.2, −8.4)/27° while the menu is up and is restored on handover.
+- **`StorePanel` → `StoreCatalogView`** on the shop tab, logic unchanged (direct Play sheet for
+  skins, paywall for the pass, fail-open). The result screen's button now *leaves* the run for that
+  tab via the proven `QuitToMenu` path, so no overlay sits over a finished run and RESTORE is
+  reachable cold in two taps. `StorePanel.IsOpen` → `MainMenu.IsOpen` at both call sites.
+- **Profile tab:** real numbers (all-time best, today, streak, last 8 runs) via new
+  `ProgressStore` + engine-free `MotionRunner.Progression` (`DailyStreak`, `RunHistory`,
+  `SeasonProgress`, `MockLeaderboard`); the board is mocked behind `ILeaderboardSource` and says
+  so on screen. `RunSession.Crash` now also stamps the day and appends a run record — only a
+  *finished* run, so a streak cannot be farmed by quitting.
+- **Back** gained `BackAction.MenuHome`: on a non-home tab back comes home instead of falling
+  through to Android. Ranked below `CancelStaging`, inert inside a session (both tested).
+- **Dev version line (T-017):** `bundleVersion` `1.0` → `1.0.0`; `BuildAndroidDev` stamps
+  `1.0.0-dev.<yyyyMMdd-HHmm>.<sha>` for the build only and restores it in the existing `finally`.
+  Shown under the title when `Debug.isDebugBuild`, so the `.aab` and the release APK cannot carry
+  it. Also lands in `android:versionName` — `adb shell dumpsys package` answers "which build?".
+
+**Four things only the device showed** (all fixed, second build re-verified): cards at alpha 0.92
+let the attract run's lane lines and a red block read *through* the season-pass and streak text →
+0.98 (scrim 0.90 → 0.97); the menu camera at 8.5 m made the road wider than the view and put a
+side-lane runner two thirds of the way to the screen edge → (0, 5.2, −8.4)/27°; the demo runner
+swept through coins and left them hanging → `AttractRun.CollectCoins` (obstacles still pass
+through, deliberately); unstamped days were near-identical to the card → `MenuTheme.Empty` lifted.
+Also dropped the profile's duplicate version line, and the mock board now ranks on the ALL-TIME
+best — ranking on today's put the player last on their own profile every morning.
+
+Still owed by a human: **camera mode from the new home tab** (needs a face in frame — the
+staging/cancel path is unchanged code but was not walked), and a look at the attract run's pace
+over a long idle.
 ## 2026-09-01 — hands-free flow: raise-hand resume, 3-2-1 countdown, per-scheme boards (pause-game-feature)
 
 Implements the hands-free flow handoff (auto-pause fold-in, raise-hand resume, per-scheme boards;

@@ -23,8 +23,11 @@ namespace MotionRunner.Gameplay
         /// button is a nicety and being able to start the next run is not.
         public event Action RestartRequested;
 
-        /// Raised by the SKINS button on the result screen - the store entry point (T-020).
-        /// GameBootstrap owns what opens; the HUD only announces the tap.
+        /// Raised by the SHOP button on the result screen - the store entry point (T-020).
+        /// RunFlow owns what opens; the HUD only announces the tap. It leaves the run for the
+        /// menu's shop tab, so this behaves exactly like QuitRequested with a different landing
+        /// place - which is what makes it safe against the tap that fired it also restarting the
+        /// run behind it (see the note on the Quit button below).
         public event Action StoreRequested;
 
         /// Raised by the pause button. RunFlow owns what pausing means; the HUD only announces
@@ -214,7 +217,7 @@ namespace MotionRunner.Gameplay
             // one visible tap away from every crash - which is what a judge needs (§6.3).
             RuntimeUi.TextButton("Skins", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 270f), new Vector2(480f, 110f),
-                SecondaryColor, "SKINS & STORE", 42, TextColor,
+                SecondaryColor, "SKINS & SHOP", 42, TextColor,
                 () => StoreRequested?.Invoke());
 
             // Leaving is a button here for the reason it is one on the pause menu: back is
@@ -222,11 +225,12 @@ namespace MotionRunner.Gameplay
             // something a player is taught.
             //
             // It cannot double as the "tap anywhere" restart the rest of the screen is, and it
-            // does not need the store's StorePanel.IsOpen guard to say so: the tap runs
-            // RunFlow.QuitToMenu -> RunSession.Stop(), which nulls Input, clears the pending
-            // restart and disables the session - and RunSession's DefaultExecutionOrder(100)
-            // puts all of that strictly before the Update that would otherwise have read this
-            // same TouchPhase.Ended as a jump (the 27 Aug store-tap bug).
+            // needs no overlay guard to say so: the tap runs RunFlow.QuitToMenu ->
+            // RunSession.Stop(), which nulls Input, clears the pending restart and disables the
+            // session - and RunSession's DefaultExecutionOrder(100) puts all of that strictly
+            // before the Update that would otherwise have read this same TouchPhase.Ended as a
+            // jump (the 27 Aug store-tap bug). SKINS & SHOP above now takes the same route, which
+            // is why it stopped needing a guard of its own too.
             RuntimeUi.TextButton("Quit", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 130f), new Vector2(480f, 110f),
                 SecondaryColor, "QUIT TO MENU", 42, TextColor,
