@@ -76,11 +76,13 @@ namespace MotionRunner.Menu
             _stamps?.Refresh();
         }
 
-        /// Switching tabs abandons a camera setup in progress. The rig would otherwise stay live
-        /// behind the shop with nothing ticking it - a camera held open behind a price list is
-        /// exactly the look the on-device-only promise is meant to rule out (and it is the same
-        /// reason PauseState releases the camera while the pause menu is up).
-        public override void OnHidden() => _modes?.CancelStaging();
+        /// Switching tabs abandons a camera setup in progress AND a pick that has not committed
+        /// yet - Abandon covers both, where CancelStaging misses the one frame between staging
+        /// turning Ready and the Commit that follows. The rig would otherwise stay live behind the
+        /// shop with nothing ticking it - a camera held open behind a price list is exactly the
+        /// look the on-device-only promise is meant to rule out (and it is the same reason
+        /// PauseState releases the camera while the pause menu is up).
+        public override void OnHidden() => _modes?.Abandon();
 
         void Update()
         {

@@ -141,6 +141,26 @@ namespace MotionRunner.Menu
             _status.text = IdleStatus;
         }
 
+        /// The page is going away with the pick not yet committed - a tab switch, which can land
+        /// on the one frame between staging turning Ready (or a TILT tap) and the next Tick that
+        /// would Commit. CancelStaging cannot cover that frame: IsStagingCamera is false the
+        /// moment _pending is set, while the rig, the staging and the overlay are all still this
+        /// card's to clean up. A hidden page stops ticking, so without this the pending pick
+        /// freezes with a live camera behind the shop and fires a run the player did not just ask
+        /// for when the tab comes back.
+        ///
+        /// After Commit there is nothing to abandon: _done guards the handed-over rig during the
+        /// menu's own teardown, where _rig and _staging are already null.
+        public void Abandon()
+        {
+            if (_done) return;
+            _pending = Pick.None;
+            _pendingFrame = -1;
+            CleanupRig();
+            SetButtonsInteractable(true);
+            _status.text = IdleStatus;
+        }
+
         /// A pick never acts on the frame it arrives, exactly like PauseMenu.Begin: TouchTapInput
         /// reports a jump on the same TouchPhase.Ended that fires the button, so handing the run
         /// over here would give that tap to the runner on the run's very first frame. Update and
