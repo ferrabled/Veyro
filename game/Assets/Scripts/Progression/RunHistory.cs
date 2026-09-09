@@ -99,6 +99,11 @@ namespace MotionRunner.Progression
             if (!TryNumber(fields[3], out int coins)) return false;
             if (!TryNumber(fields[4], out int distance)) return false;
 
+            // The flag is written as exactly '0' or '1'. Anything else is a corrupted entry and
+            // is dropped like an unreadable number - defaulting it to "not daily" would quietly
+            // refile a Daily Run as a free one.
+            if (fields[1] != "0" && fields[1] != "1") return false;
+
             run = new RunRecord(fields[0], fields[1] == "1", score, coins, distance);
             return true;
         }

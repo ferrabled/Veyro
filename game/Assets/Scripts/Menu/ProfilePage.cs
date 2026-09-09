@@ -173,6 +173,14 @@ namespace MotionRunner.Menu
             // board with it.
             var scheme = ModePickerCard.LastUsed;
             var board = new BestBoard(new PlayerPrefsScoreStore());
+
+            // Migrate before any read. RunSession runs the same migration in Start(), but the
+            // session is a disabled component the whole time the menu is up — it wakes when a mode
+            // is picked — so on a cold launch after an upgrade this tab reads the per-scheme keys
+            // first and would show an existing player's best as 0. Migrate is idempotent by design
+            // (see BestBoard), so both call sites can keep it with no coordination between them.
+            board.Migrate();
+
             int allTimeBest = board.AllTimeBest(scheme);
             int dailyBest = board.DailyBest(scheme, todayLabel);
 

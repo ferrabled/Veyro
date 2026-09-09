@@ -8,8 +8,8 @@ pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was co
 
 ## 2026-09-02 — feat/main-menu: three-tab menu, attract run, dev version line (T-016, T-017)
 
-**EditMode 272 → 327 green** (Unity 6000.5.9f1 batchmode)**; `RunSeedTests` untouched.
-Device-verified on the Nord 2** — dev APK 69.9 MB, `versionName=1.0.0-dev.20260902-1634.5aeab74`,
+**EditMode 272 → 327 green** (Unity 6000.5.9f1 batchmode); `RunSeedTests` untouched.
+**Device-verified on the Nord 2** — dev APK 69.9 MB, `versionName=1.0.0-dev.20260902-1634.5aeab74`,
 full loop walked: menu → tilt run → crash → SKINS & SHOP → shop tab, and the finished run stamped
 the day (streak 1, W filled) and wrote its history row. Owner-requested rework of the front screen.
 
@@ -24,7 +24,7 @@ the day (streak 1, W filled) and wrote its history row. Owner-requested rework o
   showcase seed, difficulty pinned at ~2, steered by engine-free `AutoPilot` (Track asmdef, 14
   tests incl. "every library chunk is drivable"). Scores nothing, resolves no collisions, writes
   nothing. `RunFlow` owns its lifetime alongside the camera's — one owner of "is the track being
-  driven". Camera pulls back to (0, 5, −7.2)/28° while the menu is up and is restored on handover.
+  driven". Camera pulls back to (0, 5.2, −8.4)/27° while the menu is up and is restored on handover.
 - **`StorePanel` → `StoreCatalogView`** on the shop tab, logic unchanged (direct Play sheet for
   skins, paywall for the pass, fail-open). The result screen's button now *leaves* the run for that
   tab via the proven `QuitToMenu` path, so no overlay sits over a finished run and RESTORE is

@@ -75,10 +75,19 @@ namespace MotionRunner.Progression
                 rows.Add(new LeaderboardEntry(rank++, Names[i], Scores[i], false));
             }
 
-            // A score below every mocked row still gets a row: the player is on the board, at the
-            // bottom of it, rather than absent from their own profile.
+            // A score below every visible row still gets a row - the player is on the board, at
+            // the bottom of it, rather than absent from their own profile - but it carries the
+            // rank the score earns against the whole table, not the display slot it lands in. A
+            // gap between the last mocked rank and the player's own is ordinary "..." board
+            // behaviour; ties keep the loop's convention that an equal score ranks the player
+            // below it.
             if (!placed && rows.Count > 0)
-                rows[rows.Count - 1] = new LeaderboardEntry(rows.Count, YourName, yourScore, true);
+            {
+                int yourRank = 1;
+                for (int i = 0; i < Scores.Length; i++)
+                    if (Scores[i] >= yourScore) yourRank++;
+                rows[rows.Count - 1] = new LeaderboardEntry(yourRank, YourName, yourScore, true);
+            }
 
             return rows;
         }

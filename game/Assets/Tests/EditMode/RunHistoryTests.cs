@@ -71,6 +71,19 @@ namespace MotionRunner.Tests
         }
 
         [Test]
+        public void AMalformedDailyFlagDropsTheEntry()
+        {
+            // The flag has exactly two legal spellings. A corrupted one must not quietly decode
+            // as "not daily" - that would refile a Daily Run as a free run - so the entry is
+            // dropped like any other unreadable value.
+            string good = RunHistory.Append(string.Empty, Run(500));
+            var runs = RunHistory.Decode("2026-09-02|x|10|1|2;" + good + ";2026-09-02||10|1|2");
+
+            Assert.AreEqual(1, runs.Count);
+            Assert.AreEqual(500, runs[0].Score);
+        }
+
+        [Test]
         public void ASeparatorInAFieldCannotEatTheNextEntry()
         {
             // The day label is machine-generated and cannot contain one - but the encoding must

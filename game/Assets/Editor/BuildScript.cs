@@ -189,8 +189,15 @@ namespace MotionRunner.EditorTools
                 using (var process = Process.Start(info))
                 {
                     if (process == null) return "nogit";
+                    // Wait before reading: ReadToEnd blocks until git closes stdout, which would
+                    // make the timeout unreachable if git hangs. Reading after exit is safe here —
+                    // a short SHA is a few bytes, nowhere near filling the pipe buffer.
+                    if (!process.WaitForExit(5000))
+                    {
+                        try { process.Kill(); } catch { /* may have exited already */ }
+                        return "nogit";
+                    }
                     string output = process.StandardOutput.ReadToEnd().Trim();
-                    process.WaitForExit(5000);
                     return process.ExitCode == 0 && output.Length > 0 ? output : "nogit";
                 }
             }
