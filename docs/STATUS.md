@@ -24,9 +24,19 @@ grep-verified). **391/391 EditMode green** (6000.5.9f1 batchmode on this tree). 
   production access **en revisión** (submitted Mon 23:05, ≤7 days — wait for the email); **pass
   stays on sale as-is** (ladder is upcoming work; the row's honesty note stays).
 
-**Needs the owner:** review the site diff → `npx wrangler deploy` from `site/`; set
-`VEYRO_KEYSTORE*` + `VEYRO_VERSION_CODE=5` and run `BuildAndroidBundle` (agent verifies the .aab
-before upload); then walk `PLAY_CONSOLE_RELEASE_ES.md` §2–§4.
+**Artifact (owner-built 15 Sep 21:29, agent-verified):** `builds/MotionRunner.aab` — game content
+byte-identical to `8894ec9` (the tested merge; later commits touch only site/docs), versionCode
+**5**, versionName 1.0.0 (no dev stamp, not debuggable), 67.1 MiB, SHA-256
+`DF703882D708585DAD9E08E2339E37B093A14453A973CD533B83D4B3BC8311AE`. Manifest: target SDK 36,
+ARM64-only, `launchMode` singleTop, permissions INTERNET + CAMERA (features `required=false`) +
+BILLING + ACCESS_NETWORK_STATE, **no AD_ID** (Advertising-ID declaration stays No), no debuggable
+flag. jarsigner: verified, self-signed upload cert exp. 2054 (D5 keystore). IL2CPP metadata carries
+the live privacy URL and the `goog_` Play key; no Supabase strings. **Cleared for the
+internal-track upload** once the site deploy is live.
+
+**Needs the owner:** review the site diff → `npx wrangler deploy` from `site/` (BEFORE testers get
+the build); upload the verified .aab to internal testing, run the device/purchase checks, then the
+atomic closed-track promotion with the Console flips (STORE_COMPLIANCE T-020).
 
 ## 2026-09-02 — feat/main-menu: three-tab menu, attract run, dev version line (T-016, T-017)
 
