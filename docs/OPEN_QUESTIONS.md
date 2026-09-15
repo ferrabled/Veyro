@@ -19,8 +19,10 @@ the question. Keep this file short; it is read every session.
   catalog in the RevenueCat dashboard for both the Test Store and the Play Store app — 2 skins
   (`veyro.skin.ember`/`.frost`, €2.99) + Season 1 pass (`veyro.season1.pass`, €4.99), entitlements
   `skin_ember`/`skin_frost`/`season1`, offering `default`, paywall attached. Spec:
-  `docs/COSMETICS_CATALOG.md`. *Owner: move to DECISIONS.md.* The same ids must now be created
-  character-for-character in Play Console (`docs/PLAY_CONSOLE_SETUP.md` §D1).
+  `docs/COSMETICS_CATALOG.md`. *Owner: move to DECISIONS.md.* ~~The same ids must now be created
+  character-for-character in Play Console~~ (done 27–28 Aug — with ids **without the `veyro.`
+  prefix**: `skin.ember`/`skin.frost`/`season1.pass`, immutable and working; see the 15 Sep
+  correction in `COSMETICS_CATALOG.md` §2).
 
 ## Open
 

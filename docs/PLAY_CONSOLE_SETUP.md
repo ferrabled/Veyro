@@ -107,11 +107,12 @@ BILLING permission §D1 waits for, and ships as a track update.
 > purchases confirmed the entitlement wiring separately). The T-020 AAB (versionCode 4, BILLING
 > permission) is on the internal track. **D2 (15% fee tier) still pending — owner.**
 
-1. **Create the 3 in-app products.** Monetize → Products → In-app products → *Create product* —
-   ids **character-for-character** from `docs/COSMETICS_CATALOG.md` §2 (immutable):
-   `veyro.skin.ember` (€2.99) · `veyro.skin.frost` (€2.99) · `veyro.season1.pass` (€4.99).
-   Titles/descriptions from the catalog doc. **Activate** each. Products can take a few hours to
-   propagate — don't debug empty offerings in the first hour.
+1. **Create the 3 in-app products.** ✅ Done 27–28 Aug — but with ids **without the `veyro.`
+   prefix** this checklist specified: the live, immutable ids are `skin.ember` (€2.99) ·
+   `skin.frost` (€2.99) · `season1.pass` (€4.99), verified against the Console 15 Sep and proven
+   working by the 29 Aug license purchase. `docs/COSMETICS_CATALOG.md` §2 records the correction.
+   Never recreate them. (Products can take a few hours to propagate — don't debug empty offerings
+   in the first hour.)
 2. **Enrol in the 15% reduced service-fee tier** (`docs/LICENSING_REVENUE.md` §2).
 3. **Service credentials (completes P4)** — RevenueCat's current flow:
    1. Google Cloud Console → create/select a project → enable **Google Play Android Developer
