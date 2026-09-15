@@ -29,13 +29,14 @@
     <span class="eyebrow">Legal</span>
     <h1 class="ghosted-ink">Privacy Policy</h1>
     <p class="doc-meta">
-      Effective date: 29 August 2026 ·
+      Effective date: 15 September 2026 ·
       App: Veyro Run (com.ferrabled.veyro.run), published by Fernando Rabasco ("ferrabled") ·
       Contact: <a href="mailto:ferrabled+veyro@gmail.com">ferrabled+veyro@gmail.com</a>
     </p>
 
     <div class="callout">
-      <p><strong>The short version:</strong> Veyro Run plays entirely on your device — every run, every score, every camera frame. There are no user accounts, no analytics, no advertising, and no tracking of any kind. The game uses the internet for one purpose only: optional cosmetic items. It asks our purchase provider which ones your device owns when it launches, and it goes online again if you buy or restore one. Nothing else you do in the game ever leaves your phone.</p>
+      <p><strong>The short version:</strong> Veyro Run plays entirely on your device — every run, every score, every camera frame. There are no user accounts, no advertising, no gameplay analytics, and no tracking of what you do in the game. Versions that include the in-game shop use the internet for one purpose only: optional cosmetic items. The game asks our purchase provider which ones your device owns when it launches, and it goes online again if you buy or restore one. Nothing else you do in the game ever leaves your phone.</p>
+      <p><strong>Which version do you have?</strong> Closed-beta versions distributed before the shop update (September 2026) contain no purchases and make no network requests at all — for those versions, the Purchases section below simply does not apply. Everything else on this page applies to every version.</p>
     </div>
 
     <h2>Camera (optional game mode)</h2>
@@ -50,16 +51,17 @@
     <p>Tilt mode reads your device's gyroscope/accelerometer to steer. Sensor readings are used in the moment, on the device, and are not stored or transmitted.</p>
 
     <h2>Data stored on your device</h2>
-    <p>Your best scores and your last-used control mode are saved in the app's local storage on your device only. Uninstalling the app deletes them.</p>
+    <p>Your best scores and your last-used control mode are saved in the app's local storage on your device only. Uninstalling the app removes them from the device; note that Android's automatic backup service may restore app data when you reinstall, depending on your device's backup settings — that is Android behaviour, not something the game controls.</p>
 
     <h2>Purchases (optional)</h2>
-    <p>Veyro Run is free, and the whole game is in the free download. You can optionally buy cosmetic items — runner skins and a season pass — which change how your runner looks and nothing else. Buying is optional; the check described in the first point below is not, because the game has to know what you already own.</p>
+    <p><em>This section applies to versions that include the in-game shop (the September 2026 update onward). Earlier closed-beta versions contain no shop and contact no one.</em></p>
+    <p>Veyro Run is free, and the whole game is in the free download. You can optionally buy cosmetic items for your runner, which change how your runner looks and nothing else. Buying is optional; the check described in the first point below is not, because the game has to know what you already own.</p>
     <ul>
       <li><strong>RevenueCat is contacted when the game starts, whether or not you ever buy.</strong> The game uses RevenueCat, a purchase-management service acting as our processor, to answer one question: which cosmetics does this device own? It asks that question when the game launches, when you return to it after switching away, and when you open the store screen — not only at the moment of a purchase. That is what makes a cosmetic you already own appear straight away instead of after a restart. On first launch RevenueCat generates an <strong>anonymous identifier</strong> for your installation, and each request carries basic technical details: app version, platform, and store country. If you never buy anything, that identifier simply has no purchases attached to it. Its policy is at <a href="https://www.revenuecat.com/privacy">revenuecat.com/privacy</a>.</li>
       <li><strong>Google Play handles the payment.</strong> Purchases are made through your own Google account under Google Play's terms. We never see or receive your payment details — no card number, no billing address, no name. Google's handling of the transaction is covered by <a href="https://policies.google.com/privacy">Google's privacy policy</a>.</li>
       <li><strong>Buying is what adds the purchase itself.</strong> When you buy or restore, RevenueCat also receives the <strong>purchase token and purchase history</strong> that Google Play issues for the transaction, and keeps them so your purchase can be given back to you when you reinstall or switch phones.</li>
-      <li><strong>That identifier is not you.</strong> It is generated for the installation, is not linked to your name or email, and there is no Veyro Run account to link it to — none exists. Reinstalling produces a new one.</li>
-      <li><strong>Nothing else rides along.</strong> No advertising, no ad identifiers, no analytics SDK, no profiling, and no gameplay data is sent anywhere. Buying a skin does not start any other collection.</li>
+      <li><strong>That identifier is not you.</strong> It is generated for the installation, is not linked to your name or email, and there is no Veyro Run account to link it to — none exists. Reinstalling normally produces a new one, though if Android's backup service restores the app's data, the previous identifier can come back with it.</li>
+      <li><strong>Purchase records double as our sales statistics.</strong> RevenueCat shows us aggregate numbers derived from purchases — how many of each cosmetic have been bought, revenue totals. That is the extent of the "analytics" in this game: it comes from the purchase records themselves, not from any tracking of you or your play. No advertising, no ad identifiers, no separate analytics SDK, no profiling, and no gameplay data is sent anywhere. Buying a skin does not start any other collection.</li>
     </ul>
     <p>Camera mode is unaffected by all of this: camera frames are never part of a purchase, never sent to Google Play or RevenueCat, and never transmitted anywhere at all.</p>
 
@@ -67,15 +69,20 @@
     <p>Veyro Run is not directed at children under 13.</p>
 
     <h2>Your rights</h2>
-    <p>The game itself holds no data about you, so for the game there is nothing to request, export, correct, or delete — uninstalling removes the local scores and settings.</p>
-    <p>RevenueCat holds the anonymous identifier for your installation from the first launch onwards, and — if you have bought a cosmetic — the record of that purchase, which it keeps so the purchase can be restored. A purchase also appears in your own Google Play order history, which you see and manage in your Google account. To have the RevenueCat record deleted, email <a href="mailto:ferrabled+veyro@gmail.com">ferrabled+veyro@gmail.com</a> and we will request its deletion — note that deleting it means any purchase can no longer be restored to a new install.</p>
+    <p>The game itself holds no data about you, so for the game there is nothing to request, export, correct, or delete — uninstalling removes the local scores and settings from the device (subject to Android's backup behaviour, above).</p>
+    <p>In shop-enabled versions, RevenueCat holds the anonymous identifier for your installation from the first launch onwards, and — if you have bought a cosmetic — the record of that purchase, which it keeps so the purchase can be restored. A purchase also appears in your own Google Play order history, which you see and manage in your Google account.</p>
+    <p>To have the RevenueCat record deleted, email <a href="mailto:ferrabled+veyro@gmail.com">ferrabled+veyro@gmail.com</a>. Two honest caveats:</p>
+    <ul>
+      <li><strong>If you have bought something</strong>, include your Google Play order number (from your Google Play order history) so we can locate the record. Deleting it removes what RevenueCat holds, but the purchase itself remains in your Google Play account — that is Google's record, not ours to delete — so restoring purchases on a later install can create a fresh RevenueCat record containing that purchase again.</li>
+      <li><strong>If you have never bought anything</strong>, the record is a random identifier that neither we nor RevenueCat can connect to you — the app does not display it, and it is not linked to your name, email, or Google account. It contains nothing about you beyond app version, platform, and store country. We will still help with any request, but we cannot single out which anonymous record is yours.</li>
+    </ul>
     <p>Any other privacy question or concern: email the same address, and a human will answer.</p>
 
     <h2>About this website</h2>
     <p>This website (veyro.ferrabled.com) sets no cookies and runs no analytics or trackers. Two things happen at the infrastructure level when you visit: the site is served by <strong>Cloudflare</strong>, which processes visitor IP addresses to deliver pages (as any web host does), and pages load their fonts from <strong>Google Fonts</strong>, which means your browser requests the font files from Google's servers. We never see or store any of this ourselves.</p>
 
     <h2>Changes</h2>
-    <p>The Purchases section was added on 29 August 2026, when optional cosmetic purchases shipped. If a future version of the game starts any further data collection (for example push notifications), this policy will be updated here first, and the app's store listing will reflect it.</p>
+    <p>The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. Closed-beta versions distributed before that update contain no purchases and collect nothing. If a future version of the game starts any further data collection (for example push notifications), this policy will be updated here first, and the app's store listing will reflect it.</p>
 
     <h2>Contact</h2>
     <p>Questions about this policy: <a href="mailto:ferrabled+veyro@gmail.com">ferrabled+veyro@gmail.com</a>.</p>
