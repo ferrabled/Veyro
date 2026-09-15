@@ -17,9 +17,10 @@ grep-verified). **391/391 EditMode green** (6000.5.9f1 batchmode on this tree). 
   hedges; offline = owned cosmetics stay cached; restore route SHOP → RESTORE PURCHASES; "no
   analytics" → "no gameplay analytics" with purchase stats disclosed; "trails" removed from sales
   copy. Full delta: STORE_COMPLIANCE T-020 (15 Sep block). **Deploy BEFORE testers get the build.**
-- **`docs/PLAY_CONSOLE_RELEASE_ES.md`**: Spanish Console guide for this release (products check,
-  internal-test purchase checklist, Data safety / app access / rating answers, closed-track
-  promotion).
+- **Spanish Console guidance for this release** (products check, internal-test purchase checklist,
+  Data safety / app access / rating answers, closed-track promotion) was prepared and given to the
+  owner directly; it is deliberately not committed. The binding declaration record stays
+  STORE_COMPLIANCE.md.
 - **Owner answers, same day (OPEN_QUESTIONS 14):** versionCode **5** (Console max is 4);
   production access **en revisión** (submitted Mon 23:05, ≤7 days — wait for the email); **pass
   stays on sale as-is** (ladder is upcoming work; the row's honesty note stays).
