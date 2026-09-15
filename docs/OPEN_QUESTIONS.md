@@ -133,3 +133,14 @@ the question. Keep this file short; it is read every session.
       Inference Engine can serialize fp16-quantized assets (~half), or the gesture could drop the
       detector stage and crop from the face box (unproven). *Recommended default: ship as-is for
       closed testing, quantize before v1.0 if the .aab budget minds.*
+
+14. **RevenueCat closed-test release (2026-09-15)** — ✅ **all three answered by the owner, 15 Sep:**
+    - **versionCode 5.** Console max across tracks/drafts is 4. This and every future release
+      keeps using the `VEYRO_VERSION_CODE` env var, which `BuildAndroidBundle` already reads
+      (STORE_COMPLIANCE standing rule 1) — nothing new to build.
+    - **Production access: en revisión.** Solicitud enviada lunes 23:05; Google says ≤7 days,
+      answer arrives by email to the account owner. Nothing to do but wait; access approval alone
+      publishes nothing.
+    - **Season 1 pass stays on sale as-is.** The reward ladder is upcoming near-term work; the
+      shop row's "reward ladder arrives with the Season 1 update" note and the paywall stay
+      unchanged. *Owner: move this to DECISIONS.md if it should bind future sessions.*

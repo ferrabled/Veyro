@@ -6,6 +6,28 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-15 — RevenueCat closed-test release prepared (release-revenue-cat session)
+
+`release/revenue-cat` = the main-menu merge `8894ec9` (= origin/main; no profile/Supabase work,
+grep-verified). **391/391 EditMode green** (6000.5.9f1 batchmode on this tree). No game code changed.
+
+- **Site + policy revised to effective date 15 Sep, undeployed** — the 29 Aug text described a
+  purchases launch that never reached testers. Now: beta-vs-shop version transition; deletion no
+  longer claims to prevent restoration + honest anonymous-non-buyer answer; Android Auto Backup
+  hedges; offline = owned cosmetics stay cached; restore route SHOP → RESTORE PURCHASES; "no
+  analytics" → "no gameplay analytics" with purchase stats disclosed; "trails" removed from sales
+  copy. Full delta: STORE_COMPLIANCE T-020 (15 Sep block). **Deploy BEFORE testers get the build.**
+- **`docs/PLAY_CONSOLE_RELEASE_ES.md`**: Spanish Console guide for this release (products check,
+  internal-test purchase checklist, Data safety / app access / rating answers, closed-track
+  promotion).
+- **Owner answers, same day (OPEN_QUESTIONS 14):** versionCode **5** (Console max is 4);
+  production access **en revisión** (submitted Mon 23:05, ≤7 days — wait for the email); **pass
+  stays on sale as-is** (ladder is upcoming work; the row's honesty note stays).
+
+**Needs the owner:** review the site diff → `npx wrangler deploy` from `site/`; set
+`VEYRO_KEYSTORE*` + `VEYRO_VERSION_CODE=5` and run `BuildAndroidBundle` (agent verifies the .aab
+before upload); then walk `PLAY_CONSOLE_RELEASE_ES.md` §2–§4.
+
 ## 2026-09-02 — feat/main-menu: three-tab menu, attract run, dev version line (T-016, T-017)
 
 **EditMode 272 → 327 green** (Unity 6000.5.9f1 batchmode); `RunSeedTests` untouched.
