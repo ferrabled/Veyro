@@ -6,6 +6,38 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-16 — PRODUCTION ACCESS GRANTED · v5 submitted to production review
+
+**Google granted production access** (Console: "Tu juego tiene acceso a producción"). The
+application had been filed against v3, but access is account/app-level permission — it does **not**
+bind which bundle you publish. Nothing auto-published.
+
+Owner then created the production release directly, choosing the right bundle:
+
+- **versionCode 5 (1.0.0)** — the RevenueCat build, promoted **from the library**, not rebuilt, so
+  it is the exact artifact already reviewed on the closed track (STATUS 16 Sep, v5 entry).
+- **Full rollout** ("Iniciar lanzamiento completo"), not staged.
+- **Countries: 176 + rest of world.** US inclusion is the eligibility-critical one (CHECKLIST A3).
+- **Managed publishing OFF** — it auto-publishes the moment review passes, so there is no forgotten
+  Publicar button between approval and a live store URL.
+
+**The 12×14 closed-testing gate is permanently cleared.** It was a one-time requirement to obtain
+production access for a new personal developer account. It never applies again — to this app or any
+future release of it.
+
+**Consequence for every future update:** no new closed release, no re-application. The ladder is
+now **internal testing (instant, no review) → verify on device → production release with that same
+bundle → review (fast now the app is known) → live.** The closed track is optional from here and is
+only worth using when tester feedback is actually wanted. This supersedes T-031's AC.
+
+**Where this leaves the schedule.** First production reviews can take up to ~7 days, so live ~23 Sep
+if it runs normally, against a 30 Sep deadline. That leaves roughly a week for ONE update — the
+window for OneSignal (T-021) + Layers (T-022). Profiles/Supabase deliberately stays out of it
+(account-deletion policy is a documented rejection trigger; see the accounts brief).
+
+**Needs the owner:** P5/P6/P7/P9 account signups — every one is "minutes" and each gates a category.
+P9 in particular blocks T-040, whose posts are already drafted, for the $30k #BuildInPublic category.
+
 ## 2026-09-16 — Samsung / Galaxy Store track dropped (docs only)
 
 **Owner call: we are not entering the Samsung "Best App for Galaxy" category, and Galaxy Store is no
