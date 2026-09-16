@@ -55,11 +55,19 @@ they are presentation-only strings.
 
 ### Products — all three one-time, **NON-CONSUMABLE** (see `REVENUECAT_PLAN.md` §2.1; not optional)
 
-| Product id (immutable ★) | Display name (mutable) | Price ★ | Grants entitlement(s) |
+> **Correction, 15 Sep 2026 (release-revenue-cat):** the ids actually created in Play Console
+> (27–28 Aug, owner screenshot of *Monetizar → Productos únicos*) are **`skin.ember` /
+> `skin.frost` / `season1.pass`** — without the `veyro.` prefix this doc originally specified.
+> They are immutable, and the 29 Aug end-to-end license purchase proves RevenueCat's Play
+> products carry the same identifiers, so **the live ids stand — never recreate them**. Game
+> code is unaffected (it references entitlements and package ids only, never product ids).
+> Judge promo codes are generated per-product against these real ids. Table updated to reality:
+
+| Product id (immutable ★, as created) | Display name (mutable) | Price ★ | Grants entitlement(s) |
 |---|---|---|---|
-| `veyro.skin.ember` | Ember Skin | €2.99 | `skin_ember` |
-| `veyro.skin.frost` | Frost Skin | €2.99 | `skin_frost` |
-| `veyro.season1.pass` | Season 1 Pass | €4.99 | `season1` |
+| `skin.ember` | Ember Skin | €2.99 | `skin_ember` |
+| `skin.frost` | Frost Skin | €2.99 | `skin_frost` |
+| `season1.pass` | Season 1 Pass | €4.99 | `season1` |
 
 Skins sold **individually** rather than as a pack ★: a buyer who wants one isn't forced to buy
 both, the €2.99 → €4.99 ladder reads as deliberate pricing (HAMM judges strategy), and a

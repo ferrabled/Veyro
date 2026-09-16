@@ -60,6 +60,21 @@ the same change that ships a feature listed below.
   COSMETICS ONLY paragraph is un-held) no longer carry the absolute "no network requests" claim.
   Owner runs `npx wrangler deploy` from `site/`; the deploy, the listing paste and every Console
   flip above go out with the versionCode-5 upload, not before. Declared state above is untouched.
+- **Text status (15 Sep 2026, release-revenue-cat):** the 29 Aug text described a purchases
+  launch that never reached testers; all four site pages + both doc sources revised, still
+  undeployed. Effective dates now 15 Sep 2026. New corrections riding the same deploy:
+  version-transition wording (closed-beta builds have no shop; the Purchases section scopes
+  itself to shop-enabled versions), deletion answers no longer claim deleting the RevenueCat
+  record prevents restoration (the Play purchase is a separate Google record and a later
+  restore can recreate the data) and cover anonymous non-buyers honestly (their record cannot
+  be individually identified; no in-app ID screen exists), uninstall/identifier claims hedge
+  for Android Auto Backup (observed restoring the anonymous ID, 29 Aug device test), offline
+  copy says owned cosmetics normally stay available from the on-device cache, restore route is
+  the menu's SHOP → RESTORE PURCHASES, "no analytics" became "no gameplay analytics" with the
+  purchase-statistics purpose stated (matches the Data safety "Analytics" purpose for purchase
+  history), and undelivered "trails" left the sales copy. **The deploy must happen BEFORE the
+  RevenueCat build reaches any tester**, not merely in the same window — testers must never
+  hold a purchasing build while the live policy says "no collection".
 
 ### T-021 — OneSignal push notifications
 - Data safety → device/push identifiers = collected.

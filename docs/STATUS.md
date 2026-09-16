@@ -6,6 +6,54 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-16 — v5 (RevenueCat) SUBMITTED to closed-track review (release-revenue-cat session)
+
+Owner sent the atomic package from Resumen de publicación: closed track "Alpha" release **5
+(1.0.0)** (the verified AAB below) + Seguridad de los datos (purchase history + device/other IDs,
+deletion URL /support/) + Datos de inicio de sesión ("Sí" — one-time products; English
+no-credentials instructions) + content-rating redo (digital purchases = Yes) + new short/full
+listing descriptions (the live listing's "crouch to slide" and "zero network requests" claims are
+gone). Ordering held: the 15 Sep policy was live on the site before submission (fetch-verified),
+and the internal-track install + purchase checks passed on device (owner, 16 Sep).
+
+**State: sent for review — not published.** Production-access application separately "en
+revisión" (submitted 14 Sep, ≤7 days per Console). No changes while review runs; testers update
+only after it publishes. **Deliberately deferred (owner):** the 6 listing screenshots were not
+refreshed — some may show the old mode picker; a listing-only edit later reviews without a binary.
+
+## 2026-09-15 — RevenueCat closed-test release prepared (release-revenue-cat session)
+
+`release/revenue-cat` = the main-menu merge `8894ec9` (= origin/main; no profile/Supabase work,
+grep-verified). **391/391 EditMode green** (6000.5.9f1 batchmode on this tree). No game code changed.
+
+- **Site + policy revised to effective date 15 Sep, undeployed** — the 29 Aug text described a
+  purchases launch that never reached testers. Now: beta-vs-shop version transition; deletion no
+  longer claims to prevent restoration + honest anonymous-non-buyer answer; Android Auto Backup
+  hedges; offline = owned cosmetics stay cached; restore route SHOP → RESTORE PURCHASES; "no
+  analytics" → "no gameplay analytics" with purchase stats disclosed; "trails" removed from sales
+  copy. Full delta: STORE_COMPLIANCE T-020 (15 Sep block). **Deploy BEFORE testers get the build.**
+- **Spanish Console guidance for this release** (products check, internal-test purchase checklist,
+  Data safety / app access / rating answers, closed-track promotion) was prepared and given to the
+  owner directly; it is deliberately not committed. The binding declaration record stays
+  STORE_COMPLIANCE.md.
+- **Owner answers, same day (OPEN_QUESTIONS 14):** versionCode **5** (Console max is 4);
+  production access **en revisión** (submitted Mon 23:05, ≤7 days — wait for the email); **pass
+  stays on sale as-is** (ladder is upcoming work; the row's honesty note stays).
+
+**Artifact (owner-built 15 Sep 21:29, agent-verified):** `builds/MotionRunner.aab` — game content
+byte-identical to `8894ec9` (the tested merge; later commits touch only site/docs), versionCode
+**5**, versionName 1.0.0 (no dev stamp, not debuggable), 67.1 MiB, SHA-256
+`DF703882D708585DAD9E08E2339E37B093A14453A973CD533B83D4B3BC8311AE`. Manifest: target SDK 36,
+ARM64-only, `launchMode` singleTop, permissions INTERNET + CAMERA (features `required=false`) +
+BILLING + ACCESS_NETWORK_STATE, **no AD_ID** (Advertising-ID declaration stays No), no debuggable
+flag. jarsigner: verified, self-signed upload cert exp. 2054 (D5 keystore). IL2CPP metadata carries
+the live privacy URL and the `goog_` Play key; no Supabase strings. **Cleared for the
+internal-track upload** once the site deploy is live.
+
+**Needs the owner:** review the site diff → `npx wrangler deploy` from `site/` (BEFORE testers get
+the build); upload the verified .aab to internal testing, run the device/purchase checks, then the
+atomic closed-track promotion with the Console flips (STORE_COMPLIANCE T-020).
+
 ## 2026-09-02 — feat/main-menu: three-tab menu, attract run, dev version line (T-016, T-017)
 
 **EditMode 272 → 327 green** (Unity 6000.5.9f1 batchmode); `RunSeedTests` untouched.

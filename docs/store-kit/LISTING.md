@@ -89,8 +89,10 @@ reads as one.
 
 ## 3. Full description (limit 4,000) — v1.0 + purchases
 
-> ⚠️ **PASTE THIS WITH THE T-020 RELEASE, NOT BEFORE (prepared 29 Aug 2026).** The block below is
-> the description for the submission that ships the purchases build (versionCode 5) — it names the
+> ⚠️ **PASTE THIS WITH THE T-020 RELEASE, NOT BEFORE (prepared 29 Aug 2026; still pending 15 Sep —
+> the closed track never received the purchases build).** The block below is the description for
+> the submission that ships the purchases build (versionCode = owner-confirmed highest + 1; the
+> record says 4 is used, so it is 5 — confirmed) — it names the
 > cosmetics and it no longer claims the game never connects. Pasting it earlier would advertise a
 > feature the live build does not have and contradict the Console answers currently on file.
 > Pasting the *old* text after that build ships is the mirror-image error: it would claim
@@ -233,13 +235,13 @@ the closed track.
 | App category | Games → Arcade (Action is the alternate; Arcade fits an endless runner better) |
 | Tags | Choose from Play's fixed list: *Arcade*, *Casual*, *Endless runner* if offered |
 | Contact email | **ferrabled+veyro@gmail.com** (answered 25 Aug, OPEN_QUESTIONS 9). Explicitly a temporary alias the owner will replace — grep `site/` + `docs/PRIVACY_POLICY.md` when that happens. **Not** the OpenZeppelin work address. |
-| Website / privacy policy | ✅ **Live** at `https://veyro.ferrabled.com/privacy/` (Cloudflare Workers, deployed + verified 25 Aug). The GitHub Pages plan was dropped. ⚠️ **versionCode 1 still has the dead GitHub Pages URL compiled in** — the closed track must serve versionCode 2, and `GameLinks.PrivacyPolicyUrl` must match the field above (OPEN_QUESTIONS 9; "URL coupling" in `STORE_COMPLIANCE.md`). **Purchases section written 29 Aug, effective date 29 August 2026, not yet deployed** — `npx wrangler deploy` from `site/` belongs to the T-020 submission. |
+| Website / privacy policy | ✅ **Live** at `https://veyro.ferrabled.com/privacy/` (Cloudflare Workers, deployed + verified 25 Aug). The GitHub Pages plan was dropped. ⚠️ **versionCode 1 still has the dead GitHub Pages URL compiled in** — the closed track must serve versionCode 2, and `GameLinks.PrivacyPolicyUrl` must match the field above (OPEN_QUESTIONS 9; "URL coupling" in `STORE_COMPLIANCE.md`). **Purchases section written 29 Aug, revised 15 Sep (effective date 15 September 2026, version-transition + deletion/backup/offline corrections), not yet deployed** — `npx wrangler deploy` from `site/` belongs to the T-020 submission and must precede the build reaching testers. |
 | Content rating | Filed 25 Aug: all-No → **PEGI 3**. Digital purchases answered **no**, which is correct while the build has none — it flips to **yes** in the T-020 release (`STORE_COMPLIANCE.md` flip table). |
 | Ads | **No** (v1.0 contains no ads — see the T-023 verdict in STATUS) |
 | In-app purchases | **Flips to Yes in the T-020 submission** — the flag stays off until the versionCode-5 build with `purchases-unity` in it is the one being uploaded, then goes on with the price range (€2.99–€4.99: `veyro.skin.ember`, `veyro.skin.frost` €2.99; `veyro.season1.pass` €4.99). Same submission as the §3 description with COSMETICS ONLY in it — the two must not be published apart. |
 | Target audience | 13+ recommended. Under-13 pulls in Families policy, Designed-for-Families review and extra ad/data rules for no benefit here |
-| Support URL | `https://veyro.ferrabled.com/support/` (live). **Rewritten 29 Aug, not yet deployed:** the purchases FAQ is now present tense, a "restore purchases" answer was added, and the camera/offline answers no longer claim the game makes no network requests. Deploy with the T-020 submission. |
-| Terms | `https://veyro.ferrabled.com/terms/` (live). **Rewritten 29 Aug, not yet deployed:** §3 moved from "may offer" to "offers" purchases, §2 names the one online exception, effective date bumped to 29 August 2026. Deploy with the T-020 submission. |
+| Support URL | `https://veyro.ferrabled.com/support/` (live). **Rewritten 29 Aug, revised 15 Sep, not yet deployed:** purchases FAQ names the September 2026 update explicitly (the closed beta has no shop), restore route updated to SHOP → RESTORE PURCHASES, data-deletion answer covers non-buyers and no longer claims deletion prevents restoration, offline answer no longer claims owned cosmetics lock. Deploy with the T-020 submission. |
+| Terms | `https://veyro.ferrabled.com/terms/` (live). **Rewritten 29 Aug, revised 15 Sep, not yet deployed:** §2/§3 scope purchases to shop-enabled versions, "trails" removed (not shipped), offline wording fixed, effective date 15 September 2026. Deploy with the T-020 submission. |
 
 **Two claims from the old `listing.md` draft that must NOT be carried forward** (it was deleted in the
 26 Aug merge; its asset/brand half moved to `ART_DIRECTION.md` §0a):
