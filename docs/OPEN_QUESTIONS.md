@@ -28,8 +28,7 @@ the question. Keep this file short; it is read every session.
 
 1. **Team size:** solo otherwise (art, video, testing)? Affects how many agent tracks run in
    parallel, and who approves store submissions.
-2. **Devices:** which Android phone and iPhone are available? Any Galaxy / Fold access (owned,
-   borrowed, or Samsung Remote Test Lab)?
+2. **Devices:** which Android phone and iPhone are available?
 3. **Orientation:** portrait or landscape? *Default: portrait for v1.0 — bigger mobile audience,
    simpler UI — revisit landscape for the TV story.*
 4. **Art direction:** low-poly flat-colour, toon-shaded, neon? *Default: agents propose 2–3 style

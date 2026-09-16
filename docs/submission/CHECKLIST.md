@@ -14,7 +14,7 @@ Legend: ☐ not started · ⏳ blocked · ✅ done. Update in place.
 | | Requirement | Status | Blocked on |
 |---|---|---|---|
 | A1 | RevenueCat SDK powering ≥ 1 real in-app purchase in the published build | ☐ | **T-020.** P1/P4 cleared 24 Aug — the Unity half is unblocked *now* (Test Store). Real-purchase verification needs the 3 Play products created (`PLAY_CONSOLE_SETUP.md` §D1) + service-account JSON (§D3, ~36 h) |
-| A2 | First public release **between 1 Aug and 30 Sep 2026** on App Store, Google Play or Galaxy Store | ☐ | **T-031.** Closed test live 26 Aug → production ~16 Sep. Remaining: listing assets, and 12 testers opted in *continuously* |
+| A2 | First public release **between 1 Aug and 30 Sep 2026** on App Store or Google Play | ☐ | **T-031.** Closed test live 26 Aug → production ~16 Sep. Remaining: listing assets, and 12 testers opted in *continuously* |
 | A3 | App accessible from the US | ☐ | Play Console country settings — do not restrict to Spain |
 | A4 | Devpost account registered for Shipaton 2026 | ☐ | **P8** |
 | A5 | Entrant not resident in an excluded territory | ✅ | — |
@@ -55,7 +55,6 @@ python3 -c "from PIL import Image; print(Image.open('shot.png').size)"   # must 
 | C5 | OneSignal | **App ID** + ≥ 1 deployed campaign, described | blocked on **P5** + T-021 |
 | C6 | Layers | SDK installed and verifiable + experiment write-up with outcome | blocked on **P6** + T-022 |
 | C7 | Noise | live app URL + Noise account email | blocked on **P7** |
-| C8 | Samsung | **live Galaxy Store URL** + optimization description | blocked on **P3** + T-033 |
 | C9 | Catvertising | — | **not entered** (T-023 verdict, STATUS 23 Aug) |
 
 ## D. Things that are easy to forget
@@ -103,9 +102,9 @@ and it does not even start until the 12th tester is opted in. Twelve is a floor;
 check the opted-in count in Console rather than assuming (you cannot discover you are at eleven on
 day 13).
 
-There is now ~10 days of slack, all of it *after* production access. D11's Galaxy Store fallback is
-correspondingly less likely to be needed — but it is still the only backup if Play review rejects,
-so leave P3 as a live prerequisite rather than closing it.
+There is now ~10 days of slack, all of it *after* production access. Google Play is the only release
+path, with iOS via P2 as the sole backup if Play review rejects — treat the Play dates as having no
+second store behind them.
 
 ---
 

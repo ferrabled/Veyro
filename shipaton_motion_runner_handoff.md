@@ -58,7 +58,7 @@ The product should deliberately avoid the scope trap of building a huge Minecraf
 
 The game’s strongest strategic differentiator is the physical input model: movement of the phone or the player’s body controls the character. The second differentiator is a “Daily Run” with a shared deterministic seed, making the same run available to everyone each day. That creates a natural loop for score competition, sharing, notifications, and growth.
 
-The intended sponsor strategy is not to bolt on unrelated sponsor features. Instead, one coherent product loop should satisfy multiple categories: Best Game through gameplay/art/monetization; Samsung through a Fold/large-screen camera mode; OneSignal through Daily Run/streak/challenge notifications; Layers through measurable referral/competition growth loops; Noise through repeatable social-video formats; RevenueCat Design through polished motion, world and progression UX; HAMM through a thoughtful cosmetic/season monetization model; Stripe as an optional later web-to-app funnel.
+The intended sponsor strategy is not to bolt on unrelated sponsor features. Instead, one coherent product loop should satisfy multiple categories: Best Game through gameplay/art/monetization; OneSignal through Daily Run/streak/challenge notifications; Layers through measurable referral/competition growth loops; Noise through repeatable social-video formats; RevenueCat Design through polished motion, world and progression UX; HAMM through a thoughtful cosmetic/season monetization model; Stripe as an optional later web-to-app funnel.
 
 ## North-star sentence
 
@@ -262,7 +262,7 @@ This is the preferred growth loop because it naturally connects the game, social
 
 ## 6.5 Social content / Noise strategy
 
-The game is inherently visual and should be easy to demonstrate in short-form video. Repeatable formats can include: “Can you beat me?”, “I built a game controlled by tilting your phone,” “One phone. One TV. Four players,” “The same world every day—who is \#1?”, and “Galaxy Fold hands-free mode.”
+The game is inherently visual and should be easy to demonstrate in short-form video. Repeatable formats can include: “Can you beat me?”, “I built a game controlled by tilting your phone,” “One phone. One TV. Four players,” and “The same world every day—who is \#1?”
 
 # 7. TV/display strategy and multiplatform approach
 
@@ -290,7 +290,7 @@ The app should treat TV mirroring as a “make this bigger” action, not a hard
 
 ## 7.6 Multiplatform target
 
-Target iOS and Android with a shared Unity game codebase. Samsung Galaxy Store is a strategic additional distribution target because it is required for the Samsung sponsor category. The app does not need a custom TV app.
+Target iOS and Android with a shared Unity game codebase. The app does not need a custom TV app.
 
 # 8. Computer-vision approach: MediaPipe / native CV / OpenCV / Roboflow
 
@@ -440,10 +440,9 @@ This section distinguishes official category criteria from our recommended produ
 | **Target**                        | **Current 1st prize**                                       | **Why it fits**                                              | **What we should implement**                                                        | **Priority**                 |
 |-----------------------------------|-------------------------------------------------------------|--------------------------------------------------------------|-------------------------------------------------------------------------------------|------------------------------|
 | Best Game                         | USD 15,000                                                  | This is the product itself                                   | Great gameplay, art direction, genre-fit monetization                               | MUST                         |
-| Best App for Galaxy — Samsung     | 3 weeks Galaxy Store featured placement + non-cash benefits | Fold/camera mode is a meaningful device-specific feature     | Publish on Galaxy Store; foldable optimization; camera/hand-free mode if validated  | MUST                         |
 | Keep Them Coming Back — OneSignal | USD 25,000                                                  | Daily Run and challenge loop naturally creates re-engagement | At least one campaign; ideally Daily Run + streak + friend-beat-you Journey         | MUST                         |
 | RevenueCat Design                 | USD 15,000                                                  | Game is visual; polish can differentiate                     | World transition, motion, animation, progression, cosmetics, clean HUD              | HIGH                         |
-| Most Viral — Noise                | USD 15,000                                                  | The concept is demonstrable in short video                   | Repeatable “beat my score / phone controller / Fold mode” content formats           | HIGH                         |
+| Most Viral — Noise                | USD 15,000                                                  | The concept is demonstrable in short video                   | Repeatable “beat my score / phone controller / hands-free” content formats          | HIGH                         |
 | Growth Loop — Layers              | USD 15,000                                                  | Challenge/share/beat-score is a natural loop                 | Install Layers, define hypothesis, measure one growth experiment, document learning | HIGH                         |
 | HAMM                              | USD 15,000                                                  | Cosmetics/season pass fit mobile game economics              | Thoughtful paywall, cosmetic pricing, Season Pass, no pay-to-win                    | MEDIUM-HIGH                  |
 | Funnel Vision — Stripe            | USD 15,000                                                  | Could sell season pass via web funnel                        | RevenueCat Funnels + Stripe checkout + live web-to-app funnel                       | OPTIONAL LATER               |
@@ -452,8 +451,6 @@ This section distinguishes official category criteria from our recommended produ
 | Gaming Influencer                 | USD 15,000                                                  | Not about game development; it is a gaming backlog app       | Would require building a different product                                          | SKIP                         |
 
 ## 11.2 Official sponsor facts
-
-Samsung: the Best App for Galaxy category requires a Galaxy Store publication and evaluates overall quality plus Galaxy optimization. Devpost says 20% of the category score is Galaxy Store optimization, including foldables, multi-window or device-specific hardware; store exclusivity can get bonus consideration but is not required. \[S2\]
 
 OneSignal: eligibility requires integrating OneSignal and deploying at least one campaign through the OneSignal API, MCP or dashboard, then describing the campaign and providing the OneSignal App ID. A single deployed message is enough for eligibility, but more thoughtful use can score better. \[S2\]
 
@@ -466,11 +463,6 @@ Stripe: eligibility requires a live web-to-app funnel using RevenueCat Funnels w
 > BEST GAME  
 > \|  
 > +-- core gameplay + art + genre-fit monetization  
->   
-> SAMSUNG  
-> \|  
-> +-- Galaxy Store  
-> +-- Fold / hands-free camera mode  
 >   
 > ONESIGNAL  
 > \|  
@@ -545,10 +537,6 @@ The official rules say #BuildInPublic judges sharing the journey, engagement and
 
 ## 12.3 Phase 3 — sponsor differentiators
 
-- Galaxy Store release.
-
-- Galaxy Fold camera/hands-free mode if technical spike passes.
-
 - Noise content pipeline / repeated social formats.
 
 - RevenueCat paywall + cosmetic product catalog.
@@ -594,8 +582,8 @@ The official rules say #BuildInPublic judges sharing the journey, engagement and
 | Week 2     | Polish, character, audio, result screen, TV-mirroring validation.                  |
 | Week 3     | Daily Run + seed + leaderboard/share proof-of-concept.                             |
 | Week 4     | RevenueCat + basic cosmetics + Season 1 shell.                                     |
-| Week 5     | OneSignal + Layers experiments + Samsung/Fold prototype.                           |
-| Week 6     | Noise content + App Store/Play/Galaxy release work + QA.                           |
+| Week 5     | OneSignal + Layers experiments.                                                    |
+| Week 6     | Noise content + App Store/Play release work + QA.                                  |
 | Final days | Submission video, screenshots, category answers, sponsor proof, analytics/results. |
 
 # 13. Risks, assumptions and open technical questions
@@ -609,7 +597,6 @@ The official rules say #BuildInPublic judges sharing the journey, engagement and
 | How much UI can remain on the phone?        | Mirroring duplicates the phone UI.                      | Design a mirrored-safe “TV layout” and keep HUD minimal.                |
 | How do daily seeds remain stable?           | Version changes can alter generation.                   | Store generator version with the seed.                                  |
 | What is the correct season economy?         | Too cheap/expensive can hurt HAMM credibility.          | Prototype paywall and 2–3 price points using analytics.                 |
-| Galaxy camera posture                       | Fold may have different cameras/orientations.           | Test specific Fold model(s) and camera placement before committing.     |
 
 ## 13.1 Important assumptions
 
@@ -655,7 +642,6 @@ The official rules say #BuildInPublic judges sharing the journey, engagement and
 
 - Layers: instrument challenge share loop and run a focused experiment.
 
-- Samsung: publish/prepare Galaxy Store and validate a Fold-specific mode.
 
 - Noise: prepare repeatable social formats and publish consistently.
 
