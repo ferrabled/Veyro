@@ -44,17 +44,16 @@ P9 in particular blocks T-040, whose posts are already drafted, for the $30k #Bu
 longer a distribution target.** Publishing an app *with in-app purchases* on Galaxy Store requires a
 Samsung **commercial** seller account, which requires a registered business entity. We do not have
 one, so the category's mandatory live Galaxy Store URL is unobtainable — not a scheduling problem
-that more time would fix. This is the record of the decision; the planning docs no longer mention
-Samsung at all.
+that more time would fix. This is the record of the decision; the planning docs no longer pursue
+Samsung anywhere.
 
 Stripped every Samsung/Galaxy/Fold reference out of the plan: both handoff specs (prize-matrix row,
 sponsor-strategy paragraph, §11.2 category requirement, §11.3 blueprint line, multiplatform target,
 seller-registration step, the Update-1 Galaxy submission and Update-2 Fold layout, the Fold-camera
 and Galaxy-billing risk rows, the Fold hardware assumption, the §14 checklists, source S13),
-DECISIONS (D7 category list, D11 backup-store clause), PREREQUISITES (P3, H5, P10's Galaxy payout
-profile), OPEN_QUESTIONS (Fold-access question), DEVPOST_ANSWERS (category row + answer block),
-CHECKLIST (C8, A2 wording, the slack note) and LICENSING_REVENUE. BACKLOG keeps **T-033 marked
-dropped** so nobody re-adds it, pointing here for the reason.
+PREREQUISITES (P3, H5, P10's Galaxy payout profile), OPEN_QUESTIONS (Fold-access question),
+DEVPOST_ANSWERS (category row + answer block), CHECKLIST (C8, A2 wording, the slack note) and
+LICENSING_REVENUE. BACKLOG keeps **T-033 marked dropped** so nobody re-adds it, pointing here.
 
 **Schedule consequence worth flagging: Google Play is now single-threaded.** D11 had treated Galaxy
 Store as the backup eligibility store if Play slipped; that backup is gone, so iOS via P2 (the

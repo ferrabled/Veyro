@@ -14,7 +14,7 @@ Legend: ☐ not started · ⏳ blocked · ✅ done. Update in place.
 | | Requirement | Status | Blocked on |
 |---|---|---|---|
 | A1 | RevenueCat SDK powering ≥ 1 real in-app purchase in the published build | ☐ | **T-020.** P1/P4 cleared 24 Aug — the Unity half is unblocked *now* (Test Store). Real-purchase verification needs the 3 Play products created (`PLAY_CONSOLE_SETUP.md` §D1) + service-account JSON (§D3, ~36 h) |
-| A2 | First public release **between 1 Aug and 30 Sep 2026** on App Store or Google Play | ☐ | **T-031.** Closed test live 26 Aug → production ~16 Sep. Remaining: listing assets, and 12 testers opted in *continuously* |
+| A2 | First public release **between 1 Aug and 30 Sep 2026** on App Store, Google Play or Galaxy Store (our route is Google Play — Galaxy is unavailable to us, D12) | ⏳ | **In Google's hands.** Production access granted 16 Sep; v5 (versionCode 5) submitted to production review the same day — full rollout, all countries, managed publishing **off**, so it auto-publishes the moment review passes. T-031 is closed; nothing on our side remains |
 | A3 | App accessible from the US | ☐ | Play Console country settings — do not restrict to Spain |
 | A4 | Devpost account registered for Shipaton 2026 | ☐ | **P8** |
 | A5 | Entrant not resident in an excluded territory | ✅ | — |
@@ -33,7 +33,7 @@ Legend: ☐ not started · ⏳ blocked · ✅ done. Update in place.
 | B1 | Project name | — | owner | ✅ `Veyro Run` | — |
 | B2 | Text description | see `DEVPOST_ANSWERS.md` §2 | drafted ✅, needs `[N]` fills | ☐ | real numbers |
 | B3 | Demo video | **< 2:00**, public on YouTube/Vimeo, app shown functioning on a device, no unauthorised trademarks or copyrighted music [S2] | owner + device | ☐ | script ✅ `VIDEO_SCRIPT.md`; needs the shoot |
-| B4 | Live store URL | app publicly listed | owner | ⏳ | **T-031** — closed test live 26 Aug, production ~16 Sep |
+| B4 | Live store URL | app publicly listed | owner | ⏳ | **Production review since 16 Sep** — auto-publishes on approval (managed publishing off). Live ~23 Sep if review runs normally |
 | B5 | App icon | **1024 × 1024** [S1] | designer | ☐ | brief ✅ `store-kit/ART_DIRECTION.md` |
 | B6 | Screenshot | **≥ 1 at exactly 1179 × 2556, no device frame** [S1] | device owner | ☐ | recipe ✅ `store-kit/SCREENSHOTS.md` §3 |
 | B7 | Judge access — free trial **or** promo code | promo codes for the cosmetic SKU | owner, in Play Console | ⏳ | **T-020 + product live**; text ✅ `DEVPOST_ANSWERS.md` §4 |
@@ -85,26 +85,24 @@ Recomputed 26 Aug: P1 cleared 24 Aug and closed testing went live 26 Aug, five d
 |---|---|---|
 | 24 Aug ✅ | Play Console approved + verified | — |
 | 26 Aug ✅ | Closed-testing build up on the closed track | — |
-| **now** | **12+ testers opted in** — the clock only starts at the 12th | H6 (recruit 16–18) |
-| ~2 Sep | 3 Play products created + service-account JSON uploaded (~36 h propagation) | `PLAY_CONSOLE_SETUP.md` §D |
-| ~5 Sep | T-020 done: real sandbox purchase + entitlement survives reinstall | §D above |
-| ~8 Sep | Store listing complete (copy ✅ incl. camera, icon, screenshots) | T-006, designer |
-| ~9 Sep | 14 days elapsed → apply for production | 12 testers continuous from 26 Aug |
-| ~16 Sep | Production live → **B4 store URL exists** | Play review, ≤ ~7 days |
+| 2 Sep ✅ | 3 Play products created + service-account JSON uploaded | `PLAY_CONSOLE_SETUP.md` §D |
+| 5 Sep ✅ | T-020 done: real purchase + entitlement survives reinstall | §D above |
+| 14 Sep ✅ | 14 continuous days elapsed → applied for production access | 12 testers held from 26 Aug |
+| 16 Sep ✅ | **Production access GRANTED** + v5 submitted to production review | — |
+| **~23 Sep** | **Production live → B4 store URL exists** | **Google's review clock; nothing on our side** |
 | ~16–20 Sep | Video shot (camera mode is already **in** v1.0, not an update) | T-011/12/13 playtest |
 | ~20 Sep | Promo codes generated and tested | B7 |
 | **29 Sep** | **Devpost form complete** | everything above |
 | 30 Sep 23:45 PDT | Deadline | — |
 
-**The single point of failure is now tester retention, not P1.** P1 cleared and the build is up, so
-the one date in this chain that cannot be compressed by working harder is the 14 continuous days —
-and it does not even start until the 12th tester is opted in. Twelve is a floor; recruit 16–18, and
-check the opted-in count in Console rather than assuming (you cannot discover you are at eleven on
-day 13).
+**The single point of failure is now Google's production review, and nothing on our side moves it.**
+Tester retention and the 12×14 clock are done — that gate is permanently cleared. v5 is submitted and
+auto-publishes on approval, so no human action sits between approval and a live store URL.
 
-There is now ~10 days of slack, all of it *after* production access. Google Play is the only release
-path, with iOS via P2 as the sole backup if Play review rejects — treat the Play dates as having no
-second store behind them.
+Google Play is the only release path, with iOS via P2 as the sole backup if Play review rejects —
+treat these dates as having no second store behind them. If review runs normally (live ~23 Sep),
+roughly a week remains for exactly **one** update: the window for OneSignal (T-021) + Layers (T-022).
+Slip past ~26 Sep and v5 is the submission build by default.
 
 ---
 

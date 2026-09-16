@@ -13,7 +13,7 @@ Shipaton 2026 — Product, Game Design, Technical Architecture & Sponsor Strateg
 | Submission deadline | 30 September 2026 @ 11:45pm PDT |
 | Days remaining | **41 days** (from 20 Aug 2026) |
 | Total prize pool | $740,000+ in cash (per Devpost) |
-| Release requirement | First public release of the app between **Aug 1 – Sep 30, 2026** on the App Store or Google Play. Building before Aug 1 was allowed; updates to previously-released apps do not qualify. |
+| Release requirement | First public release of the app between **Aug 1 – Sep 30, 2026** on the App Store, Google Play, or (new this year) Samsung Galaxy Store. Building before Aug 1 was allowed; updates to previously-released apps do not qualify. |
 | Core RevenueCat requirement | "uses the RevenueCat SDK to power at least one **in-app or web purchase**" — or, per the challenge summary, "serve ads through **RevenueCat Ads**" |
 | Primary product target | Best Game ($20k) + Grand Prize traction + sponsor overlap |
 
@@ -405,7 +405,7 @@ All amounts below are quoted from the live Devpost prize list, 20 Aug 2026. [S1]
 
 ## 11.2 Official requirements worth engineering time (verified)
 
-- **Eligibility:** working app using the RevenueCat SDK to power ≥1 in-app **or web** purchase (challenge text also allows serving ads through RevenueCat Ads). Built for iOS/iPadOS/macOS/Android; first public release Aug 1–Sep 30, 2026 on App Store or Google Play; accessible from the US.
+- **Eligibility:** working app using the RevenueCat SDK to power ≥1 in-app **or web** purchase (challenge text also allows serving ads through RevenueCat Ads). Built for iOS/iPadOS/macOS/Android; first public release Aug 1–Sep 30, 2026 on App Store, Google Play, or Galaxy Store; accessible from the US.
 - **Submission package:** text description; demo video **≤2 minutes of essential footage**, public on YouTube/Vimeo, no third-party trademarks/copyrighted music; store URL; **1024×1024 icon**; **≥1 screenshot at 1179×2556, no device frame**; **free trial or promo code so judges can unlock the IAP and test premium features**.
 - **OneSignal:** integrate + deploy ≥1 campaign via API/MCP/dashboard; describe it; provide App ID.
 - **Layers:** SDK installed and verifiable before judging; describe the growth loop (audience, message, channel/surface, experiment, intended outcome) and what was learned.
@@ -554,10 +554,10 @@ Judging filters check store publication, RevenueCat SDK on the bundle ID, requir
 Contest facts re-verified on the live pages on **20 August 2026**. Technology facts from official vendor documentation.
 
 **S1 — Shipaton 2026 Devpost overview + full prize list** — https://revenuecat-shipaton-2026.devpost.com/
-Deadline, challenge text ("in-app purchase or serve ads through RevenueCat Ads"), release window (Aug 1–Sep 30), full itemized prize list (quoted in §11.1), submission requirements (2-min video cap, 1024×1024 icon, 1179×2556 screenshot, free trial/promo code), judging criteria blurbs.
+Deadline, challenge text ("in-app purchase or serve ads through RevenueCat Ads"), release window (Aug 1–Sep 30, Galaxy Store new this year), full itemized prize list (quoted in §11.1), submission requirements (2-min video cap, 1024×1024 icon, 1179×2556 screenshot, free trial/promo code), judging criteria blurbs.
 
 **S2 — Shipaton 2026 Devpost rules** — https://revenuecat-shipaton-2026.devpost.com/rules
-Eligibility ("first public version… released during the Submission Period"; builds may pre-date the window), per-category requirements (OneSignal campaign + App ID, Layers SDK verifiable install, Stripe live funnel + payment volume).
+Eligibility ("first public version… released during the Submission Period"; builds may pre-date the window), per-category requirements (Samsung 20% Galaxy-optimization weighting, OneSignal campaign + App ID, Layers SDK verifiable install, Stripe live funnel + payment volume).
 
 **S3 — How we judge Shipaton** — https://www.shipaton.com/blog/how-we-judge-shipaton
 Filtering, ≥2 screeners, 2-minute video emphasis, ~100 finalists, category-overreach warning.
