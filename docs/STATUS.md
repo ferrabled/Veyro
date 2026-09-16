@@ -6,6 +6,21 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-16 — v5 (RevenueCat) SUBMITTED to closed-track review (release-revenue-cat session)
+
+Owner sent the atomic package from Resumen de publicación: closed track "Alpha" release **5
+(1.0.0)** (the verified AAB below) + Seguridad de los datos (purchase history + device/other IDs,
+deletion URL /support/) + Datos de inicio de sesión ("Sí" — one-time products; English
+no-credentials instructions) + content-rating redo (digital purchases = Yes) + new short/full
+listing descriptions (the live listing's "crouch to slide" and "zero network requests" claims are
+gone). Ordering held: the 15 Sep policy was live on the site before submission (fetch-verified),
+and the internal-track install + purchase checks passed on device (owner, 16 Sep).
+
+**State: sent for review — not published.** Production-access application separately "en
+revisión" (submitted 14 Sep, ≤7 days per Console). No changes while review runs; testers update
+only after it publishes. **Deliberately deferred (owner):** the 6 listing screenshots were not
+refreshed — some may show the old mode picker; a listing-only edit later reviews without a binary.
+
 ## 2026-09-15 — RevenueCat closed-test release prepared (release-revenue-cat session)
 
 `release/revenue-cat` = the main-menu merge `8894ec9` (= origin/main; no profile/Supabase work,

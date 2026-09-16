@@ -64,11 +64,11 @@ Tilt mode reads your device's gyroscope/accelerometer to steer. Sensor readings 
 
 ## Data stored on your device
 
-Your best scores and your last-used control mode are saved in the app's local storage on your device only. Uninstalling the app removes them from the device; note that Android's automatic backup service may restore app data when you reinstall, depending on your device's backup settings — that is Android behaviour, not something the game controls.
+Your local game data — best scores, daily streak, recent run history, your equipped cosmetic, and preferences such as your last-used control mode — is saved in the app's local storage on your device only. Uninstalling the app removes it from the device; note that Android's automatic backup service may restore app data when you reinstall, depending on your device's backup settings — that is Android behaviour, not something the game controls.
 
 ## Purchases (optional)
 
-*This section applies to versions that include the in-game shop (the 15th September 2026 update onward). Earlier closed-beta versions contain no shop and contact no one.*
+*This section applies to versions that include the in-game shop (the September 2026 update onward). Earlier closed-beta versions contain no shop and contact no one.*
 
 Veyro Run is free, and the whole game is in the free download. You can optionally buy cosmetic items for your runner, which change how your runner looks and nothing else. Buying is optional; the check described in the first point below is not, because the game has to know what you already own.
 

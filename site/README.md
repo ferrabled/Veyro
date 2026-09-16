@@ -81,12 +81,13 @@ long as the two-ink rule holds and each pose still reads at a glance.
    contacts it. All four pages now say so. Any future page that describes when the game goes
    online has to match `docs/PRIVACY_POLICY.md` §Purchases.*
    *Revised 15 Sep 2026 (release-revenue-cat), still undeployed: effective dates moved to the
-   real revision date (15 Sep), all four pages distinguish the no-shop closed-beta versions
-   from shop-enabled versions, deletion no longer claims to prevent restoration (the Play
-   purchase is Google's record), uninstall/new-identifier claims hedge for Android Auto
-   Backup (observed 29 Aug), offline copy says owned cosmetics normally stay available from
-   cache, support's restore route is SHOP → RESTORE PURCHASES, and "trails" left the sales
-   copy (not shipped). Deploy before the RevenueCat build reaches testers.*
+   real revision date (15 Sep); privacy, terms and support distinguish the no-shop closed-beta
+   versions from shop-enabled versions (the home page stays version-neutral); deletion no
+   longer claims to prevent restoration (the Play purchase is Google's record);
+   uninstall/new-identifier claims hedge for Android Auto Backup (observed 29 Aug); offline
+   copy says owned cosmetics normally stay available from cache; support's restore route is
+   SHOP → RESTORE PURCHASES; and "trails" left the sales copy (not shipped). Deploy before
+   the RevenueCat build reaches testers.*
 4. **Contact email** `ferrabled+veyro@gmail.com` is a temporary alias — when the real one
    exists, grep the whole `site/` + `docs/PRIVACY_POLICY.md` for it.
 
