@@ -25,13 +25,12 @@ D7 set the target list on 20 Aug. Re-checked against today's state:
 | **Keep Them Coming Back (OneSignal)** | ⚠️ **only if T-021 ships** | Requires the SDK **and** at least one deployed campaign **and** the App ID [S2]. T-021 is unstarted. |
 | **Growth Loop (Layers)** | ⚠️ **only if T-022 ships** | Requires the SDK installed and verifiable, plus a described experiment with an outcome [S2]. T-022 is unstarted. |
 | **Most Viral (Noise)** | ⚠️ **only if there is real content** | Needs a live app promoted via Noise. Entering with two posts is exactly the overreach screeners punish. |
-| **Best App for Galaxy (Samsung)** | ⚠️ **only if actually published there** | Requires a live **Galaxy Store URL** [S2]. P3 (seller account) is not started; T-033 is post-v1.0. High upside, low competition — but the URL is not optional. |
 | **Catvertising** | ❌ | See `docs/STATUS.md` T-023: no ads in v1.0. The category wants RevenueCat Ads as *a monetization method*; a rewarded revive bolted on in the last week is the textbook box-check. |
 | Stripe / Replit / JetBrains / Influencer / Peace / Next Gen | ❌ | Per D7 — wrong stack, wrong product, or ineligible. |
 
 **Rule for the final pass, the night before submission:** walk the ⚠️ rows one at a time and ask
-*"can I paste the required artefact right now?"* — the App ID, the Layers experiment outcome, the
-Galaxy Store URL. If not, untick it. Four strongly-evidenced categories beat nine thin ones.
+*"can I paste the required artefact right now?"* — the App ID, the Layers experiment outcome. If
+not, untick it. Four strongly-evidenced categories beat nine thin ones.
 
 ---
 
@@ -191,14 +190,6 @@ Campaign: [N — describe the deployed campaign and how it was created: API, MCP
 SDK: com.layers.analytics, installed in the submitted build.
 Audience: [N]  Message: [N]  Channel/surface: [N]  Experiment: [N]
 Outcome and what the signals showed: [N]
-```
-
-### Samsung — *only if published on Galaxy Store*
-```
-Galaxy Store URL: [N]
-Optimization: [N — foldable/flex-mode behaviour, multi-window, Samsung-device performance notes.]
-Note: RevenueCat's Unity SDK does not yet support Galaxy billing, so the Galaxy build ships with
-store purchases disabled or via a web purchase link; the RevenueCat purchase lives in the Play build.
 ```
 
 ---

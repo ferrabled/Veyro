@@ -6,6 +6,65 @@ session doesn't get. Durable operational knowledge does **not** belong here — 
 code comments, recurring traps go in the "Known gotchas" list in CLAUDE.md. Old entries may be
 pruned once their content lives elsewhere (the 30–31 Aug five-entry arc was consolidated this way).
 
+## 2026-09-16 — PRODUCTION ACCESS GRANTED · v5 submitted to production review
+
+**Google granted production access** (Console: "Tu juego tiene acceso a producción"). The
+application had been filed against v3, but access is account/app-level permission — it does **not**
+bind which bundle you publish. Nothing auto-published.
+
+Owner then created the production release directly, choosing the right bundle:
+
+- **versionCode 5 (1.0.0)** — the RevenueCat build, promoted **from the library**, not rebuilt, so
+  it is the exact artifact already reviewed on the closed track (STATUS 16 Sep, v5 entry).
+- **Full rollout** ("Iniciar lanzamiento completo"), not staged.
+- **Countries: 176 + rest of world.** US inclusion is the eligibility-critical one (CHECKLIST A3).
+- **Managed publishing OFF** — it auto-publishes the moment review passes, so there is no forgotten
+  Publicar button between approval and a live store URL.
+
+**The 12×14 closed-testing gate is permanently cleared.** It was a one-time requirement to obtain
+production access for a new personal developer account. It never applies again — to this app or any
+future release of it.
+
+**Consequence for every future update:** no new closed release, no re-application. The ladder is
+now **internal testing (instant, no review) → verify on device → production release with that same
+bundle → review (fast now the app is known) → live.** The closed track is optional from here and is
+only worth using when tester feedback is actually wanted. This supersedes T-031's AC.
+
+**Where this leaves the schedule.** First production reviews can take up to ~7 days, so live ~23 Sep
+if it runs normally, against a 30 Sep deadline. That leaves roughly a week for ONE update — the
+window for OneSignal (T-021) + Layers (T-022). Profiles/Supabase deliberately stays out of it
+(account-deletion policy is a documented rejection trigger; see the accounts brief).
+
+**Needs the owner:** P5/P6/P7/P9 account signups — every one is "minutes" and each gates a category.
+P9 in particular blocks T-040, whose posts are already drafted, for the $30k #BuildInPublic category.
+
+## 2026-09-16 — Samsung / Galaxy Store track dropped (docs only)
+
+**Owner call: we are not entering the Samsung "Best App for Galaxy" category, and Galaxy Store is no
+longer a distribution target.** Publishing an app *with in-app purchases* on Galaxy Store requires a
+Samsung **commercial** seller account, which requires a registered business entity. We do not have
+one, so the category's mandatory live Galaxy Store URL is unobtainable — not a scheduling problem
+that more time would fix. This is the record of the decision; the planning docs no longer pursue
+Samsung anywhere.
+
+Stripped every Samsung/Galaxy/Fold reference out of the plan: both handoff specs (prize-matrix row,
+sponsor-strategy paragraph, §11.2 category requirement, §11.3 blueprint line, multiplatform target,
+seller-registration step, the Update-1 Galaxy submission and Update-2 Fold layout, the Fold-camera
+and Galaxy-billing risk rows, the Fold hardware assumption, the §14 checklists, source S13),
+PREREQUISITES (P3, H5, P10's Galaxy payout profile), OPEN_QUESTIONS (Fold-access question),
+DEVPOST_ANSWERS (category row + answer block), CHECKLIST (C8, A2 wording, the slack note) and
+LICENSING_REVENUE. BACKLOG keeps **T-033 marked dropped** so nobody re-adds it, pointing here.
+
+**Schedule consequence worth flagging: Google Play is now single-threaded.** D11 had treated Galaxy
+Store as the backup eligibility store if Play slipped; that backup is gone, so iOS via P2 (the
+friend's Apple Developer account) is the only remaining fallback if Play review rejects. The
+CHECKLIST slack note now says so.
+
+No code, build or store-listing change — docs only. Nothing to verify in Unity.
+
+**Next / human:** nothing blocking. If Play rejection risk starts looking real, P2's iOS path is now
+worth testing earlier rather than later.
+
 ## 2026-09-16 — v5 (RevenueCat) SUBMITTED to closed-track review (release-revenue-cat session)
 
 Owner sent the atomic package from Resumen de publicación: closed track "Alpha" release **5
