@@ -1,0 +1,20 @@
+# Keep-alive for the Supabase free-tier project: free projects pause after 7 days with
+# zero database traffic. This Worker (Cloudflare free plan) pings a `select 1` RPC every
+# 3 days, which makes an inactivity pause very unlikely — not officially guaranteed;
+# only the paid plan removes pausing entirely (owner decision).
+#
+# Owner setup (one time, from this directory — same wrangler login as the site deploy):
+#   npx wrangler deploy
+# Both values below are PUBLIC (the anon key ships in the game binary and is committed in
+# SupabaseKeys.cs), so they live here as plain vars — no secrets involved.
+
+name = "veyro-supabase-keepalive"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[triggers]
+crons = ["0 3 */3 * *"]
+
+[vars]
+SUPABASE_URL = "https://mrtedxxuwkoiumatxowx.supabase.co"
+SUPABASE_ANON_KEY = "sb_publishable_KF7FFNG13PUrDe-sSdPvpw_Ec0qJ3qH"

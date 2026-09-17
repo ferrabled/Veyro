@@ -7,6 +7,7 @@
         "MotionRunner.Commerce",
         "MotionRunner.CameraInput",
         "MotionRunner.Progression",
+        "MotionRunner.Social",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

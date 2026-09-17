@@ -10,9 +10,10 @@ namespace MotionRunner.Commerce.RevenueCat
     /// sees a RevenueCat type. Never constructed in the Editor - the SDK NREs there (§2.5);
     /// GameBootstrap hands the Editor a FakeStore instead.
     ///
-    /// Anonymous app user IDs are correct for v1.0: no backend, no login (D10). T-009 later
-    /// swaps in the Play Games player id via LogIn() - do not invent an ID scheme before then.
-    /// SetOnesignalUserID exists on Purchases for T-021; nothing here makes that awkward.
+    /// Anonymous app user IDs are the boot state; T-009's profile backend then calls
+    /// Identify(supabaseUserId) -> LogIn(), so RevenueCat, Supabase and (later, T-021)
+    /// OneSignal share one stable player id (D13 proposal; supersedes the old Play-Games-id
+    /// note). SetOnesignalUserID exists on Purchases for T-021; nothing here makes that awkward.
     ///
     /// Fail-open throughout: configuration failure, no network, empty offerings - every call
     /// completes with an outcome, entitlements just stay empty, and the game never blocks on
@@ -81,6 +82,41 @@ namespace MotionRunner.Commerce.RevenueCat
             }
             _configured = true;
             RefreshCustomerInfo();
+            if (_pendingIdentity != null) ApplyIdentity(_pendingIdentity);
+        }
+
+        /// Identify arriving before the SDK is configured (profile backend answered first) is
+        /// held and applied right after Configure - the same one-frame dance as everything else.
+        string _pendingIdentity;
+        string _appliedIdentity;
+
+        public void Identify(string userId)
+        {
+            if (string.IsNullOrEmpty(userId) || userId == _appliedIdentity) return;
+            if (!SdkConfigured())
+            {
+                _pendingIdentity = userId;
+                return;
+            }
+            ApplyIdentity(userId);
+        }
+
+        /// LogIn aliases the current anonymous app user id to the stable one server-side, so
+        /// entitlements bought before and after identification stay one customer (T-009/D13).
+        void ApplyIdentity(string userId)
+        {
+            _pendingIdentity = null;
+            _purchases.LogIn(userId, (customerInfo, created, error) =>
+            {
+                if (error != null)
+                {
+                    // Fail-open: identity stays anonymous, receipts still restore everything.
+                    Debug.LogWarning("[Store] LogIn failed - staying anonymous: " + error.Message);
+                    return;
+                }
+                _appliedIdentity = userId;
+                if (customerInfo != null) ApplyCustomerInfo(customerInfo);
+            });
         }
 
         /// Listener path: fires on launch, after purchases, and after out-of-app changes

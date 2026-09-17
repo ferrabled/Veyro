@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using MotionRunner.CameraInput;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
+using MotionRunner.Social;
 using UnityEngine;
 
 namespace MotionRunner.Menu
@@ -49,6 +50,10 @@ namespace MotionRunner.Menu
         /// whichever tab is up.
         public StoreCatalogView Catalog { get; private set; }
 
+        /// The online profile seam, for the profile tab. May be a never-ready fake (no
+        /// backend configured) - pages must treat that as "boards are sample data".
+        public IProfileService Profile { get; private set; }
+
         public MenuTab Tab { get; private set; } = MenuTab.Run;
 
         /// True on the shop or the profile - the state back should undo by coming home rather than
@@ -64,11 +69,13 @@ namespace MotionRunner.Menu
         MenuTabBar _bar;
         bool _done;
 
-        public static MainMenu Create(IStore store, SkinService skins, MenuTab tab)
+        public static MainMenu Create(IStore store, SkinService skins, IProfileService profile,
+            MenuTab tab)
         {
             var go = new GameObject("MainMenu");
             var menu = go.AddComponent<MainMenu>();
             menu._store = store;
+            menu.Profile = profile;
             menu.Catalog = new StoreCatalogView(store, skins);
             _current = menu;
             menu.Build(tab);

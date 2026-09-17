@@ -1,0 +1,16 @@
+{
+    "name": "MotionRunner.Social.Supabase",
+    "rootNamespace": "MotionRunner.Social.Supabase",
+    "references": [
+        "MotionRunner.Social"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

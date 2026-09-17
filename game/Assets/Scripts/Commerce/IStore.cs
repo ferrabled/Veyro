@@ -36,6 +36,13 @@ namespace MotionRunner.Commerce
 
         void Restore(Action<PurchaseOutcome> done);
 
+        /// Aliases this install's store identity to a stable player id — the Supabase user
+        /// UUID (T-009, D13 proposal; supersedes the Play-Games-id note in REVENUECAT_PLAN
+        /// §3.3). Safe to call before the backend is configured (the adapter applies it once
+        /// ready) and idempotent for the same id. Entitlements survive either way — receipts
+        /// are the source of truth — this only makes the ids line up across services.
+        void Identify(string userId);
+
         /// Presents the dashboard-configured paywall for offering `default`.
         /// Deliberately takes NO required-entitlement argument: the catalog has three
         /// independent entitlements, so "does the user already have it" is never a single

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MotionRunner.Core;
 using MotionRunner.Progression;
+using MotionRunner.Social;
 using MotionRunner.Track;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,36 +11,49 @@ namespace MotionRunner.Menu
 {
     /// The right tab: who the player is, where they stand, and what they have been running.
     ///
-    /// Two of the three cards are already real. Best score, streak and the recent-runs list all
-    /// come off disk through ProgressStore, so they are true from the first run. The leaderboard
-    /// is the one that cannot be - a shared board needs the database D10 defers past v1.0 - so it
-    /// is drawn from MockLeaderboard behind ILeaderboardSource, with the player's own real daily
-    /// best slotted into it and a line under it saying exactly that. A mocked board that does not
-    /// admit it is mocked is a lie to the player and a trap for whoever reads a screenshot of it
-    /// six months from now.
+    /// All three cards can be real now. Best score, streak and the recent-runs list come off
+    /// disk through ProgressStore; the leaderboard comes from the shared Supabase board (T-009)
+    /// through LiveLeaderboard when the backend answers, and falls back to MockLeaderboard —
+    /// still labelled as sample data — when it does not (no key, offline, first frames). The
+    /// player card shows the server-generated handle once a profile exists, with its reroll
+    /// budget, and the links card carries the account-deletion path Play policy requires.
     public sealed class ProfilePage : MenuPage
     {
         const float TopOffset = 12f;
         const float PlayerHeight = 180f;
         const float BoardHeight = 520f;
         const float RunsHeight = 452f;
-        const float LinksHeight = 180f;
+        const float LinksHeight = 248f;
 
         const float RowHeight = 62f;
         const int BoardRows = 6;
         const int RunRows = 5;
 
-        readonly ILeaderboardSource _leaderboard = new MockLeaderboard();
+        readonly ILeaderboardSource _mock = new MockLeaderboard();
+        LiveLeaderboard _live;
+
+        BoardScope _scope = BoardScope.Daily;
+        int _allTimeBestShown;
 
         Text _headline;
+        Text _reroll;
         Text _subline;
         Text[] _boardRows;
         Text[] _runRows;
         Text _runsEmpty;
+        Text _boardNote;
+        Button _scopeDaily;
+        Button _scopeAllTime;
+        Text _delete;
+        bool _deleteArmed;
 
         protected override void Build()
         {
             RuntimeUi.Panel("Scrim", Root, MenuTheme.Scrim);
+
+            _live = new LiveLeaderboard(Menu.Profile);
+            _live.Changed += OnBoardChanged;
+            if (Menu.Profile != null) Menu.Profile.ProfileChanged += OnProfileChanged;
 
             var stack = new MenuStack(Root, TopOffset);
             BuildPlayerCard(stack.Add("Player", PlayerHeight));
@@ -48,13 +62,20 @@ namespace MotionRunner.Menu
             BuildLinksCard(stack.Add("Links", LinksHeight));
         }
 
+        void OnDestroy()
+        {
+            if (_live != null) _live.Changed -= OnBoardChanged;
+            if (Menu != null && Menu.Profile != null)
+                Menu.Profile.ProfileChanged -= OnProfileChanged;
+        }
+
         void BuildPlayerCard(RectTransform slot)
         {
             RuntimeUi.Panel("Card", slot, MenuTheme.Card);
             float pad = MenuTheme.CardPadding;
 
-            // A square avatar in the accent colour: there is no account and no photo, so this is
-            // a placeholder that is honest about being one rather than a borrowed silhouette.
+            // A square avatar in the accent colour: there is no photo, so this is a placeholder
+            // that is honest about being one rather than a borrowed silhouette.
             var avatar = RuntimeUi.Element("Avatar", slot, out var avatarRect);
             avatarRect.anchorMin = new Vector2(0f, 0.5f);
             avatarRect.anchorMax = new Vector2(0f, 0.5f);
@@ -64,8 +85,19 @@ namespace MotionRunner.Menu
 
             _headline = RuntimeUi.Label("Name", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad + 132f, -84f), new Vector2(-pad, -26f),
+                new Vector2(pad + 132f, -84f), new Vector2(-pad - 250f, -26f),
                 44, TextAnchor.MiddleLeft, MenuTheme.Text);
+
+            // The reroll is a right-aligned link on the name row: rerolling is a small act on
+            // the name, not a card of its own. Hidden until a profile exists.
+            _reroll = RuntimeUi.Label("Reroll", slot,
+                new Vector2(1f, 1f), new Vector2(1f, 1f),
+                new Vector2(-pad - 240f, -84f), new Vector2(-pad, -26f),
+                26, TextAnchor.MiddleRight, MenuTheme.Dim);
+            _reroll.raycastTarget = true;
+            var rerollButton = _reroll.gameObject.AddComponent<Button>();
+            rerollButton.targetGraphic = _reroll;
+            rerollButton.onClick.AddListener(RerollHandle);
 
             _subline = RuntimeUi.Label("Stats", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -80,17 +112,47 @@ namespace MotionRunner.Menu
 
             RuntimeUi.Label("Title", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -66f), new Vector2(-pad, -14f),
+                new Vector2(pad, -66f), new Vector2(-pad - 360f, -14f),
                 38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "LEADERBOARD";
+
+            // The two scopes of the shared board (D15). The scheme half of the split (tilt vs
+            // camera) follows the mode the player last ran with, same as the bests above.
+            _scopeDaily = BuildScopeTab(slot, "ScopeDaily", -pad - 344f, -pad - 184f, "TODAY",
+                () => SetScope(BoardScope.Daily));
+            _scopeAllTime = BuildScopeTab(slot, "ScopeAll", -pad - 176f, -pad, "ALL-TIME",
+                () => SetScope(BoardScope.AllTime));
 
             _boardRows = BuildRows(slot, BoardRows, -76f);
 
-            RuntimeUi.Label("Note", slot,
+            // One bottom line, two honest states: the sample-data admission or the player's
+            // live rank. (The TAP TO JOIN consent ask lived here until 17 Sep - joining is
+            // automatic now, owner call; the privacy policy copy describes exactly that.)
+            _boardNote = RuntimeUi.Label("Note", slot,
                 new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(pad, 12f), new Vector2(-pad, 56f),
-                26, TextAnchor.MiddleLeft, MenuTheme.Faint).text = _leaderboard.IsLive
-                ? string.Empty
-                : "sample board — the shared one arrives with online scores";
+                26, TextAnchor.MiddleLeft, MenuTheme.Faint);
+        }
+
+        Button BuildScopeTab(RectTransform slot, string name, float left, float right,
+            string label, Action onTap)
+        {
+            var text = RuntimeUi.Label(name, slot,
+                new Vector2(1f, 1f), new Vector2(1f, 1f),
+                new Vector2(left, -62f), new Vector2(right, -18f),
+                26, TextAnchor.MiddleCenter, MenuTheme.Dim);
+            text.text = label;
+            text.raycastTarget = true;
+            var button = text.gameObject.AddComponent<Button>();
+            button.targetGraphic = text;
+            button.onClick.AddListener(() => onTap());
+            return button;
+        }
+
+        void SetScope(BoardScope scope)
+        {
+            if (_scope == scope) return;
+            _scope = scope;
+            ShowBoard();
         }
 
         void BuildRunsCard(RectTransform slot)
@@ -118,17 +180,16 @@ namespace MotionRunner.Menu
 
             // "how to play" is the only way back to the first-run guide once it has been
             // dismissed; "privacy policy" is Play policy - it has to be reachable inside the app,
-            // not only on the store listing. Both used to sit along the bottom of the old mode
-            // picker; the profile tab is where a player looks for them now.
-            // No version line here. It was on the first device build and it read as a duplicate:
-            // the header carries it on every tab, so a second copy two thirds of the way down the
-            // same screen only makes the reader wonder whether the two could disagree.
+            // not only on the store listing. DELETE PROFILE is Play's account-deletion policy:
+            // the moment a server-side profile exists, an in-app deletion path must too
+            // (STORE_COMPLIANCE T-009). Two taps, because it is immediate and permanent.
             BuildLink(slot, "Guide", -34f, "HOW TO PLAY", () => Menu.RequestGuide());
             BuildLink(slot, "Privacy", -102f, "PRIVACY POLICY",
                 () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
+            _delete = BuildLink(slot, "Delete", -170f, "DELETE ONLINE PROFILE", DeleteTapped);
         }
 
-        void BuildLink(RectTransform slot, string name, float top, string label, Action onTap)
+        Text BuildLink(RectTransform slot, string name, float top, string label, Action onTap)
         {
             var text = RuntimeUi.Label(name, slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -141,6 +202,7 @@ namespace MotionRunner.Menu
             var button = text.gameObject.AddComponent<Button>();
             button.targetGraphic = text;
             button.onClick.AddListener(() => onTap());
+            return text;
         }
 
         /// A column of single-line rows, built empty and filled by Refresh. Rows are text rather
@@ -183,31 +245,91 @@ namespace MotionRunner.Menu
 
             int allTimeBest = board.AllTimeBest(scheme);
             int dailyBest = board.DailyBest(scheme, todayLabel);
+            _allTimeBestShown = allTimeBest;
 
-            _headline.text = "RUNNER";
+            RefreshHeadline();
             _subline.text = SchemeName(scheme) + " best " + allTimeBest +
                             "   ·   today " + dailyBest +
                             "   ·   streak " + streak;
 
-            // The board is ranked on the ALL-TIME best, not today's. Today's is the number the
-            // real (daily) board will eventually use, but it is zero for most of every day, so
-            // ranking on it put the player last on their own profile every morning - a worse lie
-            // than the mocked names beside it. The subline above still shows both.
-            FillBoard(allTimeBest);
+            ShowBoard();
             FillRuns();
         }
 
-        static string SchemeName(ControlScheme scheme) =>
-            scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
-
-        void FillBoard(int yourScore)
+        void RefreshHeadline()
         {
-            var entries = _leaderboard.Top(_boardRows.Length, yourScore);
+            var profile = Menu.Profile?.Current;
+            _headline.text = profile != null ? profile.Handle : "RUNNER";
+
+            // Rerolls are unlimited (owner call, 17 Sep) - the link shows whenever a profile
+            // exists and never counts down.
+            _reroll.gameObject.SetActive(profile != null);
+            _reroll.text = "new name";
+        }
+
+        void OnProfileChanged()
+        {
+            if (this == null || !gameObject.activeInHierarchy) return;
+            RefreshHeadline();
+        }
+
+        void RerollHandle()
+        {
+            _reroll.text = "…";
+            Menu.Profile?.RerollHandle((profile, error) =>
+            {
+                if (this == null || !gameObject.activeInHierarchy) return;
+                RefreshHeadline();
+                // The board shows handles, so the old name on it is stale until the next fetch.
+                _live.Refresh();
+            });
+        }
+
+        // ---- board ----
+
+        /// Points the live board at (scope of the toggle) × (group of the last-used scheme) ×
+        /// today's content. The fetch is async; until rows land — or forever, with no backend —
+        /// the mock fills the card, labelled as the sample data it is.
+        void ShowBoard()
+        {
+            var scheme = ModePickerCard.LastUsed;
+            string group = scheme == ControlScheme.Camera
+                ? InputModes.GroupCamera
+                : InputModes.GroupStandard;
+
+            StyleScope(_scopeDaily, _scope == BoardScope.Daily);
+            StyleScope(_scopeAllTime, _scope == BoardScope.AllTime);
+
+            _live.Show(new BoardQuery(_scope, DailySeed.LabelForDate(DateTime.UtcNow),
+                ChunkLibrary.ContentVersion, RunSeed.DefaultWorldId, group, BoardRows));
+
+            FillBoard();
+        }
+
+        static void StyleScope(Button tab, bool selected)
+        {
+            if (tab == null) return;
+            var text = tab.targetGraphic as Text;
+            if (text != null) text.color = selected ? MenuTheme.Accent : MenuTheme.Dim;
+        }
+
+        void OnBoardChanged()
+        {
+            if (this == null || !gameObject.activeInHierarchy) return;
+            FillBoard();
+        }
+
+        void FillBoard()
+        {
+            ILeaderboardSource source = _live.IsLive ? _live : _mock;
+            var entries = source.Top(_boardRows.Length, _allTimeBestShown);
+
             for (int i = 0; i < _boardRows.Length; i++)
             {
                 if (i >= entries.Count)
                 {
-                    _boardRows[i].text = string.Empty;
+                    _boardRows[i].text = i == 0 && _live.IsLive ? "nobody yet — set the first score" : string.Empty;
+                    _boardRows[i].color = MenuTheme.Faint;
                     continue;
                 }
 
@@ -215,7 +337,72 @@ namespace MotionRunner.Menu
                 _boardRows[i].text = entry.Rank + ".   " + entry.Name + "        " + entry.Score;
                 _boardRows[i].color = entry.IsYou ? MenuTheme.Accent : MenuTheme.Text;
             }
+
+            RefreshBoardNote();
         }
+
+        /// The bottom line of the board card: no live board → say the rows are samples;
+        /// live → the player's rank, or a nudge to finish a run.
+        void RefreshBoardNote()
+        {
+            var service = Menu.Profile;
+
+            if (!_live.IsLive)
+            {
+                _boardNote.text = service != null && service.IsReady
+                    ? "loading the shared board…"
+                    : "sample board — the shared one arrives with online scores";
+                _boardNote.color = MenuTheme.Faint;
+                return;
+            }
+
+            _boardNote.text = _live.MyRank > 0
+                ? "you are #" + _live.MyRank + " on this board"
+                : "finish a run to land on this board";
+            _boardNote.color = MenuTheme.Faint;
+        }
+
+        // ---- deletion ----
+
+        void DeleteTapped()
+        {
+            var service = Menu.Profile;
+            if (service == null || !service.IsReady)
+            {
+                _delete.text = "no online profile to delete";
+                _delete.color = MenuTheme.Faint;
+                return;
+            }
+
+            if (!_deleteArmed)
+            {
+                _deleteArmed = true;
+                _delete.text = "TAP AGAIN TO DELETE — immediate and permanent";
+                _delete.color = MenuTheme.Accent;
+                return;
+            }
+
+            _deleteArmed = false;
+            _delete.text = "deleting…";
+            _delete.color = MenuTheme.Faint;
+            service.DeleteAccount(error =>
+            {
+                if (this == null || !gameObject.activeInHierarchy) return;
+                if (error != null)
+                {
+                    _delete.text = "couldn't delete — try again (" + error.Code + ")";
+                    _delete.color = MenuTheme.Dim;
+                    return;
+                }
+                _delete.text = "profile deleted — a fresh one starts next launch";
+                _delete.color = MenuTheme.Dim;
+                RefreshHeadline();
+                ShowBoard();
+            });
+        }
+
+        static string SchemeName(ControlScheme scheme) =>
+            scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
 
         void FillRuns()
         {

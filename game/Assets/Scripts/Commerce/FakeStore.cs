@@ -85,6 +85,11 @@ namespace MotionRunner.Commerce
             done?.Invoke(PaywallOutcome ?? PurchaseOutcome.Cancelled());
         }
 
+        /// Last id handed to Identify, for tests. The fake has no server to alias on.
+        public string Identity { get; private set; }
+
+        public void Identify(string userId) => Identity = userId;
+
         /// Backdoor for tests and Editor debugging: grant/revoke directly, as the dashboard can.
         public void SetEntitlement(string entitlementId, bool active)
         {
