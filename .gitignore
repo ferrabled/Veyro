@@ -57,3 +57,6 @@ game/Assets/Resources/PerformanceTestRunInfo.json*
 game/Assets/Resources/PerformanceTestRunSettings.json*
 
 screenshots/2026-*
+
+supabase/.temp/
+infra/keepalive-worker/.wrangler/

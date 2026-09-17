@@ -88,16 +88,31 @@ the same change that ships a feature listed below.
 - Data safety → app interactions / diagnostics = collected. Privacy policy section. Same
   AD_ID check as OneSignal.
 
-### T-009 — Play Games sign-in, leaderboard, Sidekick (post-v1.0)
-- App access → **Sí**, note: "optional Google Play Games sign-in; any Google account works;
-  no demo credentials required." (Custom email/password accounts would instead require a
-  permanent non-expiring demo account for review — avoid.)
-- Data safety → account identifiers + gameplay scores = collected.
-- **Account-deletion policy activates** the moment server-side accounts/profiles exist
-  (Supabase leaderboard): in-app account deletion + a public web deletion URL declared in
-  Data safety. Build the delete endpoint with the leaderboard, not after. The site's
-  /support/ "Data deletion" section flips from "nothing to delete" to the real mechanism.
-- Privacy policy → accounts/leaderboard section; redeploy.
+### T-009 — Supabase profiles + leaderboard (post-v1.0, Update 1)
+> Redefined 3 Sep 2026: anonymous-first Supabase identity, **no Play Games sign-in in this
+> phase** (that would be Phase 2 account linking). Spec: `docs/PROFILE_LEADERBOARD_PLAN.md`;
+> paste-ready policy/support copy is HELD BACK in that plan's §8 — it must not ride the
+> versionCode-5 T-020 flip, whose site text is already staged.
+- App access → no new restricted content (profile is created silently, no login form, no
+  credentials exist). Update the instruction note only: "anonymous player profile created
+  automatically for leaderboards; no sign-in exists."
+- Data safety → **App activity: gameplay content/scores = collected** (leaderboard + run
+  history, shared with other players as handle+score). Device/other IDs already declared
+  since the T-020 flip (the Supabase anonymous user ID is the same declaration class).
+- **Account-deletion policy is LIVE with this release** (server-side profiles exist):
+  in-app Profile → Delete profile (immediate, `delete-account` Edge Function, true deletion)
+  **plus** the public web deletion URL `https://veyro.ferrabled.com/support/#delete`
+  declared in Data safety. The delete endpoint shipped in the same change as the backend
+  (`supabase/functions/delete-account/`) — the trap ("build it with the leaderboard, not
+  after") is closed by design. The site's /support/ "Data deletion" section flips from
+  "nothing to delete" to the real mechanism (copy in the plan §8).
+- Content rating → **unchanged**: handles are server-generated (no free text), so there is
+  no UGC to declare. This is load-bearing — free-text names would reopen the questionnaire.
+- Privacy policy → "Profiles and leaderboards" section + effective-date bump + redeploy
+  (copy in the plan §8).
+- Phase 2 (Google/Apple account linking, separate release): App access gains the optional-
+  login note, Data safety adds account identifiers, Apple build must offer Sign in with
+  Apple (guideline 4.8) the moment Google login exists on iOS.
 
 ### If camera data EVER leaves the device (any form, any reason)
 - Prominent disclosure + runtime consent before the transmission, Data safety camera

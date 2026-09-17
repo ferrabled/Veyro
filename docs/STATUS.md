@@ -1,5 +1,237 @@
 # Status journal (newest at top)
 
+## 2026-09-17 (evening) — T-009 DEVICE PASS on the Nord 2: full loop green against the live backend (profile-integration session)
+
+**Headline: fresh `BuildAndroidDev` (82.7 MB) installed and driven via adb — the whole
+profile/leaderboard loop works on the phone against production:** anonymous sign-in + trigger
+minted **ARCTIC-KIWI-59** on the profile tab; **TAP TO JOIN** consent gate flipped to "finish a
+run to land on this board"; a tilt Daily run (89, 39 m, 4c) crashed and **submitted through the
+hardened `process_run` path — verified server-side** (`1. ARCTIC-KIWI-59 = 89` on today's
+standard board) **and in-app** ("you are #1 on this board", own row accent-highlighted, streak
+stamped, history row added); force-stop + relaunch restored the same profile (refresh-token
+path); **reroll live on device** (→ GOLD-BEAVER-66, budget 3→2, board row renamed immediately).
+Bonus evidence: logcat shows `_logIn` — **RevenueCat aliased to the Supabase UUID on-device and
+the Test Store entitlements (season1, skin_ember) stayed active through it** (the D14 wiring,
+seen working with real purchase data). No game-side exceptions (the boot-time
+`AssetPackManager` ClassNotFound is pre-existing dev-build noise, logged before any profile
+code runs). Batchmode/Gradle side-effects on settings assets reverted again (gotcha 11 class).
+
+DB wiped by the owner beforehand (`delete from auth.users`) — all four boards verified empty
+before the pass; cascade confirmed (the "leftover runs" in the Table Editor were a stale view).
+
+**Still human-only:** camera run + forced fallback (needs a person in frame; fallback runs must
+land on the standard board — force the give-up with `adb shell appops set
+com.ferrabled.veyro.run CAMERA deny` mid-pause, restore with `… allow`), Auto-Backup reinstall
+restore (recovery key), offline-queue drain, delete-profile tap-through (left alive so the
+owner can poke at the live board; wipe test users again before testers). Worker note: cron is
+`0 3 */3 * *` → first metrics appear after the next 03:00 UTC tick on a matching day — an
+empty Metrics tab an hour after deploy is expected.
+
+**Addendum (owner call, same evening): rerolls are UNLIMITED** — migration
+`0005_unlimited_rerolls.sql` pushed live and probe-verified (5 straight rerolls, fresh names);
+client link is now plain "new name" (no budget); D15 proposal amended in OPEN_QUESTIONS 15;
+UGC posture unchanged (still generated-only). 404/404 EditMode after the change; fresh dev APK
+rebuilt + installed on the Nord 2.
+
+## 2026-09-17 (later) — T-009 security/reliability hardening: transactional backend, least privilege, resilient client — deployed and live-tested (profile-integration session)
+
+**Headline: migration `0004_hardening.sql` + rewritten Edge Functions are DEPLOYED to the live
+project (CLI was linked, owner had authorized testing) and verified with a live battery; the
+Unity client gained real failure discipline; 404/404 EditMode tests pass.**
+
+- **Transactional submit (`process_run` RPC):** per-user advisory lock; idempotent replay
+  checked BEFORE quotas (a retry of a completed request succeeds even after the quota fills;
+  same client_run_id + different payload → 409); quotas at SUBMISSION time counting EVERY
+  stored attempt — flagged and yesterday-seed runs included (≤30/24 h, ≤10 flagged/24 h,
+  min-interval ≥ duration×0.5); boards + XP in the same transaction as the insert; DB errors
+  fail CLOSED. Old `upsert_board_score`/`grant_xp` dropped.
+- **Transactional recovery (`recover_profile` RPC):** hash validated with the source row
+  locked; attempts throttled atomically (5/h/caller, FK-cascaded on deletion); **destination
+  must be a fresh profile** — a recovery key can never destroy a played profile; key rotates in
+  the same transaction. `issue_recovery_key` → **`rotate_recovery_key`** (retry-safe; lost
+  responses self-heal; superseded keys stop working). Key file now `<userId>:<key>` so stale
+  keys are detected and re-rotated. Plaintext-by-design rationale documented in the plan
+  (Keystore keys don't survive reinstall — encrypting would break the feature).
+- **Least privilege:** column-level SELECT on profiles (hash unreadable, `select=*` → 403);
+  `ALTER DEFAULT PRIVILEGES` so future tables/functions are deny-by-default; 4 KB body caps +
+  hard numeric bounds in the functions. config.toml: `enable_signup` stays true (anonymous IS
+  a signup) with email/SMS signup off individually.
+- **Client (`SupabaseProfileService`):** refresh token dropped ONLY on 400/401/403 — never on
+  429/5xx/timeout; transient submit failures (0/429/5xx) queue instead of dropping;
+  Retry-After honored; bounded exponential backoff with jitter; session work serialized; a
+  transient refresh failure no longer mints a new anonymous user over a live identity; expired
+  unrefreshable session = "no session" (nothing sent with a stale token).
+- **Keep-alive worker:** bearer header removed (apikey suffices — evidence: both forms 200),
+  10 s timeout, failures now THROW (visible in CF metrics/cron events); "never pauses" claims
+  corrected everywhere to "very unlikely; only the paid plan guarantees" (owner decision).
+- **Live evidence (all against the real project, then self-cleaned):** privileged fns 404 to
+  clients; direct writes 403; two-user isolation; rotation returns distinct keys and the old
+  key stops recovering; claim migrates handle+XP+runs+boards and deletes the old auth user;
+  nonempty destination → 409 with both profiles intact; **concurrent double-claim → exactly
+  one winner**; duplicate submit → no double XP/boards; mismatch → 409; too_fast 429; flagged
+  flood capped at 10. NOT live-tested (honest gaps): retry-after-quota-full replay (by design
+  only), recovery throttle at 5+ attempts, CAPTCHA (deliberately off — OPEN_QUESTIONS 17),
+  device behaviour (Auto Backup reinstall remains human-only). Cheating stays possible by
+  design limits — OPEN_QUESTIONS 18; never call the board cheat-proof.
+
+**Needs a human:** (1) **redeploy the keep-alive worker** (`npx wrangler deploy` in
+`infra/keepalive-worker/`) — the deployed copy predates the hardening; check: CF dashboard →
+Worker → Metrics/Cron events shows successful runs, failures appear as errored invocations;
+(2) wipe test debris before testers: SQL editor →
+`delete from auth.users; truncate public.recovery_attempts;` (DB holds only test data);
+(3) commit (GPG); (4) device pass per plan §10 unchanged.
+
+## 2026-09-17 — T-009 Supabase security research (supabase-security-review session)
+
+Reviewed migrations, all three Edge Functions, Unity session/recovery/queue handling and
+the keep-alive Worker against current official Supabase documentation. The shipped key is
+a public `sb_publishable_` key; its presence in the APK/Worker is expected. Existing RLS and
+function allowlisting are a useful baseline, not proof of the hosted configuration.
+
+Findings to address before the profile release: flagged submissions have no effective
+storage cap; yesterday's accepted runs escape the today-only daily count; rate checks race;
+run/board/XP writes are not transactional; recovery lookup/claim is not atomic and permits
+destructive claims onto nonempty destination profiles; recovery issuance/rotation can lose
+the usable key on a lost response; transient HTTP errors discard queued runs/session state.
+Client-provided scores and camera mode remain forgeable within plausibility bounds.
+Default privileges for future objects and secure device credential storage need hardening.
+
+Verification: source review plus two non-mutating live `ping()` calls, both HTTP 200/body 1
+(apikey only, and the current apikey-plus-bearer form). No abuse/concurrency tests, dashboard
+inspection, deployment, game changes or settings changes. Official guidance recommends
+apikey-only for publishable keys; the current bearer form was not observed failing.
+Free-plan keep-alive is not an official no-pause guarantee. Next: backend hardening and
+staging negative/concurrency tests; verify hosted grants/RLS and anonymous signup limits.
+CAPTCHA requires client integration before enabling it. Research delivered in conversation.
+
+## 2026-09-17 — T-009 backend LIVE and smoke-tested end-to-end; one pgcrypto bug found + fixed; branch on f40816d (profile-integration session)
+
+**Headline: the owner deployed the Supabase backend (P11 mostly ✅) and a live REST smoke test
+from this machine verified almost the whole server: anonymous sign-in ✅ (handle trigger minted
+`HAZEL-HARE-30`/`GRAND-CIVET-39`), `submit-run` ✅ (plausible daily run accepted, daily+alltime
+rank 1), `get_leaderboard`/`get_my_rank` ✅, `delete-account` ✅ (true deletion). One real bug:
+`issue_recovery_key()` failed with 42883 — hosted Supabase puts pgcrypto in the `extensions`
+schema and the function pins `search_path = public`. Fixed in
+`supabase/migrations/0003_fix_recovery_key_pgcrypto.sql` (functions now call
+`extensions.gen_random_bytes/digest`; 0001 aligned for fresh envs). The recovery→claim path is
+therefore still UNVERIFIED — retest after the owner runs `supabase db push` again.**
+
+- Branch fast-forwarded 8894ec9 → **f40816d** (PRs #8/#9: v5 in production review, **Samsung/
+  Galaxy dropped as D12** — plan §0 annotated; the schema's `android_galaxy` platform value
+  stays as a harmless reserved tag). Conflicts resolved in OPEN_QUESTIONS (upstream took 14 →
+  **T-009 decision proposals now live at 15/16, D-numbers shifted to D13–D16, score freeze
+  D17**; all cross-references updated) and PREREQUISITES (P11 row updated to deployed state).
+- `SupabaseKeys.cs` carries the real URL + publishable key (owner, 17 Sep — public by design).
+- Keep-alive Worker simplified: URL + anon key are plain `[vars]` in wrangler.toml (both are
+  public and committed anyway), so deployment is just `npx wrangler deploy` — no secret step.
+- **Test debris to clean (owner, SQL editor, service role):** the smoke test could not delete
+  its first two anonymous users (sessions are not retained here). Today's daily board carries
+  one leftover row (`GRAND-CIVET-39`, 600). One statement removes both users and cascades:
+  `delete from auth.users where id in
+  ('a34e10fd-bf38-4a6b-97eb-d5b8763bdfe3','e1c1a181-8c7d-4cb9-adae-9eeebb55861e');`
+
+**Needs a human:** (1) `supabase db push` (applies 0003), then say the word — the recovery
+claim gets smoke-tested the same way; (2) `npx wrangler deploy` in `infra/keepalive-worker/`;
+(3) the anonymous **rate limit** field only appears once anonymous sign-ins are on:
+Authentication → Rate Limits → "Rate limit for anonymous users" (set ~20/hr); (4) run the
+debris-cleanup SQL above; (5) commit the branch (GPG); (6) then the on-device pass
+(`BuildAndroidDev`) per PROFILE_LEADERBOARD_PLAN §10 — the Editor uses FakeProfileService, so
+the real backend is only exercised on a device build.
+
+## 2026-09-15 — Release handoff prepared (play-release-handoff session)
+
+- Created `docs/HANDOFF_PLAY_RELEASE_NO_PROFILES.md` in English; Play Console guidance and paste-ready answers must be in Spanish.
+- Fetched remote refs: clean `feat/main-menu` at `16fd170` has identical tracked content to `origin/main` merge `8894ec9`; local `main` is stale. Profile work remains separate and untouched.
+- Audited the main-menu website drafts against the public policy and commerce/menu code. Recorded transition wording, purchase analytics, restoration/deletion/persistence copy, and the unfinished purchasable season pass for the release agent to resolve.
+- Verification: repository/source inspection and official documentation; no new Unity tests/build, upload, website edits or deployment performed. Owner still needs to confirm the highest Play versionCode, configure signing locally, decide pass availability, and perform the Play/device checks.
+
+## 2026-09-09 — T-009 Unity half built: Social seam, Supabase adapter, live board in ProfilePage; branch rebased onto main (profile-integration session)
+
+**Headline: the whole client half of T-009 exists and compiles — 404/404 EditMode tests pass
+(391 + 13 new `SocialTests`), `RunSeedTests` untouched. The branch was fast-forwarded onto
+`origin/main` (8894ec9, the menu merge) with the two predicted docs conflicts hand-resolved
+(BACKLOG T-009, OPEN_QUESTIONS renumbering — after the 17 Sep ff onto f40816d the T-009
+decision proposals live at 15/16). Owner created the Supabase project — connection steps are
+PROFILE_LEADERBOARD_PLAN §9.**
+
+- **`MotionRunner.Social`** (engine-free, mirrors Commerce): `IProfileService` (+`Profile`,
+  `SocialError`), `RunSubmission` (snake_case fields ARE the wire format), `InputModes`
+  (tilt/camera/camera_fallback + board grouping — the one place the 3 Sep fallback rule lives
+  client-side), `PendingRuns` (offline queue, RunHistory-style single-string encoding, cap 8,
+  corruption-tolerant), `FakeProfileService` (Editor + tests; consent gates, not-ready queues,
+  becoming ready drains).
+- **`MotionRunner.Social.Supabase`**: `SupabaseProfileService` on UnityWebRequest+JsonUtility
+  (no new UPM package). Boot: refresh token → else anonymous sign-in + recovery-key claim →
+  profile load → drain queue → one-time `issue_recovery_key`. Recovery key lives in a
+  persistentDataPath file (Auto Backup carries it across reinstall; Keychain is T-032's job).
+  `SupabaseKeys.cs` holds URL + anon key (committed-public pattern; **currently empty — owner
+  pastes, §9**). PostgREST reads use the object accept header; every response shape is a flat
+  JSON object (JsonUtility can't parse top-level arrays) — server functions were aligned to
+  return 0/"" instead of nulls.
+- **Plumbing:** `IStore.Identify(userId)` → `RevenueCatStore` holds it until configured, then
+  `Purchases.LogIn` (fail-open); GameBootstrap wires profile→store on ProfileChanged.
+  `RunSession.Crash` submits fire-and-forget (`SubmitToBoards`); quits/restarts still write
+  nothing. `RunFlow.DropCameraMode` now tells the session (`NoteCameraDropped`) — the shared
+  board files such a run as `camera_fallback`/standard while the LOCAL BestBoard still scores
+  it as camera (Feature D). That asymmetry is deliberate and documented at both sites.
+- **UI:** `LiveLeaderboard : ILeaderboardSource` (cached async source; keeps the mock's
+  non-contiguous my-rank contract; stale-response guard). `ProfilePage`: handle + reroll on
+  the player card, TODAY/ALL-TIME scope tabs (group follows last-used scheme), one honest
+  bottom line (sample-data note / TAP TO JOIN consent ask — nothing submits before it / live
+  "you are #N"), and DELETE ONLINE PROFILE (two-tap, immediate) in the links card. Mock stays
+  the fallback whenever the live board has no rows yet.
+- Batchmode side-effects on ProjectSettings/URP assets were reverted (gotcha 11 class — the
+  URP global-settings runtime list got emptied by the import; not shipped).
+
+**Verified:** EditMode 404/404 in this worktree (log clean). NOT verified — needs the owner:
+paste SupabaseKeys + run the §9 CLI steps, then the §10 device pass (submits incl. forced
+fallback, board splits, reroll, offline queue, delete, reinstall-restore both ways) and the
+gotcha-10 release-APK diff (expect no new permissions).
+
+**Needs a human:** (1) PROFILE_LEADERBOARD_PLAN §9 steps 1–4 (keys, `db push` + functions
+deploy, anonymous sign-ins toggle, keep-alive Worker); (2) commit this branch (GPG); (3)
+OPEN_QUESTIONS 15/16 → DECISIONS + score-formula freeze (6→D17, gates live boards); (4) §10
+device test. The versionCode-5 T-020 flip release remains untouched and ahead of this.
+
+## 2026-09-03 — T-009 redefined: Supabase profile + leaderboard; backend + docs landed (profile-integration session)
+
+**Headline: T-009 is now "profile + shared leaderboard + run history on Supabase" — spec written,
+owner decisions taken, and the whole backend exists as config-as-code on this branch
+(`feat/profille-integration`). Unity work deliberately not started: it waits on the main-menu
+rework being committed (see Needs a human).**
+
+- **`docs/PROFILE_LEADERBOARD_PLAN.md`** (new, canonical): anonymous-first Supabase identity (no
+  login UI), **recovery-key reinstall restore** (hash server-side, key in Auto-Backup/Keychain —
+  the STATUS 29 Aug Auto-Backup resurrection is the existence proof), `Purchases.LogIn(uuid)`,
+  generated handles only (no UGC), Daily + All-time boards split standard vs camera with
+  `camera_fallback` demoted to standard (owner calls, 3 Sep — OPEN_QUESTIONS 15). Free on
+  Supabase Free + Cloudflare free; 7-day-pause trap mitigated by a cron Worker.
+- **`supabase/`**: migrations (profiles/runs/board_scores/game_config; `input_group` as a
+  *generated column* so board grouping is enforced in the DB; one-row-per-user-per-board
+  conditional upsert; RLS with **zero client writes**; leaderboard reads only via
+  security-definer RPCs exposing handle+score+rank, LIMIT capped, JSON-object shapes for
+  JsonUtility), Edge Functions `submit-run` (schema/allowlist/seed-date/plausibility/rate
+  limits; soft-fail = flagged row, never a punished honest client; server-side XP),
+  `recover-session` (claims the old profile onto the new anonymous user — no session minting,
+  no custom JWT; key rotates on claim), `delete-account` (true deletion, cascades).
+- **`infra/keepalive-worker/`**: Cloudflare Worker cron → `rpc/ping` every 3 days.
+- Docs synced: BACKLOG T-009 rewritten (PGS/iCloud approach superseded, Sidekick unbundled),
+  STORE_COMPLIANCE T-009 flip table rewritten for anonymous-first (deletion URL + Data safety
+  scores; content rating unchanged — handles are not UGC; policy copy HELD BACK in plan §8, must
+  not ride the versionCode-5 flip), PREREQUISITES **P11** (owner creates the Supabase project),
+  OPEN_QUESTIONS 6 urgency bump (score freeze now gates boards) + 14/15, REVENUECAT_PLAN §3.3
+  ID note superseded (Supabase UUID, proposal D14 after the 17 Sep renumber).
+
+**Verified:** desk-checked only — no supabase CLI/deno/postgres on this machine, and nothing
+was deployed (by design: owner-only). SQL/functions follow current Supabase docs; the coin-
+economy score bound in `validate.ts` mirrors `ScoreState` exactly. EditMode suite untouched.
+
+**Needs a human:** (1) **commit the main-menu rework on `feat/main-menu`** — this branch then
+fast-forwards onto it and the Unity half (Social seam, SupabaseLeaderboardSource behind the
+rework's `ILeaderboardSource`, ProfilePage extensions, run-end plumbing) starts; (2) P11
+(Supabase project + anon key + keep-alive Worker); (3) move OPEN_QUESTIONS 15 to DECISIONS,
+freeze the score formula (6→D17); (4) approve plan §8 copy.
+
 Keep entries short: what changed, how it was verified, what needs a human. **Hard cap ~40 lines
 per entry** — this file is read at the start of every session, so length here is context another
 session doesn't get. Durable operational knowledge does **not** belong here — invariants go in
