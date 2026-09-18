@@ -32,7 +32,10 @@ const MAX_TEXT = 32;
 
 // Hard numeric ceilings: anything beyond these is not a run, it is a probe. The DB has its
 // own CHECK constraints; rejecting here costs nothing and keeps garbage out of the RPC.
-const MAX_SEED = 21000000; // yyyyMMdd up to year 2100
+// Seeds are a SIGNED 32-BIT contract for both modes (Free seeds are tick-count derived and
+// can be negative or huge — R8); only Daily mode's seed is date-interpreted, in process_run.
+const MIN_SEED = -2147483648;
+const MAX_SEED = 2147483647;
 const MAX_SCORE = 100_000_000;
 const MAX_DISTANCE_M = 1_000_000;
 const MAX_COINS = 100_000;
@@ -56,7 +59,7 @@ export function schemaError(body: unknown): string | null {
     return "client_run_id must be a uuid";
   }
   if (!MODES.includes(b.mode as string)) return "bad mode";
-  if (!isInt(b.seed) || (b.seed as number) < 0 || (b.seed as number) > MAX_SEED) {
+  if (!isInt(b.seed) || (b.seed as number) < MIN_SEED || (b.seed as number) > MAX_SEED) {
     return "seed out of range";
   }
   if (!isShortText(b.content_version)) return "bad content_version";
@@ -86,19 +89,43 @@ export function schemaError(body: unknown): string | null {
   return null;
 }
 
-/** Shared body reader: size-capped, JSON-parsed, null on any problem. */
+/**
+ * Shared body reader: a BOUNDED BYTE reader (R9). The stream is cancelled the moment it
+ * exceeds MAX_BODY_BYTES, so a missing/lying Content-Length or a chunked body can never
+ * make the function allocate an unbounded buffer, and the limit is counted in UTF-8 bytes,
+ * not JavaScript UTF-16 characters. Returns null on any problem.
+ */
 export async function readJsonBody(req: Request): Promise<unknown | null> {
   const declared = Number(req.headers.get("content-length") ?? "0");
   if (declared > MAX_BODY_BYTES) return null;
-  let text: string;
+  if (req.body === null) return null;
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   try {
-    text = await req.text();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
   } catch {
     return null;
   }
-  if (text.length > MAX_BODY_BYTES) return null;
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   try {
-    return JSON.parse(text);
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
     return null;
   }

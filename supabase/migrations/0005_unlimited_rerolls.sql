@@ -1,5 +1,5 @@
 -- Owner call, 17 Sep: handle rerolls are UNLIMITED — let players find a name they like
--- (amends the "3 lifetime" half of the D15 proposal; still server-generated only, so still
+-- (amends the "3 lifetime" half of D15; still server-generated only, so still
 -- no UGC and no Play-policy impact). The rerolls_left column stays for wire compatibility
 -- (clients in the field read it) but is no longer decremented or checked; the abuse surface
 -- is a handle regeneration per tap, which is one indexed UPDATE — throttled, like every
