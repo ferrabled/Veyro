@@ -22,12 +22,16 @@ namespace MotionRunner.Menu
         const float TopOffset = 12f;
         const float PlayerHeight = 180f;
         const float BoardHeight = 520f;
-        const float RunsHeight = 452f;
-        const float LinksHeight = 248f;
+        const float RunsHeight = 430f;
+        const float LinksHeight = 372f;
 
         const float RowHeight = 62f;
         const int BoardRows = 6;
         const int RunRows = 5;
+
+        /// Vertical spacing of the links-card rows. Tighter than RowHeight so the six rows
+        /// (guide, privacy, delete, player id, recovery code, import) fit the height budget.
+        const float LinkSpacing = 56f;
 
         readonly ILeaderboardSource _mock = new MockLeaderboard();
         LiveLeaderboard _live;
@@ -45,6 +49,9 @@ namespace MotionRunner.Menu
         Button _scopeDaily;
         Button _scopeAllTime;
         Text _delete;
+        Text _playerId;
+        Text _recoveryCode;
+        Text _import;
         bool _deleteArmed;
 
         protected override void Build()
@@ -183,10 +190,56 @@ namespace MotionRunner.Menu
             // not only on the store listing. DELETE PROFILE is Play's account-deletion policy:
             // the moment a server-side profile exists, an in-app deletion path must too
             // (STORE_COMPLIANCE T-009). Two taps, because it is immediate and permanent.
-            BuildLink(slot, "Guide", -34f, "HOW TO PLAY", () => Menu.RequestGuide());
-            BuildLink(slot, "Privacy", -102f, "PRIVACY POLICY",
+            BuildLink(slot, "Guide", -30f, "HOW TO PLAY", () => Menu.RequestGuide());
+            BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
                 () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
-            _delete = BuildLink(slot, "Delete", -170f, "DELETE ONLINE PROFILE", DeleteTapped);
+            _delete = BuildLink(slot, "Delete", -30f - 2 * LinkSpacing,
+                "DELETE ONLINE PROFILE", DeleteTapped);
+            ShrinkToFit(_delete, 32);
+
+            // The support identifier (18 Sep review R3): deletion/support requests without the
+            // app need something that locates the record. Tap copies the full id. It locates,
+            // it does not authorize — ownership is proven with the recovery code below.
+            _playerId = BuildLink(slot, "PlayerId", -30f - 3 * LinkSpacing, "PLAYER ID", PlayerIdTapped);
+            _playerId.fontSize = 26;
+            _playerId.color = MenuTheme.Faint;
+            ShrinkToFit(_playerId, 26);
+
+            // The account's private key, player-visible (owner call, 18 Sep): proves ownership
+            // to support and re-imports the profile on another install. Anyone holding it can
+            // claim the profile, so the row says exactly that.
+            _recoveryCode = BuildLink(slot, "Recovery", -30f - 4 * LinkSpacing,
+                "RECOVERY CODE", RecoveryCodeTapped);
+            _recoveryCode.fontSize = 26;
+            _recoveryCode.color = MenuTheme.Faint;
+            ShrinkToFit(_recoveryCode, 26);
+
+            // The manual rescue when Auto Backup did not carry the key (new device, backup
+            // off): paste a recovery code copied on the old install.
+            _import = BuildLink(slot, "Import", -30f - 5 * LinkSpacing,
+                "IMPORT PROFILE (paste a recovery code)", ImportTapped);
+            _import.fontSize = 26;
+            _import.color = MenuTheme.Faint;
+            ShrinkToFit(_import, 26);
+        }
+
+        /// The links card's lower rows swap their label for variable-length feedback ("copied",
+        /// "import failed: …", the post-delete summary), and a long message used to run straight
+        /// off the right edge of the screen. Best-fit with the DESIGNED size as the ceiling
+        /// leaves every short label drawn exactly as before and shrinks only the lines that would
+        /// not otherwise fit, on any screen width.
+        ///
+        /// The overflow modes are load-bearing, not tidying: RuntimeUi.Label ships
+        /// Overflow/Overflow, which makes best-fit a NO-OP — an unbounded line always "fits", so
+        /// Unity never shrinks anything and the text just spills past the card. Best-fit only
+        /// means something once the rect actually bounds the text.
+        static void ShrinkToFit(Text text, int designedSize)
+        {
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 18;
+            text.resizeTextMaxSize = designedSize;
         }
 
         Text BuildLink(RectTransform slot, string name, float top, string label, Action onTap)
@@ -265,6 +318,63 @@ namespace MotionRunner.Menu
             // exists and never counts down.
             _reroll.gameObject.SetActive(profile != null);
             _reroll.text = "new name";
+
+            if (_playerId != null)
+            {
+                _playerId.gameObject.SetActive(profile != null);
+                if (profile != null)
+                    _playerId.text = "PLAYER ID  " + profile.UserId + "   (tap to copy)";
+            }
+            if (_recoveryCode != null)
+            {
+                bool hasCode = profile != null &&
+                               !string.IsNullOrEmpty(Menu.Profile?.RecoveryCode);
+                _recoveryCode.gameObject.SetActive(hasCode);
+                if (hasCode)
+                    _recoveryCode.text = "RECOVERY CODE — tap to copy. Restores this profile " +
+                                         "anywhere; anyone with it can claim it";
+            }
+            if (_import != null)
+                _import.gameObject.SetActive(Menu.Profile != null && Menu.Profile.IsReady);
+        }
+
+        void PlayerIdTapped()
+        {
+            var profile = Menu.Profile?.Current;
+            if (profile == null) return;
+            GUIUtility.systemCopyBuffer = profile.UserId;
+            _playerId.text = "PLAYER ID copied to clipboard";
+        }
+
+        void RecoveryCodeTapped()
+        {
+            string code = Menu.Profile?.RecoveryCode;
+            if (string.IsNullOrEmpty(code)) return;
+            GUIUtility.systemCopyBuffer = code;
+            _recoveryCode.text = "RECOVERY CODE copied — store it somewhere safe";
+        }
+
+        void ImportTapped()
+        {
+            var service = Menu.Profile;
+            if (service == null || !service.IsReady) return;
+
+            string pasted = (GUIUtility.systemCopyBuffer ?? string.Empty).Trim();
+            _import.text = "importing…";
+            service.ImportProfile(pasted, error =>
+            {
+                if (this == null || !gameObject.activeInHierarchy) return;
+                if (error != null)
+                {
+                    _import.text = "import failed: " + error.Message;
+                    _import.color = MenuTheme.Dim;
+                    return;
+                }
+                _import.text = "profile imported";
+                _import.color = MenuTheme.Dim;
+                RefreshHeadline();
+                ShowBoard();
+            });
         }
 
         void OnProfileChanged()
@@ -394,10 +504,14 @@ namespace MotionRunner.Menu
                     _delete.color = MenuTheme.Dim;
                     return;
                 }
-                _delete.text = "profile deleted — a fresh one starts next launch";
+                // Deliberately NO board refresh here: the service is dormant after deletion
+                // and a fetch must not mint a replacement account mid-flow (18 Sep review R2).
+                // Scope is stated honestly: local device stats are device data and stay.
+                _delete.text = "online profile deleted — device stats stay; a fresh profile starts next launch";
                 _delete.color = MenuTheme.Dim;
                 RefreshHeadline();
-                ShowBoard();
+                _boardNote.text = "profile deleted — the board returns next launch";
+                _boardNote.color = MenuTheme.Faint;
             });
         }
 

@@ -65,7 +65,11 @@ namespace MotionRunner.Core
             var profile = CreateProfileService();
             profile.ProfileChanged += () =>
             {
+                // Profile loaded -> alias the store to it. Profile DELETED (Current null) ->
+                // reset the store identity too, so the deleted UUID stops accruing provider
+                // data (18 Sep review R2).
                 if (profile.Current != null) store.Identify(profile.Current.UserId);
+                else store.ResetIdentity();
             };
             if (profile.Current != null) store.Identify(profile.Current.UserId);
 

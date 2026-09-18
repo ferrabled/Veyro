@@ -90,6 +90,8 @@ namespace MotionRunner.Commerce
 
         public void Identify(string userId) => Identity = userId;
 
+        public void ResetIdentity() => Identity = null;
+
         /// Backdoor for tests and Editor debugging: grant/revoke directly, as the dashboard can.
         public void SetEntitlement(string entitlementId, bool active)
         {

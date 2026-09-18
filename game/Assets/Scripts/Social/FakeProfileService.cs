@@ -100,6 +100,34 @@ namespace MotionRunner.Social
             done?.Invoke(Current, null);
         }
 
+        /// The code a paste-import will accept, standing in for the real key file.
+        public static readonly string FakeRecoveryCode = new string('a', 64);
+
+        public string RecoveryCode => IsReady ? FakeRecoveryCode : string.Empty;
+
+        public void ImportProfile(string recoveryCode, Action<SocialError> done)
+        {
+            if (!IsReady)
+            {
+                done?.Invoke(new SocialError("offline", "no session"));
+                return;
+            }
+            if (recoveryCode != FakeRecoveryCode)
+            {
+                done?.Invoke(new SocialError("not_found", "code not recognized"));
+                return;
+            }
+            if (Submitted.Count > 0)
+            {
+                done?.Invoke(new SocialError("destination_not_empty",
+                    "this install has already played"));
+                return;
+            }
+            Current = new Profile("imported-user", "IMPORTED-FOX-1", 3, 42);
+            ProfileChanged?.Invoke();
+            done?.Invoke(null);
+        }
+
         public void DeleteAccount(Action<SocialError> done)
         {
             if (!IsReady)

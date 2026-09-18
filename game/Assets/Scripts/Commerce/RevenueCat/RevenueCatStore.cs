@@ -12,7 +12,7 @@ namespace MotionRunner.Commerce.RevenueCat
     ///
     /// Anonymous app user IDs are the boot state; T-009's profile backend then calls
     /// Identify(supabaseUserId) -> LogIn(), so RevenueCat, Supabase and (later, T-021)
-    /// OneSignal share one stable player id (D13 proposal; supersedes the old Play-Games-id
+    /// OneSignal share one stable player id (D14; supersedes the old Play-Games-id
     /// note). SetOnesignalUserID exists on Purchases for T-021; nothing here makes that awkward.
     ///
     /// Fail-open throughout: configuration failure, no network, empty offerings - every call
@@ -99,6 +99,26 @@ namespace MotionRunner.Commerce.RevenueCat
                 return;
             }
             ApplyIdentity(userId);
+        }
+
+        /// Account deletion's identity reset: LogOut returns the SDK to a fresh anonymous app
+        /// user id, so the deleted player's UUID stops accruing provider data (the server-side
+        /// customer record is deleted by the delete-account Edge Function). Fail-open: a
+        /// failure leaves the alias in place, which the support path can still clean up.
+        public void ResetIdentity()
+        {
+            _pendingIdentity = null;
+            if (!SdkConfigured() || _appliedIdentity == null) return;
+            _appliedIdentity = null;
+            _purchases.LogOut((customerInfo, error) =>
+            {
+                if (error != null)
+                {
+                    Debug.LogWarning("[Store] LogOut failed - identity unchanged: " + error.Message);
+                    return;
+                }
+                if (customerInfo != null) ApplyCustomerInfo(customerInfo);
+            });
         }
 
         /// LogIn aliases the current anonymous app user id to the stable one server-side, so

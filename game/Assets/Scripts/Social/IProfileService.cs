@@ -36,8 +36,21 @@ namespace MotionRunner.Social
         void RerollHandle(Action<Profile, SocialError> done);
 
         /// True deletion of the profile and every run/board row (Play account-deletion policy).
-        /// On success the adapter also clears its local session, recovery key and consent.
+        /// On success the adapter also clears its local session and recovery key.
         void DeleteAccount(Action<SocialError> done);
+
+        /// The account's recovery code, when one belongs to the CURRENT profile — the secret
+        /// that proves ownership and re-imports the profile on another install (owner call,
+        /// 18 Sep: player-visible, copyable). Empty while none exists or while a foreign
+        /// key's claim is pending. Anyone holding it can claim the profile: the UI shows it
+        /// with that warning.
+        string RecoveryCode { get; }
+
+        /// Claims the profile a pasted recovery code belongs to onto THIS install (the manual
+        /// cross-device / backup-off rescue; same server path as automatic reinstall
+        /// recovery). Fails honestly when this install has already played
+        /// ("destination_not_empty") — delete the local profile and relaunch first.
+        void ImportProfile(string recoveryCode, Action<SocialError> done);
     }
 
     /// The player as the backend knows them.

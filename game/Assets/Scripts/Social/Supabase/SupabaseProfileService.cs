@@ -12,29 +12,29 @@ namespace MotionRunner.Social.Supabase
     /// IProfileService over the Supabase REST surface — the only class in the game that speaks
     /// HTTP. Plain UnityWebRequest + JsonUtility on purpose (no SDK package; CLAUDE.md gotcha
     /// #10). Server contract: supabase/ (migrations + functions), spec in
-    /// docs/PROFILE_LEADERBOARD_PLAN.md.
+    /// docs/PROFILE_LEADERBOARD_PLAN.md. The decision rules live engine-free and unit-tested
+    /// in RecoveryGate / RetrySchedule (18 Sep review); this class only executes them.
     ///
-    /// Failure discipline (17 Sep hardening):
-    ///  * Transient (no HTTP answer, 429, 5xx) is NEVER terminal: sessions are kept,
-    ///    submissions stay queued, and retries back off exponentially with jitter, honouring
-    ///    Retry-After when the server sends one.
-    ///  * The refresh token is dropped ONLY on a definitive auth rejection (400/401/403) —
-    ///    a throttled or failing server must not cost the player their identity, and a
-    ///    transient failure must never mint a new anonymous account over a live one.
-    ///  * An expired session that cannot be refreshed right now counts as "no session":
-    ///    nothing is ever sent with a stale token.
+    /// Failure discipline:
+    ///  * Transient (no answer, 429, 5xx) is NEVER terminal: sessions are kept, submissions
+    ///    stay queued with their own scheduled drain, Retry-After is honoured (up to an hour),
+    ///    and everything else backs off exponentially with jitter.
+    ///  * The refresh token is dropped ONLY on a definitive auth rejection (400/401/403).
+    ///  * An expired session that cannot be refreshed right now counts as "no session".
+    ///  * A profile that failed to load is retried on later calls even while the access token
+    ///    stays valid (review R5) — token validity and profile initialization are separate.
     ///
-    /// Identity (plan §1): anonymous sign-in at first use; refresh token in PlayerPrefs for
-    /// ordinary relaunches; the RECOVERY KEY in a persistentDataPath file that Android Auto
-    /// Backup carries across reinstall. The key file is tagged with the user id it belongs
-    /// to, and the server's rotate_recovery_key() is retry-safe — so a lost response or a
-    /// claim that rotated the key server-side just means the next boot rotates again and
-    /// overwrites the stale file. iOS moves the key into the Keychain with T-032.
+    /// Recovery (review R1 — the invariant that matters most): a stored key belonging to
+    /// another user is the device's ONLY road back to the old profile. Until its claim reaches
+    /// a definitive outcome, the key is never overwritten and NO RUN IS SUBMITTED — a
+    /// submission would make this fresh user a non-empty destination and permanently block the
+    /// claim. The pending state survives restarts because it is derived from the key file
+    /// itself, not from memory.
     ///
     /// The key file is plaintext BY DESIGN: it must survive reinstall via device backup, and
-    /// Android Keystore-backed encryption keys do NOT survive reinstall — encrypting with one
-    /// would break exactly the property the key exists for. A local attacker who can read
-    /// this file can also read the PlayerPrefs session, which is the same level of access.
+    /// Android Keystore-backed encryption keys do NOT survive reinstall. A local attacker who
+    /// can read it can also read the PlayerPrefs session — same privilege level. iOS moves the
+    /// key into the Keychain with T-032.
     public sealed class SupabaseProfileService : MonoBehaviour, IProfileService
     {
         const string RefreshTokenKey = "veyro.sb.refresh";
@@ -44,10 +44,6 @@ namespace MotionRunner.Social.Supabase
         /// Refresh the access token this many seconds before it actually expires.
         const float ExpirySlackSeconds = 60f;
 
-        /// Transient-failure backoff bounds (seconds). Doubles per failure, jittered.
-        const float BackoffFirstSeconds = 5f;
-        const float BackoffMaxSeconds = 300f;
-
         string _url;
         string _anonKey;
 
@@ -55,9 +51,27 @@ namespace MotionRunner.Social.Supabase
         string _userId;
         float _accessExpiresAt; // Time.realtimeSinceStartup clock
 
-        bool _sessionWork;       // serializes Boot/refresh — never two in flight
-        float _retryNotBefore;   // backoff gate for session work
-        float _backoffSeconds = BackoffFirstSeconds;
+        bool _sessionWork;        // serializes session/profile/recovery work
+        float _retryNotBefore;    // backoff gate for that work
+        float _backoff = RetrySchedule.FirstDelaySeconds;
+
+        float _submitNotBefore;   // separate gate: a submit 429 throttles submits, not reads
+        float _submitBackoff = RetrySchedule.FirstDelaySeconds;
+        bool _draining;
+        bool _drainScheduled;
+
+        /// A foreign recovery key's claim is unresolved (see class comment). Derived from the
+        /// key file at session time; cleared only by a definitive server outcome.
+        bool _recoveryPending;
+
+        /// The claim was refused because THIS install already played (409). Definitive for
+        /// this install: stop retrying, stop blocking, keep the file for support conversations.
+        bool _recoveryBlocked;
+
+        /// Set after a successful DeleteAccount: the service goes dormant so nothing —
+        /// especially not a board refresh — silently creates a replacement account inside the
+        /// deletion flow (review R2). The next app launch starts fresh.
+        bool _dormantAfterDeletion;
 
         public bool IsReady { get; private set; }
 
@@ -76,24 +90,35 @@ namespace MotionRunner.Social.Supabase
             return service;
         }
 
-        // ---------------- session ----------------
+        // ---------------- session / profile / recovery ----------------
 
         bool HasLiveToken => _accessToken != null &&
                              Time.realtimeSinceStartup < _accessExpiresAt;
 
-        /// The one session entry point. Serialized (a second caller waits for the first),
-        /// backoff-gated, and it never invents a new anonymous identity while a transient
-        /// failure hides the old one.
+        /// Everything is settled: nothing for EnsureSession to do.
+        bool SessionSettled => HasLiveToken && IsReady && !_recoveryPending;
+
+        /// The one entry point for session work. Serialized, backoff-gated, and it never
+        /// invents a new anonymous identity while a transient failure hides the old one.
         IEnumerator EnsureSession()
         {
             while (_sessionWork) yield return null;
-            if (HasLiveToken) yield break;
+            if (_dormantAfterDeletion) yield break;
+            if (SessionSettled) yield break;
             if (Time.realtimeSinceStartup < _retryNotBefore) yield break;
 
             _sessionWork = true;
             try
             {
-                // 1. Refresh whatever token we hold.
+                // 1. A live token may still have unfinished business: an unloaded profile
+                //    (review R5) or an unresolved recovery. Retry those without touching auth.
+                if (HasLiveToken)
+                {
+                    yield return SettleRecoveryAndProfile();
+                    yield break;
+                }
+
+                // 2. Refresh whatever token we hold.
                 string refresh = PlayerPrefs.GetString(RefreshTokenKey, string.Empty);
                 if (!string.IsNullOrEmpty(refresh))
                 {
@@ -102,21 +127,20 @@ namespace MotionRunner.Social.Supabase
                     if (HasLiveToken)
                     {
                         ClearBackoff();
-                        yield return LoadProfileAndFinish();
+                        yield return SettleRecoveryAndProfile();
                         yield break;
                     }
-                    if (outcome.Transient)
+                    if (RetrySchedule.IsTransient(outcome.Status))
                     {
-                        // The token may still be perfectly valid — back off, try later,
-                        // and DO NOT fall through to creating a new anonymous user.
+                        // The token may still be valid — back off; never mint a new
+                        // anonymous user over a live identity.
                         ApplyBackoff(outcome.RetryAfterSeconds);
                         yield break;
                     }
-                    // Definitive rejection: the token is dead. Fall through to a fresh
-                    // identity (+ recovery-key claim).
+                    // Definitive rejection: the token is dead. Fall through.
                 }
 
-                // 2. Fresh install / dead token: new anonymous user.
+                // 3. Fresh install / dead token: new anonymous user, then recovery.
                 var signup = new RequestOutcome();
                 yield return SignInAnonymously(signup);
                 if (!HasLiveToken)
@@ -125,31 +149,105 @@ namespace MotionRunner.Social.Supabase
                     yield break;
                 }
                 ClearBackoff();
-
-                // 3. If a recovery key survived in the device backup, claim the old profile
-                //    onto this fresh user. The key file is tagged with the user it belonged
-                //    to; any stale key is overwritten by the rotate below.
-                var stored = ReadRecoveryKey();
-                if (!string.IsNullOrEmpty(stored.Key) && stored.UserId != _userId)
-                {
-                    yield return CallFunction("recover-session",
-                        "{\"recovery_key\":\"" + stored.Key + "\"}",
-                        (status, body, _) =>
-                        {
-                            if (status != 200) return;
-                            var response = JsonUtility.FromJson<RecoverResponse>(body);
-                            if (response == null || !response.recovered) return;
-                            if (!string.IsNullOrEmpty(response.recovery_key))
-                                WriteRecoveryKey(_userId, response.recovery_key);
-                        });
-                }
-
-                yield return LoadProfileAndFinish();
+                yield return SettleRecoveryAndProfile();
             }
             finally
             {
                 _sessionWork = false;
             }
+        }
+
+        /// With a live token: resolve any pending recovery first (its outcome changes which
+        /// profile this user owns), then make sure the profile is loaded, then issue a
+        /// recovery key if rotation is allowed, then drain the queue.
+        IEnumerator SettleRecoveryAndProfile()
+        {
+            var stored = ReadRecoveryKey();
+            _recoveryPending = !_recoveryBlocked &&
+                               RecoveryGate.IsPending(stored.UserId, stored.Key, _userId);
+
+            if (_recoveryPending)
+            {
+                long status = 0;
+                RecoverResponse response = null;
+                yield return CallFunction("recover-session",
+                    "{\"recovery_key\":\"" + stored.Key + "\"}",
+                    (s, body, _) =>
+                    {
+                        status = s;
+                        if (body != null)
+                        {
+                            try { response = JsonUtility.FromJson<RecoverResponse>(body); }
+                            catch (Exception) { response = null; }
+                        }
+                    });
+
+                switch (RecoveryGate.Resolve(status, response?.recovered ?? false,
+                            response?.reason ?? string.Empty))
+                {
+                    case RecoveryGate.Resolution.Claimed:
+                        // The old profile is ours now. Store the rotated key under the
+                        // current user; an empty rotated key self-heals via MayRotate below.
+                        if (!string.IsNullOrEmpty(response.recovery_key))
+                            WriteRecoveryKey(_userId, response.recovery_key);
+                        else
+                            DeleteRecoveryKeyFile();
+                        _recoveryPending = false;
+                        break;
+                    case RecoveryGate.Resolution.KeyInvalid:
+                        // The key recovers nothing anywhere - only now is discarding it safe.
+                        DeleteRecoveryKeyFile();
+                        _recoveryPending = false;
+                        break;
+                    case RecoveryGate.Resolution.Blocked:
+                        // This install already played; the claim will never succeed from
+                        // here. Keep the file (support can still use it), stop blocking.
+                        _recoveryBlocked = true;
+                        _recoveryPending = false;
+                        break;
+                    case RecoveryGate.Resolution.StillPending:
+                        // Transient: keep the key EXACTLY as it is, keep blocking submits,
+                        // retry after backoff (also across restarts - the file IS the state).
+                        ApplyBackoff(0f);
+                        yield break;
+                }
+            }
+
+            if (!IsReady) yield return LoadProfile();
+            if (!IsReady)
+            {
+                ApplyBackoff(0f); // profile GET failed - retried on a later call (R5)
+                yield break;
+            }
+
+            // Retry-safe key issuance - but ONLY when it cannot destroy a pending road back
+            // (RecoveryGate.MayRotate). A key tagged with the current user needs nothing.
+            var afterLoad = ReadRecoveryKey();
+            if (RecoveryGate.MayRotate(afterLoad.UserId, afterLoad.Key, _userId))
+            {
+                yield return CallRpc("rotate_recovery_key", "{}", (status, body, _) =>
+                {
+                    if (status != 200) return;
+                    var response = JsonUtility.FromJson<RotateKeyResponse>(body);
+                    if (response != null && !string.IsNullOrEmpty(response.recovery_key))
+                        WriteRecoveryKey(_userId, response.recovery_key);
+                });
+            }
+            else if (!string.IsNullOrEmpty(afterLoad.Key) && afterLoad.UserId != _userId &&
+                     !_recoveryBlocked)
+            {
+                // A claim just succeeded but its rotated key was lost with the response:
+                // the file still carries the OLD user tag. Re-tagging requires a fresh key.
+                yield return CallRpc("rotate_recovery_key", "{}", (status, body, _) =>
+                {
+                    if (status != 200) return;
+                    var response = JsonUtility.FromJson<RotateKeyResponse>(body);
+                    if (response != null && !string.IsNullOrEmpty(response.recovery_key))
+                        WriteRecoveryKey(_userId, response.recovery_key);
+                });
+            }
+
+            ScheduleDrain(0f);
         }
 
         /// POST /auth/v1/signup with an empty body is GoTrue's anonymous sign-in (enabled in
@@ -178,9 +276,7 @@ namespace MotionRunner.Social.Supabase
                         AdoptSession(body);
                         return;
                     }
-                    // ONLY a definitive auth rejection kills the stored token. 429 and 5xx
-                    // and no-answer keep it: the server being busy is not the player's
-                    // identity being invalid.
+                    // ONLY a definitive auth rejection kills the stored token.
                     if (status == 400 || status == 401 || status == 403)
                         PlayerPrefs.DeleteKey(RefreshTokenKey);
                 });
@@ -191,10 +287,19 @@ namespace MotionRunner.Social.Supabase
             var session = JsonUtility.FromJson<AuthResponse>(body);
             if (session == null || string.IsNullOrEmpty(session.access_token)) return;
 
+            string previousUser = _userId;
             _accessToken = session.access_token;
             _userId = session.user != null ? session.user.id : _userId;
             _accessExpiresAt = Time.realtimeSinceStartup +
                                Mathf.Max(session.expires_in, 120) - ExpirySlackSeconds;
+
+            if (previousUser != null && previousUser != _userId)
+            {
+                // Identity changed under us (should not happen outside signup) - the loaded
+                // profile no longer describes this user.
+                IsReady = false;
+                Current = null;
+            }
 
             if (!string.IsNullOrEmpty(session.refresh_token))
             {
@@ -203,13 +308,13 @@ namespace MotionRunner.Social.Supabase
             }
         }
 
-        IEnumerator LoadProfileAndFinish()
+        IEnumerator LoadProfile()
         {
             if (!HasLiveToken) yield break;
 
             // The object accept header makes PostgREST return ONE json object, not a one-
             // element array — JsonUtility cannot parse a top-level array. Columns are explicit
-            // and must stay within the column-level SELECT grant (0004): recovery_key_hash is
+            // and stay within the column-level SELECT grant (0004): recovery_key_hash is
             // deliberately not readable by clients.
             yield return SendJson(UnityWebRequest.kHttpVerbGET,
                 _url + "/rest/v1/profiles?select=handle,rerolls_left,xp", null, true,
@@ -224,39 +329,19 @@ namespace MotionRunner.Social.Supabase
                     ProfileChanged?.Invoke();
                 },
                 accept: "application/vnd.pgrst.object+json");
-
-            if (!IsReady) yield break;
-
-            // Retry-safe key issuance: no key on file, or a key that belongs to another user
-            // (pre-claim leftover, lost rotate response) → rotate. The old key stops working
-            // server-side, so stale credentials are never accepted indefinitely.
-            var stored = ReadRecoveryKey();
-            if (string.IsNullOrEmpty(stored.Key) || stored.UserId != _userId)
-            {
-                yield return CallRpc("rotate_recovery_key", "{}", (status, body, _) =>
-                {
-                    if (status != 200) return;
-                    var response = JsonUtility.FromJson<RotateKeyResponse>(body);
-                    if (response != null && !string.IsNullOrEmpty(response.recovery_key))
-                        WriteRecoveryKey(_userId, response.recovery_key);
-                });
-            }
-
-            StartCoroutine(DrainPending());
         }
 
         void ApplyBackoff(float retryAfterSeconds)
         {
-            float delay = retryAfterSeconds > 0f
-                ? retryAfterSeconds
-                : _backoffSeconds * UnityEngine.Random.Range(0.8f, 1.3f);
-            _retryNotBefore = Time.realtimeSinceStartup + Mathf.Min(delay, BackoffMaxSeconds);
-            _backoffSeconds = Mathf.Min(_backoffSeconds * 2f, BackoffMaxSeconds);
+            float delay = RetrySchedule.Delay(_backoff, retryAfterSeconds,
+                UnityEngine.Random.Range(0.8f, 1.3f));
+            _retryNotBefore = Time.realtimeSinceStartup + delay;
+            _backoff = RetrySchedule.NextBackoff(_backoff);
         }
 
         void ClearBackoff()
         {
-            _backoffSeconds = BackoffFirstSeconds;
+            _backoff = RetrySchedule.FirstDelaySeconds;
             _retryNotBefore = 0f;
         }
 
@@ -276,11 +361,27 @@ namespace MotionRunner.Social.Supabase
         IEnumerator SubmitRoutine(RunSubmission run, Action<SubmitOutcome> done, bool queueOnFailure)
         {
             yield return EnsureSession();
-            if (!HasLiveToken)
+
+            // Recovery unresolved: sending this run would make the fresh user a non-empty
+            // destination and permanently block the claim (R1). Queue instead - the drain
+            // runs after recovery settles.
+            if (_recoveryPending || !HasLiveToken || _dormantAfterDeletion)
             {
                 if (queueOnFailure) Enqueue(run);
                 done?.Invoke(new SubmitOutcome(queueOnFailure ? SubmitStatus.Queued : SubmitStatus.Rejected,
-                    error: new SocialError("offline", "no session")));
+                    error: new SocialError("offline",
+                        _recoveryPending ? "recovery pending" : "no session")));
+                yield break;
+            }
+
+            // The submit throttle gates every submission with this token (R4), not just the
+            // next session refresh.
+            if (Time.realtimeSinceStartup < _submitNotBefore)
+            {
+                if (queueOnFailure) Enqueue(run);
+                ScheduleDrain(_submitNotBefore - Time.realtimeSinceStartup);
+                done?.Invoke(new SubmitOutcome(queueOnFailure ? SubmitStatus.Queued : SubmitStatus.Rejected,
+                    error: new SocialError("throttled", "will retry")));
                 yield break;
             }
 
@@ -292,6 +393,7 @@ namespace MotionRunner.Social.Supabase
 
             if (resultStatus == 200)
             {
+                _submitBackoff = RetrySchedule.FirstDelaySeconds;
                 var response = JsonUtility.FromJson<SubmitResponse>(resultBody);
                 if (response == null)
                 {
@@ -311,13 +413,15 @@ namespace MotionRunner.Social.Supabase
                 yield break;
             }
 
-            // Transient (no answer, throttled, server error): worth retrying later. 429 also
-            // arms the backoff so the drain does not hammer a throttling server.
-            bool transient = resultStatus == 0 || resultStatus == 429 || resultStatus >= 500;
-            if (transient)
+            if (RetrySchedule.IsTransient(resultStatus))
             {
-                if (resultStatus == 429) ApplyBackoff(retryAfter);
+                float delay = RetrySchedule.Delay(_submitBackoff, retryAfter,
+                    UnityEngine.Random.Range(0.8f, 1.3f));
+                _submitNotBefore = Time.realtimeSinceStartup + delay;
+                _submitBackoff = RetrySchedule.NextBackoff(_submitBackoff);
+
                 if (queueOnFailure) Enqueue(run);
+                ScheduleDrain(delay);
                 done?.Invoke(new SubmitOutcome(queueOnFailure ? SubmitStatus.Queued : SubmitStatus.Rejected,
                     error: new SocialError(resultStatus == 0 ? "offline" : "http_" + resultStatus,
                         "will retry")));
@@ -337,7 +441,7 @@ namespace MotionRunner.Social.Supabase
         IEnumerator FetchBoardRoutine(BoardQuery query, Action<BoardResult, SocialError> done)
         {
             yield return EnsureSession();
-            if (!HasLiveToken)
+            if (!HasLiveToken || _dormantAfterDeletion)
             {
                 done?.Invoke(null, new SocialError("offline", "no session"));
                 yield break;
@@ -388,7 +492,7 @@ namespace MotionRunner.Social.Supabase
         IEnumerator RerollRoutine(Action<Profile, SocialError> done)
         {
             yield return EnsureSession();
-            if (!HasLiveToken || Current == null)
+            if (!HasLiveToken || Current == null || _dormantAfterDeletion)
             {
                 done?.Invoke(Current, new SocialError("offline", "no session"));
                 yield break;
@@ -409,13 +513,89 @@ namespace MotionRunner.Social.Supabase
                 }
                 if (string.IsNullOrEmpty(response.handle))
                 {
-                    done?.Invoke(Current, new SocialError("no_rerolls", "reroll budget spent"));
+                    // Unlimited rerolls: an empty handle now only means the burst throttle.
+                    done?.Invoke(Current, new SocialError("throttled", "one moment between name changes"));
                     return;
                 }
                 Current = new Profile(Current.UserId, response.handle, response.rerolls_left, Current.Xp);
                 ProfileChanged?.Invoke();
                 done?.Invoke(Current, null);
             });
+        }
+
+        /// The current profile's own recovery code (owner call, 18 Sep: player-visible). A
+        /// foreign key — a pending claim's — is never exposed as "yours".
+        public string RecoveryCode
+        {
+            get
+            {
+                if (_userId == null) return string.Empty;
+                var stored = ReadRecoveryKey();
+                return stored.UserId == _userId ? stored.Key ?? string.Empty : string.Empty;
+            }
+        }
+
+        public void ImportProfile(string recoveryCode, Action<SocialError> done)
+        {
+            if (string.IsNullOrEmpty(recoveryCode) || recoveryCode.Trim().Length != 64)
+            {
+                done?.Invoke(new SocialError("bad_code", "a recovery code is 64 characters"));
+                return;
+            }
+            StartCoroutine(ImportRoutine(recoveryCode.Trim().ToLowerInvariant(), done));
+        }
+
+        IEnumerator ImportRoutine(string code, Action<SocialError> done)
+        {
+            yield return EnsureSession();
+            if (!HasLiveToken || _dormantAfterDeletion)
+            {
+                done?.Invoke(new SocialError("offline", "no session"));
+                yield break;
+            }
+
+            long status = 0;
+            RecoverResponse response = null;
+            yield return CallFunction("recover-session",
+                "{\"recovery_key\":\"" + code + "\"}",
+                (s, body, _) =>
+                {
+                    status = s;
+                    if (body != null)
+                    {
+                        try { response = JsonUtility.FromJson<RecoverResponse>(body); }
+                        catch (Exception) { response = null; }
+                    }
+                });
+
+            switch (RecoveryGate.Resolve(status, response?.recovered ?? false,
+                        response?.reason ?? string.Empty))
+            {
+                case RecoveryGate.Resolution.Claimed:
+                    if (!string.IsNullOrEmpty(response.recovery_key))
+                        WriteRecoveryKey(_userId, response.recovery_key);
+                    else
+                        DeleteRecoveryKeyFile(); // MayRotate reissues one next settle
+                    // The profile under this user changed identity: reload it.
+                    IsReady = false;
+                    Current = null;
+                    yield return LoadProfile();
+                    ScheduleDrain(0f);
+                    done?.Invoke(IsReady ? null
+                        : new SocialError("offline", "imported — profile loads on next launch"));
+                    yield break;
+                case RecoveryGate.Resolution.Blocked:
+                    done?.Invoke(new SocialError("destination_not_empty",
+                        "this install has already played — delete its online profile, restart, then import"));
+                    yield break;
+                case RecoveryGate.Resolution.KeyInvalid:
+                    done?.Invoke(new SocialError("not_found", "code not recognized"));
+                    yield break;
+                default:
+                    done?.Invoke(new SocialError(status == 429 ? "throttled" : "offline",
+                        "couldn't reach the server — try again"));
+                    yield break;
+            }
         }
 
         public void DeleteAccount(Action<SocialError> done)
@@ -442,12 +622,18 @@ namespace MotionRunner.Social.Supabase
                 yield break;
             }
 
-            // Everything local about this identity goes with the account (plan §5): session,
-            // recovery key, queued runs. The next launch starts a fresh profile.
+            // Everything local about this identity goes with the account, and the service
+            // goes DORMANT: no call may silently create a replacement account inside the
+            // deletion flow (review R2). The next app launch starts fresh. Local device stats
+            // (bests, history) are deliberately untouched — they are device data, and the
+            // player-facing copy says so.
+            _dormantAfterDeletion = true;
             _accessToken = null;
             _userId = null;
             Current = null;
             IsReady = false;
+            _recoveryPending = false;
+            _recoveryBlocked = false;
             ClearBackoff();
             PlayerPrefs.DeleteKey(RefreshTokenKey);
             PlayerPrefs.DeleteKey(PendingKey);
@@ -467,42 +653,86 @@ namespace MotionRunner.Social.Supabase
             PlayerPrefs.Save();
         }
 
+        /// The queue has its own retry loop (review R4): every transient failure schedules a
+        /// future drain instead of waiting for the next profile load or app restart.
+        void ScheduleDrain(float delaySeconds)
+        {
+            if (_drainScheduled || _dormantAfterDeletion) return;
+            if (PlayerPrefs.GetString(PendingKey, string.Empty).Length == 0) return;
+            _drainScheduled = true;
+            StartCoroutine(DrainAfter(delaySeconds));
+        }
+
+        IEnumerator DrainAfter(float delaySeconds)
+        {
+            if (delaySeconds > 0f) yield return new WaitForSecondsRealtime(delaySeconds);
+            _drainScheduled = false;
+            yield return DrainPending();
+        }
+
         IEnumerator DrainPending()
         {
-            var queued = PendingRuns.Decode(PlayerPrefs.GetString(PendingKey, string.Empty));
-            foreach (var run in queued)
+            if (_draining || _recoveryPending || _dormantAfterDeletion) yield break;
+            _draining = true;
+            try
             {
-                bool settled = false;
-                bool keep = false;
-                // queueOnFailure false: the run is ALREADY in the queue; re-queueing would dupe.
-                yield return SubmitRoutine(run, outcome =>
+                var queued = PendingRuns.Decode(PlayerPrefs.GetString(PendingKey, string.Empty));
+                foreach (var run in queued)
                 {
-                    settled = true;
-                    keep = outcome.Status == SubmitStatus.Queued ||
-                           (outcome.Status == SubmitStatus.Rejected &&
-                            outcome.Error != null &&
-                            (outcome.Error.Code == "offline" ||
-                             outcome.Error.Code.StartsWith("http_5") ||
-                             outcome.Error.Code == "http_429"));
-                }, queueOnFailure: false);
+                    bool settled = false;
+                    bool keep = false;
+                    // queueOnFailure false: the run is ALREADY queued; re-queueing would dupe.
+                    yield return SubmitRoutine(run, outcome =>
+                    {
+                        settled = true;
+                        keep = outcome.Status == SubmitStatus.Queued ||
+                               (outcome.Status == SubmitStatus.Rejected &&
+                                outcome.Error != null &&
+                                (outcome.Error.Code == "offline" ||
+                                 outcome.Error.Code == "throttled" ||
+                                 outcome.Error.Code.StartsWith("http_5") ||
+                                 outcome.Error.Code == "http_429"));
+                    }, queueOnFailure: false);
 
-                if (!settled || keep) yield break; // transient again — keep the rest queued
+                    if (!settled || keep)
+                    {
+                        // Transient again: keep the rest queued and try later on the submit
+                        // gate's own schedule.
+                        float delay = Mathf.Max(_submitNotBefore - Time.realtimeSinceStartup,
+                            RetrySchedule.FirstDelaySeconds);
+                        _draining = false;
+                        ScheduleDrain(delay);
+                        yield break;
+                    }
 
-                PlayerPrefs.SetString(PendingKey,
-                    PendingRuns.Remove(PlayerPrefs.GetString(PendingKey, string.Empty),
-                        run.client_run_id));
-                PlayerPrefs.Save();
+                    PlayerPrefs.SetString(PendingKey,
+                        PendingRuns.Remove(PlayerPrefs.GetString(PendingKey, string.Empty),
+                            run.client_run_id));
+                    PlayerPrefs.Save();
+                }
             }
+            finally
+            {
+                _draining = false;
+            }
+        }
+
+        /// Coming back to the foreground is the cheapest "connectivity may be back" signal:
+        /// kick the session (which retries recovery/profile) and the queue.
+        void OnApplicationPause(bool paused)
+        {
+            if (paused || _dormantAfterDeletion) return;
+            StartCoroutine(EnsureSession());
+            ScheduleDrain(1f);
         }
 
         // ---------------- recovery key storage ----------------
         // A file under persistentDataPath: covered by Android Auto Backup (the mechanism that
         // demonstrably restores this app's data across reinstall — STATUS 29 Aug). Format
-        // "<userId>:<hexKey>" so a stale key (rotated away, or belonging to a pre-claim user)
-        // is recognized and replaced by rotate_recovery_key. Plaintext by design — see the
+        // "<userId>:<hexKey>" so a stale key is recognized. Plaintext by design — see the
         // class comment. iOS: Keychain with T-032.
 
-        readonly struct StoredKey
+        internal readonly struct StoredKey
         {
             public readonly string UserId;
             public readonly string Key;
@@ -562,8 +792,6 @@ namespace MotionRunner.Social.Supabase
         {
             public long Status;
             public float RetryAfterSeconds;
-
-            public bool Transient => Status == 0 || Status == 429 || Status >= 500;
 
             public void Fill(long status, float retryAfter)
             {

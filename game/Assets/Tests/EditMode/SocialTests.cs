@@ -128,6 +128,84 @@ namespace MotionRunner.Tests
             Assert.That(decoded[0].client_run_id, Is.EqualTo(second.client_run_id));
         }
 
+        // ---- recovery gate (18 Sep review R1: the rules that keep the old profile reachable) ----
+
+        [Test]
+        public void AForeignKeyIsPendingAndBlocksRotation()
+        {
+            Assert.That(RecoveryGate.IsPending("old-user", "abc", "new-user"), Is.True);
+            Assert.That(RecoveryGate.MayRotate("old-user", "abc", "new-user"), Is.False,
+                "rotating would overwrite the only road back to the old profile");
+        }
+
+        [Test]
+        public void OwnKeyOrNoKeyIsNotPending()
+        {
+            Assert.That(RecoveryGate.IsPending("me", "abc", "me"), Is.False);
+            Assert.That(RecoveryGate.IsPending("", "", "me"), Is.False);
+            Assert.That(RecoveryGate.MayRotate("", "", "me"), Is.True, "no key at all: issue one");
+            Assert.That(RecoveryGate.MayRotate("me", "abc", "me"), Is.False, "own key: nothing to do");
+        }
+
+        [Test]
+        public void TransientRecoveryFailuresStayPending()
+        {
+            // The R1 reproduction: a 503 (or no answer, or throttle) must NOT resolve the
+            // claim — resolving is what permits key replacement and run submission.
+            foreach (long status in new long[] { 0, 429, 500, 503 })
+            {
+                Assert.That(RecoveryGate.Resolve(status, false, ""),
+                    Is.EqualTo(RecoveryGate.Resolution.StillPending), "status " + status);
+            }
+        }
+
+        [Test]
+        public void DefinitiveRecoveryOutcomesResolve()
+        {
+            Assert.That(RecoveryGate.Resolve(200, true, ""),
+                Is.EqualTo(RecoveryGate.Resolution.Claimed));
+            Assert.That(RecoveryGate.Resolve(200, false, ""),
+                Is.EqualTo(RecoveryGate.Resolution.KeyInvalid));
+            Assert.That(RecoveryGate.Resolve(409, false, "destination_not_empty"),
+                Is.EqualTo(RecoveryGate.Resolution.Blocked));
+            Assert.That(RecoveryGate.Resolve(400, false, ""),
+                Is.EqualTo(RecoveryGate.Resolution.KeyInvalid));
+        }
+
+        // ---- retry schedule (18 Sep review R4) ----
+
+        [Test]
+        public void ServerRetryAfterWinsAndIsNotShortened()
+        {
+            // The reproduction: Retry-After 120 was capped to our own 5-minute backoff logic;
+            // a server-supplied delay must be respected up to an hour.
+            Assert.That(RetrySchedule.Delay(5f, 120f, 1f), Is.EqualTo(120f));
+            Assert.That(RetrySchedule.Delay(5f, 1200f, 1f), Is.EqualTo(1200f));
+            Assert.That(RetrySchedule.Delay(5f, 999999f, 1f), Is.EqualTo(RetrySchedule.MaxServerDelaySeconds));
+        }
+
+        [Test]
+        public void BackoffDoublesAndCaps()
+        {
+            float backoff = RetrySchedule.FirstDelaySeconds;
+            for (int i = 0; i < 12; i++) backoff = RetrySchedule.NextBackoff(backoff);
+            Assert.That(backoff, Is.EqualTo(RetrySchedule.MaxDelaySeconds));
+            Assert.That(RetrySchedule.Delay(backoff, 0f, 1.3f),
+                Is.LessThanOrEqualTo(RetrySchedule.MaxDelaySeconds));
+        }
+
+        [Test]
+        public void OnlyThrottlesAndServerErrorsAreTransient()
+        {
+            Assert.That(RetrySchedule.IsTransient(0), Is.True);
+            Assert.That(RetrySchedule.IsTransient(429), Is.True);
+            Assert.That(RetrySchedule.IsTransient(500), Is.True);
+            Assert.That(RetrySchedule.IsTransient(503), Is.True);
+            Assert.That(RetrySchedule.IsTransient(400), Is.False);
+            Assert.That(RetrySchedule.IsTransient(401), Is.False);
+            Assert.That(RetrySchedule.IsTransient(409), Is.False);
+        }
+
         // ---- the service contract, via the fake ----
 
         [Test]
@@ -178,6 +256,27 @@ namespace MotionRunner.Tests
                 Assert.That(after.Handle, Is.Not.EqualTo(previous));
                 previous = after.Handle;
             }
+        }
+
+        [Test]
+        public void ImportClaimsWithTheRightCodeAndRefusesAPlayedInstall()
+        {
+            var service = FakeProfileService.Ready();
+
+            SocialError wrong = null;
+            service.ImportProfile("not-a-code", e => wrong = e);
+            Assert.That(wrong, Is.Not.Null);
+
+            SocialError ok = new SocialError("sentinel", "never cleared");
+            service.ImportProfile(FakeProfileService.FakeRecoveryCode, e => ok = e);
+            Assert.That(ok, Is.Null);
+            Assert.That(service.Current.Handle, Is.EqualTo("IMPORTED-FOX-1"));
+
+            // An install that has already played must never be silently destroyed by an import.
+            service.SubmitRun(Run(), null);
+            SocialError blocked = null;
+            service.ImportProfile(FakeProfileService.FakeRecoveryCode, e => blocked = e);
+            Assert.That(blocked?.Code, Is.EqualTo("destination_not_empty"));
         }
 
         [Test]
