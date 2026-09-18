@@ -3,8 +3,8 @@
 > Written 3 Sep 2026 (profile-integration session). This is the execution spec for the feature
 > that triggers D10's condition ("Supabase only when the shared leaderboard ships"). It follows
 > the REVENUECAT_PLAN format: decisions first, then schema, functions, Unity seam, UI, release
-> flips, owner checklist. Owner decisions taken 3 Sep are marked **[OWNER 3 Sep]**; proposals
-> still pending are in OPEN_QUESTIONS 15–16.
+> flips, owner checklist. Owner decisions taken 3 Sep are marked **[OWNER 3 Sep]**; all of them
+> are now recorded — D13–D16 (19 Sep), with D17 the score freeze and D18 CAPTCHA-off.
 
 ## 0. What ships and why Supabase
 
@@ -63,10 +63,13 @@ text go out together (§8).
 | Free-mode runs | Personal history only, no board |
 | Reinstall | Profile + XP + purchases must all return without login (recovery key, §1) |
 
-Proposals awaiting owner move to DECISIONS.md (OPEN_QUESTIONS 15–16; numbers shifted 17 Sep —
-D12 is the Samsung drop): D13 Supabase backend now, D14 Supabase UUID = RevenueCat app user ID,
-D15–16 the table above, D17 **score formula frozen** (closes OPEN_QUESTIONS 6 — required before
-boards go live; shared boards make the formula practically immutable).
+**Recorded in DECISIONS.md, 19 Sep** (numbers shifted 17 Sep — D12 is the Samsung drop):
+**D13** Supabase backend now, **D14** Supabase UUID = RevenueCat app user ID, **D15–16** the
+table above, **D17** score formula frozen (the shared board plus the server validator make it
+practically immutable — the formula, `game_config` and `validate.ts` now move together or not
+at all), **D18** CAPTCHA deliberately off. Do not relitigate; propose changes via
+OPEN_QUESTIONS.md. Attestation / replay validation is deliberately NOT a decision — it is
+tracked as work in **T-041** (post-hackathon by default), so T-009 has no open questions left.
 
 ## 3. Schema (migration `supabase/migrations/0001_init.sql`)
 
@@ -167,7 +170,7 @@ trigger (same security, zero function invocations).
 
 Accepted trade-off — stated plainly: **the leaderboard is not cheat-proof.** Score, duration and
 input mode are client claims; plausibility bounds reject the impossible, not the fabricated, and
-server-side XP derives from those claims (OPEN_QUESTIONS 18). Designed-in future mitigations, no
+server-side XP derives from those claims (tracked as T-041). Designed-in future mitigations, no
 schema break: `replay_trace bytea` column later (deterministic seeds → server re-simulation of
 top-N suspects), Play Integrity / App Attest verdict check inside `submit-run`. CAPTCHA on
 anonymous signup is deliberately off (OPEN_QUESTIONS 17): Supabase enforces it at the Auth
@@ -243,22 +246,22 @@ which is the same privilege level. The key file is tagged `<userId>:<key>` so st
 - Galaxy build: same binary/backend, nothing extra. Apple: nutrition labels (identifiers +
   gameplay content); deletion already built (5.1.1(v)).
 
-### Held-back policy copy (paste at release, adjust dates)
+### Policy copy — WRITTEN INTO THE SITE, 18 Sep (supersedes the held-back drafts)
 
-**Privacy policy — new section "Profiles and leaderboards":** When you first go online, the
-game creates an anonymous player profile: a random player ID, an auto-generated display name
-(e.g. SWIFT-FOX-42), and your run results (score, distance, coins, run date, input mode, app
-version, platform). This is stored with our database provider Supabase to show shared
-leaderboards and your run history. No email, real name, or contact detail is collected or
-required. A recovery code stored in your device backup lets the same profile return after a
-reinstall. You can delete your profile and all its data at any time in Profile → Delete
-profile; deletion is immediate and permanent. Without the app, request deletion at
-https://veyro.ferrabled.com/support/#delete.
-
-**Support page — "Data deletion" replaces "nothing to delete":** primary path Profile → Delete
-profile (immediate, permanent, includes scores and handle). Email fallback for users without
-the app: include the Player ID shown on the profile screen; anonymous profiles without a
-Player ID cannot be identified and contain no personal data. 30-day processing window.
+The full copy now lives in the actual pages — `site/public/privacy/index.html` (new "Player
+profile and leaderboards" section, recovery-code paragraph, updated short version and Your
+rights), `site/public/support/index.html` (leaderboard FAQ + the `#delete` anchor with in-app
+path, Player-ID email fallback, ownership verification, 30-day window), `site/public/terms/`
+§2/§6 and the homepage claims — mirrored in `docs/PRIVACY_POLICY.md`. Everything is
+**version-scoped** ("the leaderboard update onward"), so the pages stay truthful whenever the
+owner deploys; deploy no later than the release window. Two review corrections baked in
+(18 Sep, R3): profiles are described as **pseudonymous, deletable records** — never "contain
+no personal data" — and the app now shows a copyable **Player ID** on the PROFILE tab so the
+email fallback actually works; an ID locates a record, and ownership is demonstrated with the
+**player-visible recovery code** (owner call, 18 Sep, replacing the rename idea): the PROFILE
+tab exposes it with a tap-to-copy and a warning, and an IMPORT PROFILE row lets the same code
+move a profile to a new install manually (backup-off rescue; same recover-session path, fresh
+destination required, code rotates on every successful claim).
 
 ## 9. Owner checklist (ordered) — connecting the created project (project exists since 9 Sep)
 
@@ -288,9 +291,8 @@ steps (P11 is human-only).
 4. **Keep-alive Worker** (stops the free-tier 7-day pause): in `infra/keepalive-worker/`, put
    the project URL in wrangler.toml, then `npx wrangler secret put SUPABASE_ANON_KEY` and
    `npx wrangler deploy`.
-5. Move OPEN_QUESTIONS 15–16 to DECISIONS.md (incl. the score-formula freeze — hard prereq for
-   live boards) and approve the §8 deletion copy (the consent line is gone — joining is
-   automatic since 17 Sep).
+5. ~~Move OPEN_QUESTIONS 15–16 to DECISIONS.md and approve the §8 deletion copy.~~ **Done
+   19 Sep:** D13–D18 recorded, deletion/support copy approved as drafted and live in `site/`.
 6. Device test per §10 (`BuildAndroidDev` flavour), then, at release time, the atomic §8 flip.
 7. Phase 2 (later): Google OAuth client + SIWA config.
 

@@ -296,8 +296,8 @@ Notes that belong in the adapter's header comment when it is written:
   becomes the app user ID via `LogIn(appUserId, …)`~~ **Updated 3 Sep 2026 (T-009 redefinition):
   the stable ID is the Supabase user UUID**, not a Play Games player ID — it works on iOS and the
   Galaxy Store too. `IStore` gains `Identify(string)`; `RevenueCatStore` calls `LogIn(supabaseUserId)`
-  once configured. Spec: `docs/PROFILE_LEADERBOARD_PLAN.md` §1; decision proposal OPEN_QUESTIONS 15
-  (D14). Do not invent any other ID scheme.
+  once configured. Spec: `docs/PROFILE_LEADERBOARD_PLAN.md` §1; recorded as **D14**
+  (19 Sep). Do not invent any other ID scheme.
 - `SetOnesignalUserID(string)` exists on `Purchases` [S27]. Wire it in T-021, not now, but the seam
   should not make it awkward.
 - The whole thing must be **fail-open**. Network down, store unavailable, SDK not configured → the

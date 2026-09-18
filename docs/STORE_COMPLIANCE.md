@@ -96,16 +96,25 @@ the same change that ships a feature listed below.
 - App access → no new restricted content (profile is created silently, no login form, no
   credentials exist). Update the instruction note only: "anonymous player profile created
   automatically for leaderboards; no sign-in exists."
-- Data safety → **App activity: gameplay content/scores = collected** (leaderboard + run
-  history, shared with other players as handle+score). Device/other IDs already declared
-  since the T-020 flip (the Supabase anonymous user ID is the same declaration class).
+- Data safety → three rows, reconciled 18 Sep against Google's definitions (review R3/checklist):
+  - **Personal info → User IDs = collected, REQUIRED** (Google's User IDs definition expressly
+    includes account ids; the Supabase player UUID and the generated handle are that — do not
+    assume the existing "Device or other IDs" row covers them). Purposes: app functionality,
+    account management, fraud prevention/security.
+  - **App activity → Other actions = collected, REQUIRED, and SHARED** (finished-run results
+    uploaded automatically — there is no in-app choice, so "optional" is wrong; "shared"
+    because handle+score are displayed publicly to other players, which is distinct from
+    Supabase acting as processor). Purpose: app functionality.
+  - Device/other IDs stays as declared since the T-020 flip.
 - **Account-deletion policy is LIVE with this release** (server-side profiles exist):
-  in-app Profile → Delete profile (immediate, `delete-account` Edge Function, true deletion)
-  **plus** the public web deletion URL `https://veyro.ferrabled.com/support/#delete`
-  declared in Data safety. The delete endpoint shipped in the same change as the backend
-  (`supabase/functions/delete-account/`) — the trap ("build it with the leaderboard, not
-  after") is closed by design. The site's /support/ "Data deletion" section flips from
-  "nothing to delete" to the real mechanism (copy in the plan §8).
+  in-app PROFILE → DELETE ONLINE PROFILE (immediate; `delete-account` deletes the Supabase
+  user + cascades AND requests RevenueCat customer deletion when the RC_API_KEY function
+  secret is configured — owner action) **plus** the public web deletion URL
+  `https://veyro.ferrabled.com/support/#delete`, which **exists in the repo site copy since
+  18 Sep** (version-scoped, so it is truthful whenever deployed) — deploy the site BEFORE
+  the profile build reaches any user, or the Data safety form points at a URL without the
+  anchor. The in-app PROFILE tab shows a copyable Player ID as the support identifier for
+  app-less requests (an ID locates a record; ownership is verified before acting on it).
 - Content rating → **unchanged**: handles are server-generated (no free text), so there is
   no UGC to declare. This is load-bearing — free-text names would reopen the questionnaire.
 - Privacy policy → "Profiles and leaderboards" section + effective-date bump + redeploy

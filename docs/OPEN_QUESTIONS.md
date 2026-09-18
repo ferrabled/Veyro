@@ -34,17 +34,12 @@ the question. Keep this file short; it is read every session.
 4. **Art direction:** low-poly flat-colour, toon-shaded, neon? *Default: agents propose 2–3 style
    frames in T-006 for you to pick from.* Must respect the Veyron note above.
 5. **Budget ceiling** for the ~$150–250 of unavoidable costs (Apple $99, Play $25, test devices)?
-6. **Freeze the score formula before the first public build?** Currently `whole metres + coin points`,
-   a coin worth 10 × a multiplier that steps every 3 coins and caps at ×5 (`ScoreState`). Once Daily
-   Run (T-008) and challenges (T-024) are live, changing it makes old scores incomparable.
-   *Default: leave it, play it once, treat it as frozen from the first closed-testing upload; balance
-   via chunk difficulty and speed instead.*
-
-   **URGENCY BUMP (3 Sep, T-009 redefinition):** the shared leaderboard (T-009) makes the freeze
-   effectively irreversible AND the server now validates score against the formula
-   (`supabase/functions/_shared/validate.ts` reproduces the coin economy — a formula change
-   without a `game_config`/validator update would flag every honest run). Freeze before the
-   T-009 release ships, record as D17.
+6. ~~**Freeze the score formula before the first public build?**~~ **ANSWERED by the owner,
+   19 Sep: freeze as-is — recorded as D17.** `whole metres + coin points`, a coin worth 10 × a
+   multiplier that steps every 3 coins and caps at ×5 (`ScoreState`); balance via chunk
+   difficulty and speed instead. Binding consequence: the formula, `game_config` and
+   `supabase/functions/_shared/validate.ts` now move together or not at all — changing one
+   alone flags every honest run.
 
 7. ~~Camera mode: park, invest, or drop?~~ **Answered by the owner, 22 Aug: build it** (option d,
    BlazeFace-on-CPU — 4.2 ms blocking median on the Nord 2, numbers in STATUS T-010b). Implemented
@@ -152,48 +147,29 @@ the question. Keep this file short; it is read every session.
       shop row's "reward ladder arrives with the Season 1 update" note and the paywall stay
       unchanged. *Owner: move this to DECISIONS.md if it should bind future sessions.*
 
-15. **Record the 3 Sep owner call in DECISIONS.md (owner-only) — T-009 redefinition.** Decided
-    in-session 3 Sep (profile-integration session; spec `docs/PROFILE_LEADERBOARD_PLAN.md`).
-    *(Numbers shifted up one on 17 Sep: D12 was taken by the Samsung drop.)*
-    - **D13:** Profile + shared leaderboard backend = **Supabase free tier** (D10's "only when
-      the shared leaderboard ships" condition is now met). Anonymous-first identity, no login
-      UI; reinstall restore via a hashed **recovery key** in device backup / Keychain; optional
-      Google/Apple linking is a later Phase 2.
-    - **D14:** The Supabase user UUID becomes the **RevenueCat app user ID** via
-      `Purchases.LogIn` (supersedes REVENUECAT_PLAN §3.3's "Play Games player ID" note).
-    - **D15:** Leaderboard names are **server-generated handles only** (reroll allowed, never
-      free text) — keeps the game UGC-free for content rating and needs no moderation surface.
-      *(Amended by the owner 17 Sep: rerolls are **unlimited**, not 3-lifetime — migration
-      0005; still generated-only, so the UGC posture is unchanged.)*
-    - **D16:** Boards = **Daily + All-time**, keyed (date, content_version, world_id), split
-      **standard** (tilt/touch, incl. degraded camera runs) vs **camera**; a `camera_fallback`
-      run never ranks on the camera board; Free-mode runs are history-only.
-    *These were answered explicitly by the owner on 3 Sep; recording them is the only step left.*
+15. ~~**Record the 3 Sep owner call in DECISIONS.md — T-009 redefinition.**~~ **DONE, 19 Sep:
+    recorded as D13 (Supabase backend, anonymous-first identity, recovery code + manual
+    import), D14 (Supabase UUID = RevenueCat app user ID, reset on delete), D15
+    (server-generated handles only; unlimited rerolls per the 17 Sep amendment) and D16
+    (Daily + All-time, keyed and split standard vs camera).**
 
-16. **Approve the deletion-page/support copy before the T-009 release** (owner) — drafted in
-    `PROFILE_LEADERBOARD_PLAN.md` §8. *Default: ship as drafted.* (The consent-line half of
-    this item is gone: the owner decided 17 Sep that joining the leaderboard is automatic, so
-    the policy copy — which already describes automatic profile creation and score sharing —
-    carries the whole privacy story.)
+16. ~~**Approve the deletion-page/support copy before the T-009 release.**~~ **ANSWERED by
+    the owner, 19 Sep: ship as drafted.** Live in `site/public/privacy/` and
+    `site/public/support/` — in-app delete path, the `/support/#delete` web path, the 30-day
+    commitment, the Player-ID-locates / recovery-code-proves verification rule, and the
+    disclosure that the recovery code can survive an uninstall. Still needs deploying with
+    the Update-1 binary, never on the versionCode-5 T-020 flip.
 
-17. **CAPTCHA on anonymous sign-ups — deliberately NOT enabled (17 Sep hardening review).**
-    Supabase Auth supports hCaptcha/Cloudflare Turnstile, but enforcement applies to the
-    signup endpoint itself, and the Unity client has no practical way to render either
-    challenge without adding a WebView plugin (new dependency, gotcha #10 APK surface, and a
-    challenge screen in a game's first launch). **Enabling enforcement in the dashboard today
-    would break sign-in for every shipped client.** Current lid on bot signups: the per-IP
-    anonymous rate limit + per-user submission quotas + flagged-run caps (migration 0004) —
-    which is throttling, NOT bot prevention; a determined attacker can still mint accounts
-    slowly. *Recommended default: leave CAPTCHA off for Shipaton scale; revisit with a
-    WebView-based flow only if board pollution is actually observed.* Owner decision because
-    it trades a real dependency + UX cost against a so-far-theoretical abuse.
+17. ~~**CAPTCHA on anonymous sign-ups.**~~ **ANSWERED by the owner, 19 Sep: leave it off —
+    recorded as D18.** Enabling enforcement would break sign-in for every shipped client and
+    needs a WebView the client does not have. Current lid is throttling (per-IP anonymous
+    rate limit, per-user quotas, flagged-run caps in migration `0004`), **not** bot
+    prevention. Revisit only if board pollution is actually observed.
 
-18. **Attestation / replay validation — documented residual risk, out of scope (17 Sep).**
-    Score, duration and input mode remain client claims; plausibility bounds + the coin-
-    economy ceiling only reject the impossible, not the fabricated, and server-side XP derives
-    from those claims. The leaderboard is NOT cheat-proof and no doc may claim it is. The
-    schema is ready for deferred mitigation (seed triple + client_run_id stored → a
-    `replay_trace` column enables re-simulation of top-N suspects; Play Integrity / App
-    Attest could gate `submit-run`). *Recommended default: ship as-is for Shipaton; decide on
-    replay validation or attestation only if real abuse appears — both add scope and
-    attestation risks breaking offline submissions.*
+18. ~~**Attestation / replay validation — documented residual risk, out of scope.**~~
+    **ANSWERED by the owner, 19 Sep: not a decision — tracked as work.** Filed as **T-041**
+    (post-hackathon by default; pulled forward only if the schedule frees up). Deliberately
+    NOT recorded in DECISIONS.md, because this is a "not yet", not a settled "never". The
+    standing constraint survives either way: **no document, listing or pitch may describe the
+    board as cheat-proof.** The cheapest first step lives in that task — a top-N sanity query
+    before submission day, since nothing currently alerts on an implausible score.

@@ -1,5 +1,150 @@
 # Status journal (newest at top)
 
+## 2026-09-19 — T-009 owner decisions recorded (D13–D18), overflow + restore-honesty fixes, validator tests run (profile-integration session)
+
+**Headline: the four owner calls this PR encodes are no longer proposals** — D13 (Supabase
+backend, anonymous-first identity, recovery code + manual import), D14 (Supabase UUID =
+RevenueCat app user ID, reset on delete), D15 (server-generated handles only; unlimited
+rerolls per the 17 Sep amendment) and D16 (Daily + All-time, keyed and split standard vs
+camera) are in DECISIONS.md, together with **D17 score formula FROZEN** and **D18 CAPTCHA
+deliberately off**. OPEN_QUESTIONS 6, 15, 16 and 17 struck; **18 (attestation / replay
+validation) stays open at the owner's request** — it is the only T-009 question left.
+
+**D17 is binding on three files at once:** the formula (`ScoreState`), `game_config`, and
+`supabase/functions/_shared/validate.ts` now move together or not at all. Changing one alone
+flags every honest run, because the server reproduces the coin economy.
+
+**Code fixes:**
+- **Links-card text no longer runs off the screen.** The recovery-code row and the post-delete
+  message were clipped at the right edge on a 1080-wide device. First attempt (best-fit alone)
+  was a no-op: `RuntimeUi.Label` ships `Overflow`/`Overflow`, and an unbounded line always
+  "fits", so Unity never shrinks. The fix (`ProfilePage.ShrinkToFit`) sets `Wrap`/`Truncate`
+  first, then best-fit with the DESIGNED size as the ceiling — short labels render exactly as
+  before, long feedback shrinks or wraps inside its row. Verified on device.
+- **RESTORE PURCHASES stops claiming success when nothing came back** (owner call, 19 Sep).
+  A restore that reaches the store and finds no receipt still *succeeds*, so the old code said
+  "purchases restored" over an unchanged, empty entitlement set — exactly the path a player
+  takes after DELETE ONLINE PROFILE resets the store identity. `StoreCatalogView` now snapshots
+  `ActiveEntitlements.Count` across the call (the adapter applies customer info before invoking
+  the callback) and reports what actually happened: restored / already unlocked / nothing to
+  restore.
+
+**Privacy copy:** the "Data stored on your device" section now discloses that the recovery code
+is written to the app's storage folder and, on some Android versions and devices, **survives an
+uninstall** — observed on the Nord 2, and the reason reinstall recovery works with backup off.
+Uninstalling is therefore not a reliable erase; the two deliberate removals (DELETE ONLINE
+PROFILE, or clearing app data) are named. Applied to `docs/PRIVACY_POLICY.md` and
+`site/public/privacy/`; the support page's deletion section now also says deletion removes the
+device's recovery code. OPEN_QUESTIONS 16 answered: ship as drafted.
+
+**Verified:** 411/411 EditMode; **3/3 Deno tests** for the shared validator (`deno test
+supabase/functions/_shared/validate.test.ts` — Deno installed on the dev machine 19 Sep, so the
+"not installed here" note in that file is gone); device pass on the Nord 2 for both layout
+fixes. Batchmode left no settings-asset churn.
+
+**Needs a human:** (1) **purchase restore after deletion** — the owner will verify it in the
+internal release: buy as a license tester, delete the profile, tap RESTORE, confirm the skin
+returns. The Test Store cannot answer this (no real receipt). (2) Redeploy the keep-alive
+worker. (3) Wipe test debris before testers — device testing left several throwaway profiles
+and auth users, including one minted by a direct `recover-session` probe.
+(4) Nothing further on decisions — see the addendum below.
+
+**Addendum (owner call, same day): attestation / replay validation is NOT a decision.** The
+owner declined to record it as D19 — "not yet" is not "never" — so it is filed as **T-041**
+instead: post-hackathon by default, pulled forward only if the schedule frees up.
+OPEN_QUESTIONS 18 struck and now points at the task, which means **T-009 has no open
+questions left**. Two things carried into the task rather than lost: the standing constraint
+that no document, listing or pitch may call the board cheat-proof, and the observation that
+"revisit if abuse appears" cannot fire on its own today — nothing alerts on an implausible
+score — so the cheapest first step is a top-N sanity query before submission day.
+
+## 2026-09-18 (later) — T-009 review findings FIXED: recovery state machine, complete deletion, retry/queue rework, privilege + validator corrections, website copy landed (profile-integration session)
+
+**Headline: every R-finding in `docs/T009_SECURITY_PRIVACY_REVIEW.md` was validated and fixed;
+migration `0006_hardening2.sql` + rewritten functions are DEPLOYED and live-verified.**
+
+- **R1 (worst):** recovery is now a persisted state machine. The rules live engine-free in
+  `RecoveryGate` (unit-tested): a foreign key on file = PENDING → it is never overwritten,
+  submissions queue instead of sending (a submission would make the fresh user a non-empty
+  destination and permanently block the claim), and retries continue across restarts because
+  the key file itself is the state. Only definitive outcomes resolve: claimed (store rotated
+  key), key-invalid (discard), destination-not-empty (keep file, stop blocking).
+- **R2:** `delete-account` now also requests **RevenueCat customer deletion** (needs the
+  owner-set `RC_API_KEY` function secret; response reports `provider_deleted`), the client
+  resets the commerce identity (`IStore.ResetIdentity` → `Purchases.LogOut`), the service
+  goes DORMANT after deletion (no call can mint a replacement account mid-flow — ProfilePage
+  no longer refreshes the board there), and the player-facing scope says local device stats
+  remain.
+- **R4/R5:** submissions have their own throttle gate + scheduled drain loop (retries no
+  longer wait for a profile load or restart; foregrounding kicks both); Retry-After respected
+  up to 1 h (`RetrySchedule`, unit-tested — the 120 s repro is a test); profile-load failure
+  now retries on later calls while the token stays valid.
+- **R6:** global `ALTER DEFAULT PRIVILEGES` (the per-schema 0004 revokes could not subtract
+  PostgreSQL's global PUBLIC EXECUTE) + a DO-block SELF-TEST inside 0006 that creates a
+  disposable table+function and fails the migration if either is born reachable — it passed
+  on the production role during `db push`.
+- **R7:** rerolls stay UNLIMITED; a 2 s per-user burst throttle (and the same on key
+  rotation) stops scripts without touching humans. Verified live: immediate 2nd reroll
+  throttled, 3 s later fresh name.
+- **R8/R9 + idempotency:** Free seeds use the signed-int32 contract (verified live with a
+  negative seed); `readJsonBody` is a bounded BYTE reader (6 KB unicode body → 400, verified
+  live); duplicate detection compares the FULL payload (drift → 409, exact replay →
+  duplicate, verified live) and returns the stored flag reason (new `runs.flag_reason`).
+  Committed `validate.test.ts` (deno — runs in CI/anywhere with deno; not runnable on this
+  machine). Recovery now takes the same per-user submission locks as `process_run` for both
+  sides of a claim (deadlock-ordered), and the fresh-destination check dropped the
+  rerolls_left signal 0005 had frozen.
+- **R3 (website):** the full copy is IN the site files now, all version-scoped ("the
+  leaderboard update onward") so every page stays truthful whenever deployed: privacy gains
+  the "Player profile and leaderboards" section + recovery-code paragraph; support gains the
+  leaderboard FAQ and the real **`#delete` anchor** (in-app path, Player-ID email fallback,
+  ownership verification, 30-day window); terms §2/§6 and the homepage claims updated ("no
+  accounts/none" absolutes gone); `docs/PRIVACY_POLICY.md` in sync; effective dates 18 Sep.
+  The app now shows a **copyable Player ID** on the PROFILE tab (the email fallback's
+  identifier). "Anonymous = no personal data" wording removed everywhere: profiles are
+  pseudonymous, deletable records. STORE_COMPLIANCE Data safety reconciled: **User IDs
+  (Personal info) collected/required; App activity → Other actions collected/required/SHARED**.
+
+**Live evidence (self-cleaned):** free negative seed accepted · payload-drift 409 · exact
+replay duplicate · oversized unicode body 400 · reroll throttle · privilege self-test in-push.
+NOT verified here: RC customer deletion (needs RC_API_KEY), deno tests (no deno locally), the
+client state machine on-device (fresh build below), Auto-Backup reinstall (human-only).
+
+**Needs the owner:** (1) create a RevenueCat **secret** API key and set it as a function
+secret: `npx supabase secrets set RC_API_KEY=sk_...` (never in the repo) — until then
+deletions report `provider_deleted:false` and the support-email fallback covers provider
+deletion; (2) deploy the site (`npx wrangler deploy` from `site/`) no later than the T-009
+release window — the pages are version-scoped and safe to deploy early; (3) at release: the
+Data safety rows above + deletion URL `https://veyro.ferrabled.com/support/#delete` in the
+Console; (4) commit; (5) device pass incl. delete flow + reinstall-recovery.
+
+**Addendum (owner call, same day): the recovery code is PLAYER-VISIBLE and replaces
+rename-verification.** PROFILE tab gains RECOVERY CODE (tap to copy, with the takeover
+warning) and IMPORT PROFILE (paste a code → the existing recover-session claim; fresh
+destination required, code rotates on success) — the manual new-device/backup-off rescue and
+the support ownership proof in one credential. `IProfileService` gains `RecoveryCode` +
+`ImportProfile`; site/policy verification copy updated (code primary, rename gone). Post-
+deletion behaviour confirmed as designed: boards drop the rows instantly; the next launch
+auto-creates a fresh profile (disclosed in policy — Play-compliant). RC-deletion-less restores
+confirmed correct: receipts always restore entitlements and simply recreate a provider record.
+
+## 2026-09-18 — T-009 independent security/privacy review: changes requested (profile-security-review session)
+
+Actual adapter source compiled in a temporary .NET harness with scripted HTTP reproduced:
+recovery-key overwrite after recovery 503; submission backoff bypass with a live token;
+profile loading stranded after 503; queued retries not scheduled; a new profile created by
+the board refresh immediately after deletion. Actual TypeScript probes also reproduced
+valid Free seeds rejected and a 6,300-byte body passing the advertised 4 KB limit.
+
+Additional findings: no RevenueCat deletion/identity-reset flow; future function default
+privileges not fully revoked; unlimited rerolls lack throttling. CAPTCHA/secure storage/
+strong anti-cheat remain deferred. Live privacy/support/terms still omit Supabase and retain
+no-account claims; support lacks the advertised deletion anchor, and the proposed Player ID
+fallback has no corresponding ID display in the game. Full website and Play Data safety
+updates remain a T-009 release gate. Detailed fixes, limitations and owner checklist are in
+the review. No application changes, deployments, Console mutations or live abuse tests.
+Not rerun: Unity/device suite and database concurrency tests (local Docker engine unavailable).
+
 ## 2026-09-17 (evening) — T-009 DEVICE PASS on the Nord 2: full loop green against the live backend (profile-integration session)
 
 **Headline: fresh `BuildAndroidDev` (82.7 MB) installed and driven via adb — the whole
