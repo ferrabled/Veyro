@@ -16,25 +16,50 @@ export interface Env {
 
 export default {
   async scheduled(
-    _event: ScheduledEvent,
+    event: ScheduledEvent,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/ping`, {
-      method: "POST",
-      headers: {
-        apikey: env.SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-      },
-      body: "{}",
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) {
-      throw new Error(`keepalive ping failed: HTTP ${response.status}`);
-    }
-    const body = await response.text();
-    if (body.trim() !== "1") {
-      throw new Error(`keepalive ping unexpected body: ${body.slice(0, 100)}`);
+    const startedAt = Date.now();
+    const details = {
+      cron: event.cron,
+      scheduledTime: event.scheduledTime,
+    };
+    let status: number | undefined;
+    try {
+      const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/ping`, {
+        method: "POST",
+        headers: {
+          apikey: env.SUPABASE_ANON_KEY,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+        signal: AbortSignal.timeout(10_000),
+      });
+      status = response.status;
+      const body = await response.text();
+      if (!response.ok) {
+        throw new Error(`keepalive ping failed: HTTP ${status}: ${body.slice(0, 300)}`);
+      }
+      if (body.trim() !== "1") {
+        throw new Error(`keepalive ping unexpected body: ${body.slice(0, 100)}`);
+      }
+      console.info({
+        message: "keepalive ping succeeded",
+        ...details,
+        status,
+        durationMs: Date.now() - startedAt,
+      });
+    } catch (error) {
+      console.error({
+        message: "keepalive ping failed",
+        ...details,
+        status,
+        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      });
+      // Keep the invocation marked as failed in Cloudflare's metrics and cron history.
+      throw error;
     }
   },
 };
