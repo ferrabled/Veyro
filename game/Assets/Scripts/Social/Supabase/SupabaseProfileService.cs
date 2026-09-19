@@ -40,6 +40,7 @@ namespace MotionRunner.Social.Supabase
         const string RefreshTokenKey = "veyro.sb.refresh";
         const string PendingKey = "veyro.runs.pending";
         const string RecoveryFileName = "veyro-recovery.txt";
+        const string SupportRecoveryFileName = "veyro-recovery-support.txt";
 
         /// Refresh the access token this many seconds before it actually expires.
         const float ExpirySlackSeconds = 60f;
@@ -63,10 +64,6 @@ namespace MotionRunner.Social.Supabase
         /// A foreign recovery key's claim is unresolved (see class comment). Derived from the
         /// key file at session time; cleared only by a definitive server outcome.
         bool _recoveryPending;
-
-        /// The claim was refused because THIS install already played (409). Definitive for
-        /// this install: stop retrying, stop blocking, keep the file for support conversations.
-        bool _recoveryBlocked;
 
         /// Set after a successful DeleteAccount: the service goes dormant so nothing —
         /// especially not a board refresh — silently creates a replacement account inside the
@@ -97,7 +94,7 @@ namespace MotionRunner.Social.Supabase
 
         /// Everything is settled: nothing for EnsureSession to do.
         bool SessionSettled => HasLiveToken && IsReady && !_recoveryPending &&
-            (_recoveryBlocked || !string.IsNullOrEmpty(RecoveryCode));
+            !string.IsNullOrEmpty(RecoveryCode);
 
         /// The one entry point for session work. Serialized, backoff-gated, and it never
         /// invents a new anonymous identity while a transient failure hides the old one.
@@ -164,8 +161,7 @@ namespace MotionRunner.Social.Supabase
         IEnumerator SettleRecoveryAndProfile()
         {
             var stored = ReadRecoveryKey();
-            _recoveryPending = !_recoveryBlocked &&
-                               RecoveryGate.IsPending(stored.UserId, stored.Key, _userId);
+            _recoveryPending = RecoveryGate.IsPending(stored.UserId, stored.Key, _userId);
 
             if (_recoveryPending)
             {
@@ -202,8 +198,13 @@ namespace MotionRunner.Social.Supabase
                         break;
                     case RecoveryGate.Resolution.Blocked:
                         // This install already played; the claim will never succeed from
-                        // here. Keep the file (support can still use it), stop blocking.
-                        _recoveryBlocked = true;
+                        // here. Preserve the foreign key separately before making room for
+                        // this profile's own code. A disk failure must not lose either key.
+                        if (!ArchiveRecoveryKey())
+                        {
+                            ApplyBackoff(0f);
+                            yield break;
+                        }
                         _recoveryPending = false;
                         break;
                     case RecoveryGate.Resolution.StillPending:
@@ -241,8 +242,7 @@ namespace MotionRunner.Social.Supabase
                         WriteRecoveryKey(_userId, response.recovery_key);
                 });
             }
-            else if (!string.IsNullOrEmpty(afterLoad.Key) && afterLoad.UserId != _userId &&
-                     !_recoveryBlocked)
+            else if (!string.IsNullOrEmpty(afterLoad.Key) && afterLoad.UserId != _userId)
             {
                 // A claim just succeeded but its rotated key was lost with the response:
                 // the file still carries the OLD user tag. Re-tagging requires a fresh key.
@@ -254,7 +254,7 @@ namespace MotionRunner.Social.Supabase
                         WriteRecoveryKey(_userId, response.recovery_key);
                 });
             }
-            if (!_recoveryBlocked && string.IsNullOrEmpty(RecoveryCode))
+            if (string.IsNullOrEmpty(RecoveryCode))
             {
                 ApplyBackoff(0f);
                 if (!_keyRetryScheduled)
@@ -608,7 +608,6 @@ namespace MotionRunner.Social.Supabase
                     else
                         DeleteRecoveryKeyFile();
                     _recoveryPending = false;
-                    _recoveryBlocked = false;
                     // A successful self-import may have no rotated key. Obtain and persist
                     // one before reporting success; failed issuance keeps retrying this boot.
                     yield return EnsureRecoveryKey();
@@ -672,12 +671,12 @@ namespace MotionRunner.Social.Supabase
             Current = null;
             IsReady = false;
             _recoveryPending = false;
-            _recoveryBlocked = false;
             ClearBackoff();
             PlayerPrefs.DeleteKey(RefreshTokenKey);
             PlayerPrefs.DeleteKey(PendingKey);
             PlayerPrefs.Save();
             DeleteRecoveryKeyFile();
+            DeleteRecoveryKeyFile(SupportRecoveryPath);
 
             ProfileChanged?.Invoke();
             done?.Invoke(null);
@@ -787,6 +786,28 @@ namespace MotionRunner.Social.Supabase
         }
 
         static string RecoveryPath => Path.Combine(Application.persistentDataPath, RecoveryFileName);
+        static string SupportRecoveryPath => Path.Combine(Application.persistentDataPath, SupportRecoveryFileName);
+
+        static bool ArchiveRecoveryKey()
+        {
+            try
+            {
+                // Append preserves earlier blocked profiles too; retries after a failed delete
+                // are deduplicated. Delete the active copy only after the archive is durable.
+                string key = File.ReadAllText(RecoveryPath).Trim();
+                var saved = File.Exists(SupportRecoveryPath)
+                    ? new HashSet<string>(File.ReadAllLines(SupportRecoveryPath))
+                    : new HashSet<string>();
+                if (!saved.Contains(key)) File.AppendAllText(SupportRecoveryPath, key + Environment.NewLine);
+                File.Delete(RecoveryPath);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[Profile] could not preserve blocked recovery key: " + e.Message);
+                return false;
+            }
+        }
 
         static StoredKey ReadRecoveryKey()
         {
@@ -816,11 +837,12 @@ namespace MotionRunner.Social.Supabase
             }
         }
 
-        static void DeleteRecoveryKeyFile()
+        static void DeleteRecoveryKeyFile(string path = null)
         {
             try
             {
-                if (File.Exists(RecoveryPath)) File.Delete(RecoveryPath);
+                path = path ?? RecoveryPath;
+                if (File.Exists(path)) File.Delete(path);
             }
             catch (Exception)
             {

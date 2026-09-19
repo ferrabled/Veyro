@@ -8,6 +8,7 @@ namespace MotionRunner.Commerce
         public string Applied { get; private set; }
         public bool Busy { get; private set; }
         public bool ResetPending { get; private set; }
+        public bool CommerceBusy { get; private set; }
         int _generation;
 
         public void Identify(string userId)
@@ -29,7 +30,7 @@ namespace MotionRunner.Commerce
         {
             userId = ResetPending ? null : Desired;
             generation = _generation;
-            if (Busy || (!ResetPending && Desired == Applied)) return false;
+            if (Busy || CommerceBusy || (!ResetPending && Desired == Applied)) return false;
             Busy = true;
             return true;
         }
@@ -44,5 +45,19 @@ namespace MotionRunner.Commerce
         }
 
         public bool Settled => !Busy && !ResetPending && Applied == Desired;
+
+        // Pin the applied identity until the commerce callback has seen its entitlements.
+        // Identify/Reset may change the desired identity while a native sheet is open,
+        // but native login/logout must wait until that sheet and callback finish.
+        public bool TryBeginCommerce()
+        {
+            if (!Settled || CommerceBusy) return false;
+            CommerceBusy = true;
+            return true;
+        }
+
+        public void CompleteCommerce() => CommerceBusy = false;
+
+        public bool CanApplyCustomerInfo => !Busy && (Settled || CommerceBusy);
     }
 }

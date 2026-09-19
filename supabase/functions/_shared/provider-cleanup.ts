@@ -25,7 +25,7 @@ export async function deleteProviderCustomer(
 }
 
 // Recovery enqueues its old UUID transactionally. Account deletion enqueues its current
-// UUID before deleting auth. Work survives both operations, and every recovery/deletion
+// UUID transactionally with profile deletion. Work survives both operations, and every recovery/deletion
 // request retries a bounded batch, including earlier failures. A quiet project still needs
 // the documented operator retry; this is not a promise of time-based deletion.
 export async function cleanupProviderIdentities(

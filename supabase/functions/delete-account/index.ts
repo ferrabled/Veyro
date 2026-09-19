@@ -40,19 +40,21 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
-  // Keep a retryable record even after the auth/profile cascade. Earlier recovery jobs
-  // already carry this owner_id, so those provider UUIDs are included in the result too.
-  const { error: queueError } = await admin.from("provider_cleanup").upsert({
-    user_id: userId, owner_id: userId, delete_auth: false,
-  });
-  if (queueError) return json(500, { error: "could not schedule provider deletion" });
-  const providerDeleted = await cleanupProviderIdentities(
-    admin, userId, Deno.env.get("RC_API_KEY"),
-  );
+  // Delete under the same transactional lock as submissions and recovery. This also
+  // durably queues auth/provider cleanup, so a crash here cannot resurrect the profile.
+  const { data, error: profileError } = await admin.rpc("delete_profile", { p_user: userId });
+  if (profileError || !data) return json(500, { error: "profile deletion failed" });
+  if (data.status === "profile_moved") {
+    return json(409, { error: "profile moved; delete from the recovered session" });
+  }
+  if (data.status !== "ok") return json(500, { error: "profile deletion failed" });
   const { error } = await admin.auth.admin.deleteUser(userId);
-  if (error) {
+  if (error && error.status !== 404) {
     console.error("delete failed", error);
     return json(500, { error: "delete failed" });
   }
+  const providerDeleted = await cleanupProviderIdentities(
+    admin, userId, Deno.env.get("RC_API_KEY"),
+  );
   return json(200, { deleted: true, provider_deleted: providerDeleted });
 });

@@ -82,6 +82,8 @@ Deno.serve(async (req) => {
       return json(429, { error: "too many attempts" });
     case "not_found":
       return failure();
+    case "destination_deleted":
+      return json(409, { recovered: false, recovery_key: "", reason: "destination_deleted" });
     case "destination_not_empty":
       // The CALLER's own state — telling them is safe and the client needs it: this install
       // has already played as its own profile, so recovery must not destroy it.

@@ -327,7 +327,11 @@ namespace MotionRunner.Gameplay
                 duration_s = _elapsed,
                 app_version = Application.version,
                 // The Galaxy build flavour flips this constant when T-033 ships one.
+#if UNITY_IOS
+                platform = SubmissionPlatform.Ios
+#else
                 platform = SubmissionPlatform.AndroidGooglePlay
+#endif
             }, null);
         }
 

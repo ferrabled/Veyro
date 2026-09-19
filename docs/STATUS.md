@@ -1,5 +1,48 @@
 # Status journal (newest at top)
 
+## 2026-09-19 — Latest PR #10 Copilot review verified and fixed (copilot-latest session)
+
+Checked the nine comments in Copilot review 5256642035 (19 Sep, 17:11 UTC, commit
+51d2af5). All are valid; four describe the same bounded-offline-queue wording issue.
+
+- Migration `0008_latest_review.sql` adds service-only transactional `delete_profile`,
+  taking the recovery/submission lock and cascading profile/run/board deletion before
+  auth removal. Auth/provider cleanup remains durable and retryable. Recovery-first
+  returns a conflict to the old session instead of false deletion success; deletion-first
+  prevents recovery. Recovery also refuses a deleted destination awaiting auth cleanup.
+- Every accepted Free run now earns the existing XP grant exactly once. It still creates
+  no board rows or ranks; flagged submissions earn no XP. No historical XP backfill.
+- Purchases, restores, paywalls and customer-info refreshes wait for identity settlement
+  and hold that identity through entitlement application and the completion callback.
+  A 15-second wait failure reports an error without starting a store operation. Refresh
+  failure cannot be reported as successful purchase/restore entitlement synchronization.
+- Blocked automatic recovery archives the foreign code separately, then issues the current
+  profile's code. Restart and failed-issuance retry paths preserve both; account deletion
+  clears both local code files. Disk errors preserve the original instead of overwriting it.
+- iOS builds emit `ios` run metadata; Android retains `android_gp`.
+- Privacy source/page, support and terms disclose the eight most recent pending runs,
+  older-entry eviction, and server validation/limits. Privacy also explains archived codes.
+
+**Verified:** reproduced missing Free XP and both blocked-recovery test cases before fixing.
+435/435 Unity EditMode tests pass (seven new cases), including actual RevenueCat adapter
+coroutines and SDK callbacks over its inert native wrapper, entitlement visibility inside
+restore callbacks, deferred identity changes, timeout, and disk-backed recovery/relaunch.
+12/12 Deno tests pass, including real migration/RPC execution in disposable PGlite PostgreSQL,
+Free XP/replay/flagging and both serialized deletion/recovery outcomes plus deleted-destination
+rejection. Edge Functions and cleanup script pass `deno check`. PGlite uses the existing
+pgcrypto test shim; these tests do not simulate simultaneous hosted transactions.
+The iOS tag is selected by compile-time guard; no iOS player build was run.
+
+**Next / needs human device test:** apply migration 0008 after 0007, then redeploy
+`delete-account` and `recover-session` together with the policy pages. Nothing deployed here.
+On the licensed Android build: delete the profile, immediately tap RESTORE, and verify the
+cosmetic appears before successful feedback; repeat with delayed/failed connectivity and
+confirm retry feedback. Verify recovery-first deletion reports failure on the old install,
+and deletion-first makes the old code unusable. Test a blocked foreign code on a played
+profile: its own code must become copyable and remain so after relaunch. Finish a valid Free
+run and verify XP increases once while both boards remain unchanged. These device/release
+steps are still pending; existing T-009 rollout gates continue to apply.
+
 ## 2026-09-19 — T-009 Copilot findings verified and corrected (copilot-review session; uncommitted)
 
 Checked all 17 Copilot comments on PR #10 against the implementation. All were valid;

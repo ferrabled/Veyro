@@ -21,6 +21,8 @@ namespace MotionRunner.Tests
         Type _type;
         string _recoveryPath;
         byte[] _savedKey;
+        string _supportPath;
+        byte[] _savedSupportKeys;
 
         [SetUp]
         public void SetUp()
@@ -34,6 +36,9 @@ namespace MotionRunner.Tests
             _recoveryPath = Path.Combine(Application.persistentDataPath, "veyro-recovery.txt");
             _savedKey = File.Exists(_recoveryPath) ? File.ReadAllBytes(_recoveryPath) : null;
             if (File.Exists(_recoveryPath)) File.Delete(_recoveryPath);
+            _supportPath = Path.Combine(Application.persistentDataPath, "veyro-recovery-support.txt");
+            _savedSupportKeys = File.Exists(_supportPath) ? File.ReadAllBytes(_supportPath) : null;
+            if (File.Exists(_supportPath)) File.Delete(_supportPath);
             _root = new GameObject("SupabaseAdapterReviewTest");
             _type = Type.GetType("MotionRunner.Social.Supabase.SupabaseProfileService, MotionRunner.Social.Supabase", true);
             _service = _root.AddComponent(_type);
@@ -53,6 +58,8 @@ namespace MotionRunner.Tests
             PlayerPrefs.Save();
             if (_savedKey != null) File.WriteAllBytes(_recoveryPath, _savedKey);
             else if (File.Exists(_recoveryPath)) File.Delete(_recoveryPath);
+            if (_savedSupportKeys != null) File.WriteAllBytes(_supportPath, _savedSupportKeys);
+            else if (File.Exists(_supportPath)) File.Delete(_supportPath);
             _responses.Clear();
         }
 
@@ -139,6 +146,43 @@ namespace MotionRunner.Tests
                 Assert.IsNotEmpty(((IProfileService)_service).RecoveryCode);
                 Assert.AreEqual(1, changes, "open profile tab was not notified when code arrived");
             }
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void BlockedRecoveryPreservesForeignKeyAndIssuesOwnCodeAcrossRestart(bool issueSucceeds)
+        {
+            LiveSession();
+            string foreign = "old-player:" + new string('a', 64);
+            File.WriteAllText(_recoveryPath, foreign);
+            _responses.Enqueue(("/functions/v1/recover-session", 409,
+                "{\"recovered\":false,\"reason\":\"destination_not_empty\"}"));
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp", 200, "{\"handle\":\"CURRENT\",\"xp\":10}"));
+            _responses.Enqueue(("/rest/v1/rpc/rotate_recovery_key", issueSucceeds ? 200 : 503,
+                issueSucceeds ? "{\"recovery_key\":\"" + new string('b', 64) + "\"}" : "{}"));
+            Execute(Routine("EnsureSession"));
+            Assert.AreEqual(0, _responses.Count);
+            Assert.AreEqual(foreign, File.ReadAllText(_supportPath).Trim());
+            Assert.IsFalse((bool)Get("_recoveryPending"));
+
+            // Recreate the component as on relaunch; disk state alone must prevent another claim.
+            UnityEngine.Object.DestroyImmediate(_root);
+            _root = new GameObject("RestartedProfileTest");
+            _service = _root.AddComponent(_type);
+            Set("_url", "https://test.invalid");
+            Set("_anonKey", "test");
+            LiveSession();
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp", 200, "{\"handle\":\"CURRENT\",\"xp\":10}"));
+            if (!issueSucceeds)
+                _responses.Enqueue(("/rest/v1/rpc/rotate_recovery_key", 200,
+                    "{\"recovery_key\":\"" + new string('b', 64) + "\"}"));
+            Execute(Routine("EnsureSession"));
+            Assert.AreEqual(new string('b', 64), ((IProfileService)_service).RecoveryCode);
+            Assert.AreEqual(foreign, File.ReadAllText(_supportPath).Trim());
+            Assert.AreEqual(0, _responses.Count);
+            _responses.Enqueue(("/functions/v1/delete-account", 200, "{\"deleted\":true}"));
+            Execute(Routine("DeleteRoutine", (Action<SocialError>)(e => Assert.IsNull(e))));
+            Assert.IsFalse(File.Exists(_supportPath), "deletion must clear preserved codes too");
         }
 
         void LiveSession()

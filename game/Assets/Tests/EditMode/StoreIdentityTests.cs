@@ -74,6 +74,31 @@ namespace MotionRunner.Tests
             Assert.AreEqual("new", id);
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void CommerceWaitsForLoginOrLogoutThenHoldsIdentityThroughItsCallback(bool logout)
+        {
+            var state = logout ? SignedIn() : new StoreIdentity();
+            if (logout) state.Reset();
+            else state.Identify("player");
+            state.TryBegin(out var id, out var generation);
+            Assert.IsFalse(state.TryBeginCommerce());
+            Assert.IsFalse(state.CanApplyCustomerInfo);
+            Assert.IsFalse(state.Complete(id, generation, false));
+            Assert.IsFalse(state.TryBeginCommerce(), "failed identity update must keep commerce waiting");
+            state.TryBegin(out id, out generation);
+            state.Complete(id, generation, true);
+            Assert.IsTrue(state.TryBeginCommerce());
+            Assert.IsFalse(state.TryBeginCommerce(), "overlapping commerce operation");
+            state.Identify("next-player");
+            Assert.IsFalse(state.TryBegin(out _, out _), "identity changed before commerce completed");
+            Assert.IsTrue(state.CanApplyCustomerInfo, "successful commerce callback would lose its entitlements");
+            state.CompleteCommerce();
+            Assert.IsTrue(state.TryBegin(out id, out generation));
+            Assert.AreEqual("next-player", id);
+            Assert.IsFalse(state.CanApplyCustomerInfo);
+        }
+
         static StoreIdentity SignedIn()
         {
             var state = new StoreIdentity();

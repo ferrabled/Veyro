@@ -81,7 +81,7 @@ namespace MotionRunner.Commerce.RevenueCat
                 yield break;
             }
             _configured = true;
-            RefreshCustomerInfo();
+            QueueCustomerRefresh();
             SyncIdentity();
         }
 
@@ -131,7 +131,7 @@ namespace MotionRunner.Commerce.RevenueCat
             if (userId == null && _purchases.IsAnonymous())
             {
                 Completed(null, null);
-                RefreshCustomerInfo();
+                QueueCustomerRefresh();
             }
             else if (userId == null) _purchases.LogOut((info, error) => Completed(info, error));
             else _purchases.LogIn(userId, (info, created, error) => Completed(info, error));
@@ -152,7 +152,7 @@ namespace MotionRunner.Commerce.RevenueCat
         {
             if (paused || _purchases == null || !SdkConfigured()) return;
             _purchases.InvalidateCustomerInfoCache();
-            RefreshCustomerInfo();
+            QueueCustomerRefresh();
         }
 
         public void FetchOffers(Action<IReadOnlyList<StoreOffer>, StoreError> done)
@@ -188,7 +188,10 @@ namespace MotionRunner.Commerce.RevenueCat
         /// The direct-purchase path: one tap on a skin row raises the native Google Play
         /// sheet, no paywall in between (owner call, 29 Aug). The season pass still goes
         /// through PresentPaywall - that is the offering the Paywall Builder is designed for.
-        public void Purchase(string offerId, Action<PurchaseOutcome> done)
+        public void Purchase(string offerId, Action<PurchaseOutcome> done) =>
+            RunCommerce(completed => PurchaseReady(offerId, completed), done);
+
+        void PurchaseReady(string offerId, Action<PurchaseOutcome> done)
         {
             if (!SdkConfigured())
             {
@@ -244,7 +247,9 @@ namespace MotionRunner.Commerce.RevenueCat
 
                 if (result.Error == null)
                 {
-                    done?.Invoke(PurchaseOutcome.Purchased());
+                    if (result.CustomerInfo != null) done?.Invoke(PurchaseOutcome.Purchased());
+                    else RefreshCustomerInfo(error => done?.Invoke(error == null
+                        ? PurchaseOutcome.Purchased() : PurchaseOutcome.Failed(error)));
                     return;
                 }
 
@@ -254,7 +259,8 @@ namespace MotionRunner.Commerce.RevenueCat
                     // lands here. This error carries no customer info, so the entitlement is
                     // not applied yet: report only once the refresh lands, or the caller
                     // equips a skin that is still locked and equipping never grants.
-                    RefreshCustomerInfo(() => done?.Invoke(PurchaseOutcome.AlreadyOwned()));
+                    RefreshCustomerInfo(error => done?.Invoke(error == null
+                        ? PurchaseOutcome.AlreadyOwned() : PurchaseOutcome.Failed(error)));
                     return;
                 }
 
@@ -272,7 +278,10 @@ namespace MotionRunner.Commerce.RevenueCat
             });
         }
 
-        public void Restore(Action<PurchaseOutcome> done)
+        public void Restore(Action<PurchaseOutcome> done) =>
+            RunCommerce(completed => RestoreReady(completed), done);
+
+        void RestoreReady(Action<PurchaseOutcome> done)
         {
             if (!SdkConfigured())
             {
@@ -287,7 +296,12 @@ namespace MotionRunner.Commerce.RevenueCat
                     done?.Invoke(PurchaseOutcome.Failed(ToStoreError(error)));
                     return;
                 }
-                if (customerInfo != null) ApplyCustomerInfo(customerInfo);
+                if (customerInfo == null)
+                {
+                    done?.Invoke(PurchaseOutcome.Failed(new StoreError("no_customer_info", "restore returned no customer info")));
+                    return;
+                }
+                ApplyCustomerInfo(customerInfo);
                 done?.Invoke(PurchaseOutcome.Restored());
             });
         }
@@ -296,7 +310,10 @@ namespace MotionRunner.Commerce.RevenueCat
         /// the pass, and it stays server-side revisable (REVENUECAT_PLAN §5).
         /// Present, never PresentIfNeeded: with three independent entitlements no single id
         /// answers "already owned" - the call site gates instead (REVENUECAT_PLAN §3.3).
-        public void PresentPaywall(Action<PurchaseOutcome> done)
+        public void PresentPaywall(Action<PurchaseOutcome> done) =>
+            RunCommerce(completed => PresentPaywallReady(completed), done);
+
+        void PresentPaywallReady(Action<PurchaseOutcome> done)
         {
             if (!SdkConfigured())
             {
@@ -339,31 +356,79 @@ namespace MotionRunner.Commerce.RevenueCat
             // The paywall purchase happened outside our Purchase() path, so nothing has
             // applied its entitlements yet. Report only once they are in, or the UI refresh
             // that follows still draws the pass as locked.
-            if (outcome.Succeeded) RefreshCustomerInfo(() => done?.Invoke(outcome));
+            if (outcome.Succeeded) RefreshCustomerInfo(error => done?.Invoke(
+                error == null ? outcome : PurchaseOutcome.Failed(error)));
             else done?.Invoke(outcome);
         }
 
-        /// `done` runs when the refresh has settled, applied or not. Callers that owe
-        /// IStore.Purchase's "entitlements are up to date by the time `done` runs" promise
-        /// wait on it rather than firing their own callback a frame early.
-        /// A failed refresh still completes: fail-open means the outcome is reported with
-        /// whatever entitlements we have, never withheld - the listener may deliver later.
-        void RefreshCustomerInfo(Action done = null)
+        // Refreshes also hold the identity so a late read cannot overwrite another user's
+        // entitlements. Refreshes inside a purchase/paywall already own that operation slot.
+        void QueueCustomerRefresh() => RunCommerce(completed =>
+            RefreshCustomerInfo(error => completed(error == null
+                ? PurchaseOutcome.Restored() : PurchaseOutcome.Failed(error))), null);
+
+        void RefreshCustomerInfo(Action<StoreError> done)
         {
             _purchases.GetCustomerInfo((customerInfo, error) =>
             {
                 if (error != null || customerInfo == null)
-                    Debug.LogWarning("[Store] Could not refresh entitlements - reporting with what we have: " +
-                                     (error != null ? error.Message : "no customer info"));
-                else
-                    ApplyCustomerInfo(customerInfo);
-                done?.Invoke();
+                {
+                    done?.Invoke(ToStoreError(error) ?? new StoreError("no_customer_info", "no customer info"));
+                    return;
+                }
+                ApplyCustomerInfo(customerInfo);
+                done?.Invoke(null);
             });
+        }
+
+        void RunCommerce(Action<Action<PurchaseOutcome>> operation, Action<PurchaseOutcome> done)
+        {
+            if (!SdkConfigured())
+            {
+                done?.Invoke(PurchaseOutcome.Failed(NotConfigured()));
+                return;
+            }
+            StartCoroutine(CommerceWhenReady(operation, done));
+        }
+
+        IEnumerator CommerceWhenReady(Action<Action<PurchaseOutcome>> operation, Action<PurchaseOutcome> done)
+        {
+            // An identity outage cannot leave a store button waiting forever. No purchase or
+            // restore is sent until login/logout has succeeded; the player can retry a timeout.
+            float deadline = Time.realtimeSinceStartup + 15f;
+            while (!_identity.TryBeginCommerce())
+            {
+                if (Time.realtimeSinceStartup >= deadline)
+                {
+                    done?.Invoke(PurchaseOutcome.Failed(new StoreError("identity_pending", "store identity is still updating; try again")));
+                    yield break;
+                }
+                SyncIdentity();
+                yield return null;
+            }
+
+            bool completed = false;
+            void Complete(PurchaseOutcome outcome)
+            {
+                if (completed) return;
+                completed = true;
+                try { done?.Invoke(outcome); }
+                finally
+                {
+                    _identity.CompleteCommerce();
+                    SyncIdentity();
+                }
+            }
+            try { operation(Complete); }
+            catch (Exception e)
+            {
+                Complete(PurchaseOutcome.Failed(new StoreError("store_exception", e.Message)));
+            }
         }
 
         void ApplyCustomerInfo(Purchases.CustomerInfo customerInfo)
         {
-            if (!_identity.Settled) return;
+            if (!_identity.CanApplyCustomerInfo) return;
             if (customerInfo?.Entitlements?.Active == null) return;
 
             bool firstAnswer = !IsReady;

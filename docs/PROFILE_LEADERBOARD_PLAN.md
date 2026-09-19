@@ -51,7 +51,9 @@ text go out together (§8).
 - **XP is server-authoritative.** `submit-run` increments `profiles.xp` from accepted runs; the
   client never posts an XP total. First sync after T-025 lands locally: server takes
   `max(local, server)` once via a dedicated migration path, then local becomes a cache.
-  **T-025 constraint carried over:** the earn path is not date-gated.
+  **T-025 constraint carried over:** the earn path is not date-gated. Accepted Daily and Free
+  runs both earn `min(score / 100, 500)` XP (integer division); flagged runs and duplicate
+  retries earn none. Free runs remain history-only, with no board rows or ranks (0008).
 
 ## 2. Owner decisions [OWNER 3 Sep] + proposals
 
@@ -164,11 +166,18 @@ means the next call issues another valid key, and the superseded key stops worki
 credentials are never accepted indefinitely). Rotating your own key is exactly as privileged as
 holding your session.
 
-**`delete-account`** — `auth.admin.deleteUser(user_id from JWT)`; cascades wipe
-profile/runs/boards (true deletion — Play forbids deactivation-as-deletion). Client then drops
-local session + recovery key and calls `Purchases.logOut()`.
+**`delete-account`** — migration `0008` adds service-only `delete_profile(user_id from JWT)`.
+The RPC takes the same per-user `veyro-run` lock as recovery/submission, deletes the profile
+(and cascaded runs/boards), and durably queues auth/provider cleanup in one transaction.
+The endpoint then removes the auth user and retries provider cleanup. If recovery already
+transferred the profile, deletion returns 409 rather than claiming that the moved data was
+removed; delete from the recovered session. A retired destination cannot receive a recovery.
+Client success drops the local session, active and archived recovery codes, and logs out of
+RevenueCat. Commerce waits for identity settlement, and holds that identity through entitlement
+application and its completion callback; an identity wait times out after 15 seconds with a
+retryable error before any purchase/restore is sent.
 
-**19 Sep review deployment:** apply `0007_review_corrections.sql` before deploying both
+**19 Sep review deployment:** apply `0007_review_corrections.sql` and `0008_latest_review.sql` before deploying both
 `recover-session` and `delete-account` with their shared provider-cleanup helper. Set the existing
 `RC_API_KEY` secret before testing. Cleanup uses RevenueCat's retry-safe DELETE semantics
 (HTTP 200 or 404); errors remain pending instead of losing the provider UUID. There is no
@@ -318,3 +327,14 @@ creation, submits (tilt/camera/forced fallback), both board splits render, rerol
 queue drains, delete wipes rows in Studio and the game stays fully playable; reinstall test
 both ways (backup on → handle+XP+purchases all return in one boot; backup off → fresh profile,
 no errors); keep-alive cron visible in Supabase logs.
+
+
+### 19 Sep latest-review recovery handling
+
+If automatic recovery gets `destination_not_empty`, the client first preserves the foreign
+code in `veyro-recovery-support.txt`, then removes it from the active code slot and requests a
+code for the current profile. Disk failure leaves the original intact and retries later.
+A relaunch never retries an archived claim; failed current-code issuance still retries.
+Deleting the current online profile removes both local code files, but does not delete the
+separate older profile represented by an archived code. Purchases/restore still need the
+licensed device check in §10; iOS run submissions now select the `ios` tag at compile time.

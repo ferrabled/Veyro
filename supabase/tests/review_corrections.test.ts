@@ -42,13 +42,13 @@ const rival = "22222222-2222-4222-8222-222222222222";
 const replacement = "33333333-3333-4333-8333-333333333333";
 
 async function submit(db: PGlite, user: string, run: number, score: number,
-  version = "test", platform = "android_gp") {
+  version = "test", platform = "android_gp", mode = "daily") {
   const id = `aaaaaaaa-aaaa-4aaa-8aaa-${String(run).padStart(12, "0")}`;
   const { rows } = await db.query<{ result: Record<string, unknown> }>(`
-    select public.process_run($1, $2, 'daily',
+    select public.process_run($1, $2, $6,
       to_char(now() at time zone 'utc', 'YYYYMMDD')::int,
       'greybox-1', 'greybox', 'display-only', 'tilt', $3, 100, 30, 30, 60, $4, $5) as result
-  `, [user, id, score, version, platform]);
+  `, [user, id, score, version, platform, mode]);
   return rows[0].result;
 }
 
@@ -78,6 +78,65 @@ Deno.test("retained board scores determine new-run and replay ranks; metadata dr
     assert(tied.daily_rank === 1 && tied.alltime_rank === 1, "competition ties changed");
   } finally { await db.close(); }
 });
+
+Deno.test("accepted Free runs earn XP once without entering either board; flagged runs earn none", async () => {
+  const db = await database();
+  try {
+    await db.query("insert into auth.users (id) values ($1)", [player]);
+    const free = await submit(db, player, 1, 1000, "test", "ios", "free");
+    assert(free.accepted && free.daily_rank === 0 && free.alltime_rank === 0, "Free run was ranked or rejected");
+    assert((await submit(db, player, 1, 1000, "test", "ios", "free")).duplicate, "Free replay failed");
+    await db.exec("update runs set created_at = now() - interval '1 hour'");
+    assert(!(await submit(db, player, 2, 999999, "test", "ios", "free")).accepted, "implausible run accepted");
+    const { rows } = await db.query<{ xp: number; boards: number; runs: number }>(`
+      select xp, (select count(*)::int from board_scores) boards,
+        (select count(*)::int from runs) runs from profiles where user_id = $1`, [player]);
+    assert(rows[0].xp === 10, "Free run must grant 10 XP exactly once");
+    assert(rows[0].boards === 0 && rows[0].runs === 2, "Free history/board contract changed");
+  } finally { await db.close(); }
+});
+
+for (const recoveryFirst of [false, true]) {
+  Deno.test(`deletion/recovery serialize safely, recovery first = ${recoveryFirst}`, async () => {
+    const db = await database();
+    try {
+      await db.query("insert into auth.users (id) values ($1), ($2)", [player, rival]);
+      await submit(db, player, 1, 1000);
+      await db.query("update profiles set recovery_key_hash = decode('aabb', 'hex') where user_id = $1", [player]);
+      const recover = () => db.query<{ result: { status: string } }>(
+        "select recover_profile($1, decode('aabb', 'hex')) result", [rival]);
+      const remove = () => db.query<{ result: { status: string } }>(
+        "select delete_profile($1) result", [player]);
+      if (recoveryFirst) {
+        assert((await recover()).rows[0].result.status === "ok", "recovery failed");
+        assert((await remove()).rows[0].result.status === "profile_moved", "must not claim transferred data was erased");
+        const { rows } = await db.query<{ xp: number }>("select xp from profiles where user_id = $1", [rival]);
+        assert(rows[0].xp === 10, "old session deleted recovered profile");
+      } else {
+        assert((await remove()).rows[0].result.status === "ok", "deletion failed");
+        assert((await remove()).rows[0].result.status === "ok", "partial deletion cannot be retried");
+        assert((await recover()).rows[0].result.status === "not_found", "deleted profile was recovered");
+        const { rows } = await db.query<{ count: number }>(`select
+          ((select count(*) from profiles where user_id = $1) +
+           (select count(*) from runs) + (select count(*) from board_scores))::int count`, [player]);
+        assert(rows[0].count === 0, "personal records survived deletion");
+        const jobs = await db.query<{ delete_auth: boolean }>("select delete_auth from provider_cleanup where user_id = $1 and owner_id = $1", [player]);
+        assert(jobs.rows[0].delete_auth, "auth/provider deletion must survive endpoint failure");
+        // Auth removal may still be pending: a stale JWT must not recover another profile
+        // into the now-deleted destination and then lose it to that pending auth cascade.
+        await db.query("update profiles set recovery_key_hash = decode('ccdd', 'hex') where user_id = $1", [rival]);
+        const retired = await db.query<{ result: { status: string } }>(
+          "select recover_profile($1, decode('ccdd', 'hex')) result", [player]);
+        assert(retired.rows[0].result.status === "destination_deleted", "retired identity received another profile");
+      }
+      const { rows } = await db.query<{ exposed: boolean; service: boolean }>(`select
+        has_function_privilege('authenticated', 'delete_profile(uuid)', 'execute') or
+        has_function_privilege('anon', 'delete_profile(uuid)', 'execute') exposed,
+        has_function_privilege('service_role', 'delete_profile(uuid)', 'execute') service`);
+      assert(!rows[0].exposed && rows[0].service, "deletion RPC access is incorrect");
+    } finally { await db.close(); }
+  });
+}
 
 Deno.test("recovery cleanup survives repeated transfers and account deletion with API access denied", async () => {
   const db = await database();

@@ -45,8 +45,8 @@ namespace MotionRunner.Social
             KeyInvalid,
 
             /// This install has already played as its own profile, so the claim is refused to
-            /// protect it. The key may still be valid for the old profile: keep the file (a
-            /// support conversation could still use it) but stop blocking this install.
+            /// protect it. Preserve the old key separately for support before issuing this
+            /// profile's own code and allowing submissions again.
             Blocked
         }
 

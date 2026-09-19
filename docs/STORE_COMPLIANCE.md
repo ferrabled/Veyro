@@ -160,3 +160,15 @@ be the same URL.
   count), with genuine usage — then "Apply for production access."
 - App updates during the window are fine and do NOT reset the clock; dropping below 12
   opted-in testers or pausing the track does hurt it.
+
+
+### T-009 latest review follow-up (19 Sep)
+
+Migration 0008 makes account deletion transactional with profile recovery; deploy it after
+0007 before the changed deletion/recovery functions. The privacy source and site pages now
+state the eight-entry offline queue and discarded older pending runs. A blocked foreign
+recovery code is retained separately on the device for support until the current profile is
+deleted or app data is cleared; the current profile receives its own code. Both are secrets
+on the device, never public leaderboard data. No SDK, permission, or collected-data category
+is added by these corrections. The existing T-009 atomic binary/Console/policy flip remains
+required; this review made no Console or production deployment changes.
