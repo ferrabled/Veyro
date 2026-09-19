@@ -1,5 +1,468 @@
 # Status journal (newest at top)
 
+## 2026-09-19 — Latest PR #10 Copilot review verified and fixed (copilot-latest session)
+
+Checked the nine comments in Copilot review 5256642035 (19 Sep, 17:11 UTC, commit
+51d2af5). All are valid; four describe the same bounded-offline-queue wording issue.
+
+- Migration `0008_latest_review.sql` adds service-only transactional `delete_profile`,
+  taking the recovery/submission lock and cascading profile/run/board deletion before
+  auth removal. Auth/provider cleanup remains durable and retryable. Recovery-first
+  returns a conflict to the old session instead of false deletion success; deletion-first
+  prevents recovery. Recovery also refuses a deleted destination awaiting auth cleanup.
+- Every accepted Free run now earns the existing XP grant exactly once. It still creates
+  no board rows or ranks; flagged submissions earn no XP. No historical XP backfill.
+- Purchases, restores, paywalls and customer-info refreshes wait for identity settlement
+  and hold that identity through entitlement application and the completion callback.
+  A 15-second wait failure reports an error without starting a store operation. Refresh
+  failure cannot be reported as successful purchase/restore entitlement synchronization.
+- Blocked automatic recovery archives the foreign code separately, then issues the current
+  profile's code. Restart and failed-issuance retry paths preserve both; account deletion
+  clears both local code files. Disk errors preserve the original instead of overwriting it.
+- iOS builds emit `ios` run metadata; Android retains `android_gp`.
+- Privacy source/page, support and terms disclose the eight most recent pending runs,
+  older-entry eviction, and server validation/limits. Privacy also explains archived codes.
+
+**Verified:** reproduced missing Free XP and both blocked-recovery test cases before fixing.
+435/435 Unity EditMode tests pass (seven new cases), including actual RevenueCat adapter
+coroutines and SDK callbacks over its inert native wrapper, entitlement visibility inside
+restore callbacks, deferred identity changes, timeout, and disk-backed recovery/relaunch.
+12/12 Deno tests pass, including real migration/RPC execution in disposable PGlite PostgreSQL,
+Free XP/replay/flagging and both serialized deletion/recovery outcomes plus deleted-destination
+rejection. Edge Functions and cleanup script pass `deno check`. PGlite uses the existing
+pgcrypto test shim; these tests do not simulate simultaneous hosted transactions.
+The iOS tag is selected by compile-time guard; no iOS player build was run.
+
+**Next / needs human device test:** apply migration 0008 after 0007, then redeploy
+`delete-account` and `recover-session` together with the policy pages. Nothing deployed here.
+On the licensed Android build: delete the profile, immediately tap RESTORE, and verify the
+cosmetic appears before successful feedback; repeat with delayed/failed connectivity and
+confirm retry feedback. Verify recovery-first deletion reports failure on the old install,
+and deletion-first makes the old code unusable. Test a blocked foreign code on a played
+profile: its own code must become copyable and remain so after relaunch. Finish a valid Free
+run and verify XP increases once while both boards remain unchanged. These device/release
+steps are still pending; existing T-009 rollout gates continue to apply.
+
+## 2026-09-19 — T-009 Copilot findings verified and corrected (copilot-review session; uncommitted)
+
+Checked all 17 Copilot comments on PR #10 against the implementation. All were valid;
+the two flagged-retention comments described the same issue in the two policy copies.
+
+- Profile deletion confirmation resets whenever the tab is shown. Board requests expose
+  loading/error completion, and fallback rows stay explicitly labelled as samples.
+- Restore feedback compares entitlement IDs, including equal-count replacements.
+- RevenueCat identity transitions serialize login/logout, discard stale customer info,
+  remember a stale successful login for the required logout, and retry failures without
+  forgetting the applied ID. Anonymous SDK state is handled without a failing logout loop.
+- Runs queued without a session now schedule draining with the session backoff. A pending
+  recovery no longer prevents the drain from retrying that recovery. Duplicate responses
+  preserve both ranks. Imports missing a rotated recovery key request and persist one before
+  reporting success; issuance failure remains unsettled and retries during the same boot.
+- Forward migration `0007_review_corrections.sql` checks app-version/platform replay drift
+  and computes new-run/replay ranks from the board score actually retained. Score economy,
+  XP rules, seed generation and board keys are unchanged.
+- Recovery queues the old provider UUID transactionally before transferring the profile.
+  Recovery/deletion functions retry provider cleanup before removing old auth users, retain
+  failed jobs across account deletion, and preserve a successful recovery response even if
+  cleanup throws. Owner retry script and deployment order documented in the profile plan.
+- Corrected reroll/day-label contracts, current backlog count and the contradictory question
+  headline. Both privacy copies now describe opportunistic flagged-run retention accurately
+  and disclose pending cleanup identifiers; effective date is 19 September.
+
+**Verified:** 428/428 Unity EditMode tests (17 new), including actual adapter coroutines with
+only their HTTP leaf scripted: offline scheduling/drain, pending recovery, duplicate ranks,
+import key issuance and retry. Menu regressions exercise the actual compiled menu classes.
+9/9 Deno tests cover validator limits, provider success/failure/retry, and the actual SQL
+migration chain/RPCs in disposable PGlite PostgreSQL. PGlite's unavailable pgcrypto extension
+setup/random-byte issuance is shimmed only in tests; PostgreSQL SHA-256 remains real. This is
+not a hosted Supabase/concurrency/device verification. Edge Functions and retry script pass
+`deno check`; `hob git diff --check` passes. Nothing committed or deployed.
+
+**Next / needs human device test:** owner applies migration 0007, deploys both changed Edge
+Functions and the policy copy, and checks RC_API_KEY. On the phone: arm delete, switch tabs,
+return and confirm two fresh taps are needed; go offline, finish a run, restore connectivity
+without backgrounding and confirm it drains; import a profile and confirm a recovery code is
+immediately copyable; buy/restore a licensed cosmetic across recovery/deletion and verify the
+old RevenueCat identity is deleted and pending cleanup clears. Previously orphaned IDs are
+not backfilled by 0007; include them in the already-planned pre-tester test-data cleanup.
+
+## 2026-09-19 — T-009 owner decisions recorded (D13–D18), overflow + restore-honesty fixes, validator tests run (profile-integration session)
+
+**Headline: the four owner calls this PR encodes are no longer proposals** — D13 (Supabase
+backend, anonymous-first identity, recovery code + manual import), D14 (Supabase UUID =
+RevenueCat app user ID, reset on delete), D15 (server-generated handles only; unlimited
+rerolls per the 17 Sep amendment) and D16 (Daily + All-time, keyed and split standard vs
+camera) are in DECISIONS.md, together with **D17 score formula FROZEN** and **D18 CAPTCHA
+deliberately off**. OPEN_QUESTIONS 6, 15, 16 and 17 struck; **18 (attestation / replay
+validation) is tracked as T-041 at the owner's request** — T-009 has no open questions left.
+
+**D17 is binding on three files at once:** the formula (`ScoreState`), `game_config`, and
+`supabase/functions/_shared/validate.ts` now move together or not at all. Changing one alone
+flags every honest run, because the server reproduces the coin economy.
+
+**Code fixes:**
+- **Links-card text no longer runs off the screen.** The recovery-code row and the post-delete
+  message were clipped at the right edge on a 1080-wide device. First attempt (best-fit alone)
+  was a no-op: `RuntimeUi.Label` ships `Overflow`/`Overflow`, and an unbounded line always
+  "fits", so Unity never shrinks. The fix (`ProfilePage.ShrinkToFit`) sets `Wrap`/`Truncate`
+  first, then best-fit with the DESIGNED size as the ceiling — short labels render exactly as
+  before, long feedback shrinks or wraps inside its row. Verified on device.
+- **RESTORE PURCHASES stops claiming success when nothing came back** (owner call, 19 Sep).
+  A restore that reaches the store and finds no receipt still *succeeds*, so the old code said
+  "purchases restored" over an unchanged, empty entitlement set — exactly the path a player
+  takes after DELETE ONLINE PROFILE resets the store identity. `StoreCatalogView` now snapshots
+  `ActiveEntitlements.Count` across the call (the adapter applies customer info before invoking
+  the callback) and reports what actually happened: restored / already unlocked / nothing to
+  restore.
+
+**Privacy copy:** the "Data stored on your device" section now discloses that the recovery code
+is written to the app's storage folder and, on some Android versions and devices, **survives an
+uninstall** — observed on the Nord 2, and the reason reinstall recovery works with backup off.
+Uninstalling is therefore not a reliable erase; the two deliberate removals (DELETE ONLINE
+PROFILE, or clearing app data) are named. Applied to `docs/PRIVACY_POLICY.md` and
+`site/public/privacy/`; the support page's deletion section now also says deletion removes the
+device's recovery code. OPEN_QUESTIONS 16 answered: ship as drafted.
+
+**Verified:** 411/411 EditMode; **3/3 Deno tests** for the shared validator (`deno test
+supabase/functions/_shared/validate.test.ts` — Deno installed on the dev machine 19 Sep, so the
+"not installed here" note in that file is gone); device pass on the Nord 2 for both layout
+fixes. Batchmode left no settings-asset churn.
+
+**Needs a human:** (1) **purchase restore after deletion** — the owner will verify it in the
+internal release: buy as a license tester, delete the profile, tap RESTORE, confirm the skin
+returns. The Test Store cannot answer this (no real receipt). (2) Redeploy the keep-alive
+worker. (3) Wipe test debris before testers — device testing left several throwaway profiles
+and auth users, including one minted by a direct `recover-session` probe.
+(4) Nothing further on decisions — see the addendum below.
+
+**Addendum (owner call, same day): attestation / replay validation is NOT a decision.** The
+owner declined to record it as D19 — "not yet" is not "never" — so it is filed as **T-041**
+instead: post-hackathon by default, pulled forward only if the schedule frees up.
+OPEN_QUESTIONS 18 struck and now points at the task, which means **T-009 has no open
+questions left**. Two things carried into the task rather than lost: the standing constraint
+that no document, listing or pitch may call the board cheat-proof, and the observation that
+"revisit if abuse appears" cannot fire on its own today — nothing alerts on an implausible
+score — so the cheapest first step is a top-N sanity query before submission day.
+
+## 2026-09-18 (later) — T-009 review findings FIXED: recovery state machine, complete deletion, retry/queue rework, privilege + validator corrections, website copy landed (profile-integration session)
+
+**Headline: every R-finding in `docs/T009_SECURITY_PRIVACY_REVIEW.md` was validated and fixed;
+migration `0006_hardening2.sql` + rewritten functions are DEPLOYED and live-verified.**
+
+- **R1 (worst):** recovery is now a persisted state machine. The rules live engine-free in
+  `RecoveryGate` (unit-tested): a foreign key on file = PENDING → it is never overwritten,
+  submissions queue instead of sending (a submission would make the fresh user a non-empty
+  destination and permanently block the claim), and retries continue across restarts because
+  the key file itself is the state. Only definitive outcomes resolve: claimed (store rotated
+  key), key-invalid (discard), destination-not-empty (keep file, stop blocking).
+- **R2:** `delete-account` now also requests **RevenueCat customer deletion** (needs the
+  owner-set `RC_API_KEY` function secret; response reports `provider_deleted`), the client
+  resets the commerce identity (`IStore.ResetIdentity` → `Purchases.LogOut`), the service
+  goes DORMANT after deletion (no call can mint a replacement account mid-flow — ProfilePage
+  no longer refreshes the board there), and the player-facing scope says local device stats
+  remain.
+- **R4/R5:** submissions have their own throttle gate + scheduled drain loop (retries no
+  longer wait for a profile load or restart; foregrounding kicks both); Retry-After respected
+  up to 1 h (`RetrySchedule`, unit-tested — the 120 s repro is a test); profile-load failure
+  now retries on later calls while the token stays valid.
+- **R6:** global `ALTER DEFAULT PRIVILEGES` (the per-schema 0004 revokes could not subtract
+  PostgreSQL's global PUBLIC EXECUTE) + a DO-block SELF-TEST inside 0006 that creates a
+  disposable table+function and fails the migration if either is born reachable — it passed
+  on the production role during `db push`.
+- **R7:** rerolls stay UNLIMITED; a 2 s per-user burst throttle (and the same on key
+  rotation) stops scripts without touching humans. Verified live: immediate 2nd reroll
+  throttled, 3 s later fresh name.
+- **R8/R9 + idempotency:** Free seeds use the signed-int32 contract (verified live with a
+  negative seed); `readJsonBody` is a bounded BYTE reader (6 KB unicode body → 400, verified
+  live); duplicate detection compares the FULL payload (drift → 409, exact replay →
+  duplicate, verified live) and returns the stored flag reason (new `runs.flag_reason`).
+  Committed `validate.test.ts` (deno — runs in CI/anywhere with deno; not runnable on this
+  machine). Recovery now takes the same per-user submission locks as `process_run` for both
+  sides of a claim (deadlock-ordered), and the fresh-destination check dropped the
+  rerolls_left signal 0005 had frozen.
+- **R3 (website):** the full copy is IN the site files now, all version-scoped ("the
+  leaderboard update onward") so every page stays truthful whenever deployed: privacy gains
+  the "Player profile and leaderboards" section + recovery-code paragraph; support gains the
+  leaderboard FAQ and the real **`#delete` anchor** (in-app path, Player-ID email fallback,
+  ownership verification, 30-day window); terms §2/§6 and the homepage claims updated ("no
+  accounts/none" absolutes gone); `docs/PRIVACY_POLICY.md` in sync; effective dates 18 Sep.
+  The app now shows a **copyable Player ID** on the PROFILE tab (the email fallback's
+  identifier). "Anonymous = no personal data" wording removed everywhere: profiles are
+  pseudonymous, deletable records. STORE_COMPLIANCE Data safety reconciled: **User IDs
+  (Personal info) collected/required; App activity → Other actions collected/required/SHARED**.
+
+**Live evidence (self-cleaned):** free negative seed accepted · payload-drift 409 · exact
+replay duplicate · oversized unicode body 400 · reroll throttle · privilege self-test in-push.
+NOT verified here: RC customer deletion (needs RC_API_KEY), deno tests (no deno locally), the
+client state machine on-device (fresh build below), Auto-Backup reinstall (human-only).
+
+**Needs the owner:** (1) create a RevenueCat **secret** API key and set it as a function
+secret: `npx supabase secrets set RC_API_KEY=sk_...` (never in the repo) — until then
+deletions report `provider_deleted:false` and the support-email fallback covers provider
+deletion; (2) deploy the site (`npx wrangler deploy` from `site/`) no later than the T-009
+release window — the pages are version-scoped and safe to deploy early; (3) at release: the
+Data safety rows above + deletion URL `https://veyro.ferrabled.com/support/#delete` in the
+Console; (4) commit; (5) device pass incl. delete flow + reinstall-recovery.
+
+**Addendum (owner call, same day): the recovery code is PLAYER-VISIBLE and replaces
+rename-verification.** PROFILE tab gains RECOVERY CODE (tap to copy, with the takeover
+warning) and IMPORT PROFILE (paste a code → the existing recover-session claim; fresh
+destination required, code rotates on success) — the manual new-device/backup-off rescue and
+the support ownership proof in one credential. `IProfileService` gains `RecoveryCode` +
+`ImportProfile`; site/policy verification copy updated (code primary, rename gone). Post-
+deletion behaviour confirmed as designed: boards drop the rows instantly; the next launch
+auto-creates a fresh profile (disclosed in policy — Play-compliant). RC-deletion-less restores
+confirmed correct: receipts always restore entitlements and simply recreate a provider record.
+
+## 2026-09-18 — T-009 independent security/privacy review: changes requested (profile-security-review session)
+
+Actual adapter source compiled in a temporary .NET harness with scripted HTTP reproduced:
+recovery-key overwrite after recovery 503; submission backoff bypass with a live token;
+profile loading stranded after 503; queued retries not scheduled; a new profile created by
+the board refresh immediately after deletion. Actual TypeScript probes also reproduced
+valid Free seeds rejected and a 6,300-byte body passing the advertised 4 KB limit.
+
+Additional findings: no RevenueCat deletion/identity-reset flow; future function default
+privileges not fully revoked; unlimited rerolls lack throttling. CAPTCHA/secure storage/
+strong anti-cheat remain deferred. Live privacy/support/terms still omit Supabase and retain
+no-account claims; support lacks the advertised deletion anchor, and the proposed Player ID
+fallback has no corresponding ID display in the game. Full website and Play Data safety
+updates remain a T-009 release gate. Detailed fixes, limitations and owner checklist are in
+the review. No application changes, deployments, Console mutations or live abuse tests.
+Not rerun: Unity/device suite and database concurrency tests (local Docker engine unavailable).
+
+## 2026-09-17 (evening) — T-009 DEVICE PASS on the Nord 2: full loop green against the live backend (profile-integration session)
+
+**Headline: fresh `BuildAndroidDev` (82.7 MB) installed and driven via adb — the whole
+profile/leaderboard loop works on the phone against production:** anonymous sign-in + trigger
+minted **ARCTIC-KIWI-59** on the profile tab; **TAP TO JOIN** consent gate flipped to "finish a
+run to land on this board"; a tilt Daily run (89, 39 m, 4c) crashed and **submitted through the
+hardened `process_run` path — verified server-side** (`1. ARCTIC-KIWI-59 = 89` on today's
+standard board) **and in-app** ("you are #1 on this board", own row accent-highlighted, streak
+stamped, history row added); force-stop + relaunch restored the same profile (refresh-token
+path); **reroll live on device** (→ GOLD-BEAVER-66, budget 3→2, board row renamed immediately).
+Bonus evidence: logcat shows `_logIn` — **RevenueCat aliased to the Supabase UUID on-device and
+the Test Store entitlements (season1, skin_ember) stayed active through it** (the D14 wiring,
+seen working with real purchase data). No game-side exceptions (the boot-time
+`AssetPackManager` ClassNotFound is pre-existing dev-build noise, logged before any profile
+code runs). Batchmode/Gradle side-effects on settings assets reverted again (gotcha 11 class).
+
+DB wiped by the owner beforehand (`delete from auth.users`) — all four boards verified empty
+before the pass; cascade confirmed (the "leftover runs" in the Table Editor were a stale view).
+
+**Still human-only:** camera run + forced fallback (needs a person in frame; fallback runs must
+land on the standard board — force the give-up with `adb shell appops set
+com.ferrabled.veyro.run CAMERA deny` mid-pause, restore with `… allow`), Auto-Backup reinstall
+restore (recovery key), offline-queue drain, delete-profile tap-through (left alive so the
+owner can poke at the live board; wipe test users again before testers). Worker note: cron is
+`0 3 */3 * *` → first metrics appear after the next 03:00 UTC tick on a matching day — an
+empty Metrics tab an hour after deploy is expected.
+
+**Addendum (owner call, same evening): rerolls are UNLIMITED** — migration
+`0005_unlimited_rerolls.sql` pushed live and probe-verified (5 straight rerolls, fresh names);
+client link is now plain "new name" (no budget); D15 proposal amended in OPEN_QUESTIONS 15;
+UGC posture unchanged (still generated-only). 404/404 EditMode after the change; fresh dev APK
+rebuilt + installed on the Nord 2.
+
+## 2026-09-17 (later) — T-009 security/reliability hardening: transactional backend, least privilege, resilient client — deployed and live-tested (profile-integration session)
+
+**Headline: migration `0004_hardening.sql` + rewritten Edge Functions are DEPLOYED to the live
+project (CLI was linked, owner had authorized testing) and verified with a live battery; the
+Unity client gained real failure discipline; 404/404 EditMode tests pass.**
+
+- **Transactional submit (`process_run` RPC):** per-user advisory lock; idempotent replay
+  checked BEFORE quotas (a retry of a completed request succeeds even after the quota fills;
+  same client_run_id + different payload → 409); quotas at SUBMISSION time counting EVERY
+  stored attempt — flagged and yesterday-seed runs included (≤30/24 h, ≤10 flagged/24 h,
+  min-interval ≥ duration×0.5); boards + XP in the same transaction as the insert; DB errors
+  fail CLOSED. Old `upsert_board_score`/`grant_xp` dropped.
+- **Transactional recovery (`recover_profile` RPC):** hash validated with the source row
+  locked; attempts throttled atomically (5/h/caller, FK-cascaded on deletion); **destination
+  must be a fresh profile** — a recovery key can never destroy a played profile; key rotates in
+  the same transaction. `issue_recovery_key` → **`rotate_recovery_key`** (retry-safe; lost
+  responses self-heal; superseded keys stop working). Key file now `<userId>:<key>` so stale
+  keys are detected and re-rotated. Plaintext-by-design rationale documented in the plan
+  (Keystore keys don't survive reinstall — encrypting would break the feature).
+- **Least privilege:** column-level SELECT on profiles (hash unreadable, `select=*` → 403);
+  `ALTER DEFAULT PRIVILEGES` so future tables/functions are deny-by-default; 4 KB body caps +
+  hard numeric bounds in the functions. config.toml: `enable_signup` stays true (anonymous IS
+  a signup) with email/SMS signup off individually.
+- **Client (`SupabaseProfileService`):** refresh token dropped ONLY on 400/401/403 — never on
+  429/5xx/timeout; transient submit failures (0/429/5xx) queue instead of dropping;
+  Retry-After honored; bounded exponential backoff with jitter; session work serialized; a
+  transient refresh failure no longer mints a new anonymous user over a live identity; expired
+  unrefreshable session = "no session" (nothing sent with a stale token).
+- **Keep-alive worker:** bearer header removed (apikey suffices — evidence: both forms 200),
+  10 s timeout, failures now THROW (visible in CF metrics/cron events); "never pauses" claims
+  corrected everywhere to "very unlikely; only the paid plan guarantees" (owner decision).
+- **Live evidence (all against the real project, then self-cleaned):** privileged fns 404 to
+  clients; direct writes 403; two-user isolation; rotation returns distinct keys and the old
+  key stops recovering; claim migrates handle+XP+runs+boards and deletes the old auth user;
+  nonempty destination → 409 with both profiles intact; **concurrent double-claim → exactly
+  one winner**; duplicate submit → no double XP/boards; mismatch → 409; too_fast 429; flagged
+  flood capped at 10. NOT live-tested (honest gaps): retry-after-quota-full replay (by design
+  only), recovery throttle at 5+ attempts, CAPTCHA (deliberately off — OPEN_QUESTIONS 17),
+  device behaviour (Auto Backup reinstall remains human-only). Cheating stays possible by
+  design limits — OPEN_QUESTIONS 18; never call the board cheat-proof.
+
+**Needs a human:** (1) **redeploy the keep-alive worker** (`npx wrangler deploy` in
+`infra/keepalive-worker/`) — the deployed copy predates the hardening; check: CF dashboard →
+Worker → Metrics/Cron events shows successful runs, failures appear as errored invocations;
+(2) wipe test debris before testers: SQL editor →
+`delete from auth.users; truncate public.recovery_attempts;` (DB holds only test data);
+(3) commit (GPG); (4) device pass per plan §10 unchanged.
+
+## 2026-09-17 — T-009 Supabase security research (supabase-security-review session)
+
+Reviewed migrations, all three Edge Functions, Unity session/recovery/queue handling and
+the keep-alive Worker against current official Supabase documentation. The shipped key is
+a public `sb_publishable_` key; its presence in the APK/Worker is expected. Existing RLS and
+function allowlisting are a useful baseline, not proof of the hosted configuration.
+
+Findings to address before the profile release: flagged submissions have no effective
+storage cap; yesterday's accepted runs escape the today-only daily count; rate checks race;
+run/board/XP writes are not transactional; recovery lookup/claim is not atomic and permits
+destructive claims onto nonempty destination profiles; recovery issuance/rotation can lose
+the usable key on a lost response; transient HTTP errors discard queued runs/session state.
+Client-provided scores and camera mode remain forgeable within plausibility bounds.
+Default privileges for future objects and secure device credential storage need hardening.
+
+Verification: source review plus two non-mutating live `ping()` calls, both HTTP 200/body 1
+(apikey only, and the current apikey-plus-bearer form). No abuse/concurrency tests, dashboard
+inspection, deployment, game changes or settings changes. Official guidance recommends
+apikey-only for publishable keys; the current bearer form was not observed failing.
+Free-plan keep-alive is not an official no-pause guarantee. Next: backend hardening and
+staging negative/concurrency tests; verify hosted grants/RLS and anonymous signup limits.
+CAPTCHA requires client integration before enabling it. Research delivered in conversation.
+
+## 2026-09-17 — T-009 backend LIVE and smoke-tested end-to-end; one pgcrypto bug found + fixed; branch on f40816d (profile-integration session)
+
+**Headline: the owner deployed the Supabase backend (P11 mostly ✅) and a live REST smoke test
+from this machine verified almost the whole server: anonymous sign-in ✅ (handle trigger minted
+`HAZEL-HARE-30`/`GRAND-CIVET-39`), `submit-run` ✅ (plausible daily run accepted, daily+alltime
+rank 1), `get_leaderboard`/`get_my_rank` ✅, `delete-account` ✅ (true deletion). One real bug:
+`issue_recovery_key()` failed with 42883 — hosted Supabase puts pgcrypto in the `extensions`
+schema and the function pins `search_path = public`. Fixed in
+`supabase/migrations/0003_fix_recovery_key_pgcrypto.sql` (functions now call
+`extensions.gen_random_bytes/digest`; 0001 aligned for fresh envs). The recovery→claim path is
+therefore still UNVERIFIED — retest after the owner runs `supabase db push` again.**
+
+- Branch fast-forwarded 8894ec9 → **f40816d** (PRs #8/#9: v5 in production review, **Samsung/
+  Galaxy dropped as D12** — plan §0 annotated; the schema's `android_galaxy` platform value
+  stays as a harmless reserved tag). Conflicts resolved in OPEN_QUESTIONS (upstream took 14 →
+  **T-009 decision proposals now live at 15/16, D-numbers shifted to D13–D16, score freeze
+  D17**; all cross-references updated) and PREREQUISITES (P11 row updated to deployed state).
+- `SupabaseKeys.cs` carries the real URL + publishable key (owner, 17 Sep — public by design).
+- Keep-alive Worker simplified: URL + anon key are plain `[vars]` in wrangler.toml (both are
+  public and committed anyway), so deployment is just `npx wrangler deploy` — no secret step.
+- **Test debris to clean (owner, SQL editor, service role):** the smoke test could not delete
+  its first two anonymous users (sessions are not retained here). Today's daily board carries
+  one leftover row (`GRAND-CIVET-39`, 600). One statement removes both users and cascades:
+  `delete from auth.users where id in
+  ('a34e10fd-bf38-4a6b-97eb-d5b8763bdfe3','e1c1a181-8c7d-4cb9-adae-9eeebb55861e');`
+
+**Needs a human:** (1) `supabase db push` (applies 0003), then say the word — the recovery
+claim gets smoke-tested the same way; (2) `npx wrangler deploy` in `infra/keepalive-worker/`;
+(3) the anonymous **rate limit** field only appears once anonymous sign-ins are on:
+Authentication → Rate Limits → "Rate limit for anonymous users" (set ~20/hr); (4) run the
+debris-cleanup SQL above; (5) commit the branch (GPG); (6) then the on-device pass
+(`BuildAndroidDev`) per PROFILE_LEADERBOARD_PLAN §10 — the Editor uses FakeProfileService, so
+the real backend is only exercised on a device build.
+
+## 2026-09-15 — Release handoff prepared (play-release-handoff session)
+
+- Created `docs/HANDOFF_PLAY_RELEASE_NO_PROFILES.md` in English; Play Console guidance and paste-ready answers must be in Spanish.
+- Fetched remote refs: clean `feat/main-menu` at `16fd170` has identical tracked content to `origin/main` merge `8894ec9`; local `main` is stale. Profile work remains separate and untouched.
+- Audited the main-menu website drafts against the public policy and commerce/menu code. Recorded transition wording, purchase analytics, restoration/deletion/persistence copy, and the unfinished purchasable season pass for the release agent to resolve.
+- Verification: repository/source inspection and official documentation; no new Unity tests/build, upload, website edits or deployment performed. Owner still needs to confirm the highest Play versionCode, configure signing locally, decide pass availability, and perform the Play/device checks.
+
+## 2026-09-09 — T-009 Unity half built: Social seam, Supabase adapter, live board in ProfilePage; branch rebased onto main (profile-integration session)
+
+**Headline: the whole client half of T-009 exists and compiles — 404/404 EditMode tests pass
+(391 + 13 new `SocialTests`), `RunSeedTests` untouched. The branch was fast-forwarded onto
+`origin/main` (8894ec9, the menu merge) with the two predicted docs conflicts hand-resolved
+(BACKLOG T-009, OPEN_QUESTIONS renumbering — after the 17 Sep ff onto f40816d the T-009
+decision proposals live at 15/16). Owner created the Supabase project — connection steps are
+PROFILE_LEADERBOARD_PLAN §9.**
+
+- **`MotionRunner.Social`** (engine-free, mirrors Commerce): `IProfileService` (+`Profile`,
+  `SocialError`), `RunSubmission` (snake_case fields ARE the wire format), `InputModes`
+  (tilt/camera/camera_fallback + board grouping — the one place the 3 Sep fallback rule lives
+  client-side), `PendingRuns` (offline queue, RunHistory-style single-string encoding, cap 8,
+  corruption-tolerant), `FakeProfileService` (Editor + tests; consent gates, not-ready queues,
+  becoming ready drains).
+- **`MotionRunner.Social.Supabase`**: `SupabaseProfileService` on UnityWebRequest+JsonUtility
+  (no new UPM package). Boot: refresh token → else anonymous sign-in + recovery-key claim →
+  profile load → drain queue → one-time `issue_recovery_key`. Recovery key lives in a
+  persistentDataPath file (Auto Backup carries it across reinstall; Keychain is T-032's job).
+  `SupabaseKeys.cs` holds URL + anon key (committed-public pattern; **currently empty — owner
+  pastes, §9**). PostgREST reads use the object accept header; every response shape is a flat
+  JSON object (JsonUtility can't parse top-level arrays) — server functions were aligned to
+  return 0/"" instead of nulls.
+- **Plumbing:** `IStore.Identify(userId)` → `RevenueCatStore` holds it until configured, then
+  `Purchases.LogIn` (fail-open); GameBootstrap wires profile→store on ProfileChanged.
+  `RunSession.Crash` submits fire-and-forget (`SubmitToBoards`); quits/restarts still write
+  nothing. `RunFlow.DropCameraMode` now tells the session (`NoteCameraDropped`) — the shared
+  board files such a run as `camera_fallback`/standard while the LOCAL BestBoard still scores
+  it as camera (Feature D). That asymmetry is deliberate and documented at both sites.
+- **UI:** `LiveLeaderboard : ILeaderboardSource` (cached async source; keeps the mock's
+  non-contiguous my-rank contract; stale-response guard). `ProfilePage`: handle + reroll on
+  the player card, TODAY/ALL-TIME scope tabs (group follows last-used scheme), one honest
+  bottom line (sample-data note / TAP TO JOIN consent ask — nothing submits before it / live
+  "you are #N"), and DELETE ONLINE PROFILE (two-tap, immediate) in the links card. Mock stays
+  the fallback whenever the live board has no rows yet.
+- Batchmode side-effects on ProjectSettings/URP assets were reverted (gotcha 11 class — the
+  URP global-settings runtime list got emptied by the import; not shipped).
+
+**Verified:** EditMode 404/404 in this worktree (log clean). NOT verified — needs the owner:
+paste SupabaseKeys + run the §9 CLI steps, then the §10 device pass (submits incl. forced
+fallback, board splits, reroll, offline queue, delete, reinstall-restore both ways) and the
+gotcha-10 release-APK diff (expect no new permissions).
+
+**Needs a human:** (1) PROFILE_LEADERBOARD_PLAN §9 steps 1–4 (keys, `db push` + functions
+deploy, anonymous sign-ins toggle, keep-alive Worker); (2) commit this branch (GPG); (3)
+OPEN_QUESTIONS 15/16 → DECISIONS + score-formula freeze (6→D17, gates live boards); (4) §10
+device test. The versionCode-5 T-020 flip release remains untouched and ahead of this.
+
+## 2026-09-03 — T-009 redefined: Supabase profile + leaderboard; backend + docs landed (profile-integration session)
+
+**Headline: T-009 is now "profile + shared leaderboard + run history on Supabase" — spec written,
+owner decisions taken, and the whole backend exists as config-as-code on this branch
+(`feat/profille-integration`). Unity work deliberately not started: it waits on the main-menu
+rework being committed (see Needs a human).**
+
+- **`docs/PROFILE_LEADERBOARD_PLAN.md`** (new, canonical): anonymous-first Supabase identity (no
+  login UI), **recovery-key reinstall restore** (hash server-side, key in Auto-Backup/Keychain —
+  the STATUS 29 Aug Auto-Backup resurrection is the existence proof), `Purchases.LogIn(uuid)`,
+  generated handles only (no UGC), Daily + All-time boards split standard vs camera with
+  `camera_fallback` demoted to standard (owner calls, 3 Sep — OPEN_QUESTIONS 15). Free on
+  Supabase Free + Cloudflare free; 7-day-pause trap mitigated by a cron Worker.
+- **`supabase/`**: migrations (profiles/runs/board_scores/game_config; `input_group` as a
+  *generated column* so board grouping is enforced in the DB; one-row-per-user-per-board
+  conditional upsert; RLS with **zero client writes**; leaderboard reads only via
+  security-definer RPCs exposing handle+score+rank, LIMIT capped, JSON-object shapes for
+  JsonUtility), Edge Functions `submit-run` (schema/allowlist/seed-date/plausibility/rate
+  limits; soft-fail = flagged row, never a punished honest client; server-side XP),
+  `recover-session` (claims the old profile onto the new anonymous user — no session minting,
+  no custom JWT; key rotates on claim), `delete-account` (true deletion, cascades).
+- **`infra/keepalive-worker/`**: Cloudflare Worker cron → `rpc/ping` every 3 days.
+- Docs synced: BACKLOG T-009 rewritten (PGS/iCloud approach superseded, Sidekick unbundled),
+  STORE_COMPLIANCE T-009 flip table rewritten for anonymous-first (deletion URL + Data safety
+  scores; content rating unchanged — handles are not UGC; policy copy HELD BACK in plan §8, must
+  not ride the versionCode-5 flip), PREREQUISITES **P11** (owner creates the Supabase project),
+  OPEN_QUESTIONS 6 urgency bump (score freeze now gates boards) + 14/15, REVENUECAT_PLAN §3.3
+  ID note superseded (Supabase UUID, proposal D14 after the 17 Sep renumber).
+
+**Verified:** desk-checked only — no supabase CLI/deno/postgres on this machine, and nothing
+was deployed (by design: owner-only). SQL/functions follow current Supabase docs; the coin-
+economy score bound in `validate.ts` mirrors `ScoreState` exactly. EditMode suite untouched.
+
+**Needs a human:** (1) **commit the main-menu rework on `feat/main-menu`** — this branch then
+fast-forwards onto it and the Unity half (Social seam, SupabaseLeaderboardSource behind the
+rework's `ILeaderboardSource`, ProfilePage extensions, run-end plumbing) starts; (2) P11
+(Supabase project + anon key + keep-alive Worker); (3) move OPEN_QUESTIONS 15 to DECISIONS,
+freeze the score formula (6→D17); (4) approve plan §8 copy.
+
 Keep entries short: what changed, how it was verified, what needs a human. **Hard cap ~40 lines
 per entry** — this file is read at the start of every session, so length here is context another
 session doesn't get. Durable operational knowledge does **not** belong here — invariants go in

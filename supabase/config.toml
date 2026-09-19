@@ -1,0 +1,35 @@
+# Supabase project config (config-as-code). The owner links this to the live project with
+# `supabase link --project-ref <ref>` and applies with `supabase db push` +
+# `supabase functions deploy`. Secrets never live here.
+
+project_id = "veyro-run"
+
+[auth]
+# Anonymous-first identity (docs/PROFILE_LEADERBOARD_PLAN.md §1).
+# enable_signup must stay TRUE: GoTrue's anonymous sign-in IS a signup (POST /auth/v1/signup
+# with an empty body), so the global switch would kill it. Unused identity routes are closed
+# individually instead: no email/phone below, no social providers configured.
+enable_anonymous_sign_ins = true
+enable_signup = true
+
+[auth.email]
+enable_signup = false
+
+[auth.sms]
+enable_signup = false
+
+[auth.rate_limit]
+# Anonymous sign-ins per hour per IP: the anon key ships in the client, so this is the lid
+# on bot-minted accounts.
+anonymous_users = 20
+
+[functions.submit-run]
+verify_jwt = true
+
+[functions.recover-session]
+# Called by the NEW anonymous user (fresh session) presenting the old recovery key; the
+# function migrates the old profile onto the caller. So a JWT is required here too.
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

@@ -3,6 +3,7 @@ using MotionRunner.Commerce;
 using MotionRunner.Core;
 using MotionRunner.Inputs;
 using MotionRunner.Menu;
+using MotionRunner.Social;
 using MotionRunner.Track;
 using UnityEngine;
 
@@ -34,6 +35,7 @@ namespace MotionRunner.Gameplay
         RunHud _hud;
         IStore _store;
         SkinService _skins;
+        IProfileService _profile;
         FaceTrackingRig _rig;
         CameraFaceInput _faceInput;
         PauseMenu _pauseMenu;
@@ -42,7 +44,8 @@ namespace MotionRunner.Gameplay
         AttractRun _attract;
         FaceOverlay _overlay;
 
-        public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins)
+        public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins,
+            IProfileService profile)
         {
             var go = new GameObject("RunFlow");
             var flow = go.AddComponent<RunFlow>();
@@ -50,6 +53,7 @@ namespace MotionRunner.Gameplay
             flow._hud = hud;
             flow._store = store;
             flow._skins = skins;
+            flow._profile = profile;
             hud.PauseRequested += flow.RequestPause;
             hud.QuitRequested += flow.QuitToMenu;
 
@@ -67,7 +71,7 @@ namespace MotionRunner.Gameplay
 
         void ShowMenu(MenuTab tab)
         {
-            _menu = MainMenu.Create(_store, _skins, tab);
+            _menu = MainMenu.Create(_store, _skins, _profile, tab);
             _menu.Chosen += StartRun;
             _menu.GuideRequested += ShowGuide;
 
@@ -228,7 +232,10 @@ namespace MotionRunner.Gameplay
         /// rebuilt without it, and the pause menu stays up so the player resumes when ready.
         void DropCameraMode()
         {
-            _pause.DropCameraMode();
+            // The session records the drop: the shared board files this run as
+            // camera_fallback (standard group) even though the local boards keep scoring it
+            // as the camera run the player chose (Feature D vs the 3 Sep owner call).
+            if (_pause.DropCameraMode()) _session.NoteCameraDropped();
             DestroyRig();
             _session.Input = BuildInput(false);
             ApplyPhase();

@@ -2,6 +2,7 @@ using System;
 using MotionRunner.Core;
 using MotionRunner.Menu;
 using MotionRunner.Progression;
+using MotionRunner.Social;
 using MotionRunner.Track;
 using UnityEngine;
 
@@ -28,6 +29,10 @@ namespace MotionRunner.Gameplay
         public RunnerController Runner;
         public TrackDirector Director;
         public RunHud Hud;
+
+        /// The online profile seam (T-009). Optional: null or a not-ready service means runs
+        /// stay local, exactly like a store with no key (rule 3's fail-open shape).
+        public IProfileService Profile;
 
         public RunMode Mode = RunMode.Daily;
 
@@ -77,6 +82,13 @@ namespace MotionRunner.Gameplay
         int _sessionSalt;
         float _elapsed;
         bool _started;
+
+        /// True once THIS run's camera gave up and the run fell back to tilt+touch. Scheme
+        /// stays Camera for the local boards (Feature D: "still scores as the camera run it
+        /// was chosen to be"); the SHARED board instead demotes such a run to the standard
+        /// group (owner call, 3 Sep) - so the submission needs the fact the local boards
+        /// deliberately ignore. Set by RunFlow, reset every StartRun.
+        bool _cameraDropped;
 
         /// The UTC day the current run belongs to, sampled with DailyLabel in StartRun. The streak
         /// card counts days, not labels, so the conversion happens once per run rather than being
@@ -136,10 +148,15 @@ namespace MotionRunner.Gameplay
             if (Hud != null) Hud.Clear();
         }
 
+        /// RunFlow's DropCameraMode notifies the session so the run's submission can say
+        /// "camera_fallback" (see _cameraDropped).
+        public void NoteCameraDropped() => _cameraDropped = true;
+
         public void StartRun()
         {
             _runIndex++;
             _elapsed = 0f;
+            _cameraDropped = false;
             Score.Reset();
 
             // Sampled per run, not once at startup: a session left open across UTC midnight rolls
@@ -274,6 +291,8 @@ namespace MotionRunner.Gameplay
             // batching BestBoard's Save-free contract asks for.
             ProgressStore.Flush();
 
+            SubmitToBoards(score);
+
             Debug.Log("Run over. mode=" + Mode + " scheme=" + Scheme + " seed=" + CurrentSeed +
                       " score=" + score + " coins=" + Score.Coins +
                       " distance=" + (int)Score.Distance + "m chunks=" + Director.ChunksSpawned);
@@ -281,6 +300,39 @@ namespace MotionRunner.Gameplay
             if (Hud != null)
                 Hud.ShowResult(new RunSummary(Mode, Scheme, score, Score.Coins, Score.BestCombo,
                     (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel));
+        }
+
+        /// Hands the finished run to the shared boards (T-009). Fire-and-forget from Crash:
+        /// every finished run participates (joining is automatic - owner call, 17 Sep); the
+        /// service queues offline and never throws, so a dead backend costs this call site
+        /// nothing. Only Crash submits, for the same reason only Crash scores: a quit or
+        /// restart is not a result.
+        void SubmitToBoards(int score)
+        {
+            if (Profile == null) return;
+
+            Profile.SubmitRun(new RunSubmission
+            {
+                client_run_id = Guid.NewGuid().ToString(),
+                mode = Mode == RunMode.Daily ? RunSubmission.ModeDaily : RunSubmission.ModeFree,
+                seed = CurrentSeed.Seed,
+                content_version = CurrentSeed.ContentVersion,
+                world_id = CurrentSeed.WorldId,
+                day_label = DailyLabel,
+                input_mode = InputModes.For(Scheme == ControlScheme.Camera, _cameraDropped),
+                score = score,
+                distance_m = Score.Distance,
+                coins = Score.Coins,
+                best_combo = Score.BestCombo,
+                duration_s = _elapsed,
+                app_version = Application.version,
+                // The Galaxy build flavour flips this constant when T-033 ships one.
+#if UNITY_IOS
+                platform = SubmissionPlatform.Ios
+#else
+                platform = SubmissionPlatform.AndroidGooglePlay
+#endif
+            }, null);
         }
 
         /// The RUN AGAIN button. QUEUED, not started: this runs inside the EventSystem's dispatch,

@@ -237,13 +237,33 @@ namespace MotionRunner.Menu
             if (_busy) return;
             _busy = true;
             _status.text = "restoring…";
+
+            // A restore that reaches the store and finds nothing still SUCCEEDS - the SDK
+            // completed, there was simply no receipt to re-derive from. Reporting "purchases
+            // restored" there is a lie the player can act on, and it is exactly the path a
+            // player takes after DELETE ONLINE PROFILE resets the store identity (T-009).
+            // The adapter applies the customer info before invoking this callback, so
+            // comparing the entitlement set across the call says what actually happened.
+            var before = new HashSet<string>(_store.ActiveEntitlements);
             _store.Restore(outcome =>
             {
                 if (!StillBuilt) return;
                 _busy = false;
-                _status.text = outcome.Succeeded ? "purchases restored" : Describe(outcome, "restore");
+                _status.text = outcome.Succeeded
+                    ? DescribeRestore(before, _store.ActiveEntitlements)
+                    : Describe(outcome, "restore");
                 Refresh();
             });
+        }
+
+        /// What a successful restore actually did. "Nothing to restore" is the honest answer
+        /// when the store account owns nothing - it is not a failure, and it is not a
+        /// restoration either.
+        static string DescribeRestore(HashSet<string> before, IReadOnlyCollection<string> after)
+        {
+            if (after.Count > 0 && !before.SetEquals(after)) return "purchases restored";
+            if (after.Count > 0) return "everything you own is already unlocked";
+            return "nothing to restore on this account";
         }
 
         static string Describe(PurchaseOutcome outcome, string what)

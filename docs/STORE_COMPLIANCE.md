@@ -88,16 +88,45 @@ the same change that ships a feature listed below.
 - Data safety → app interactions / diagnostics = collected. Privacy policy section. Same
   AD_ID check as OneSignal.
 
-### T-009 — Play Games sign-in, leaderboard, Sidekick (post-v1.0)
-- App access → **Sí**, note: "optional Google Play Games sign-in; any Google account works;
-  no demo credentials required." (Custom email/password accounts would instead require a
-  permanent non-expiring demo account for review — avoid.)
-- Data safety → account identifiers + gameplay scores = collected.
-- **Account-deletion policy activates** the moment server-side accounts/profiles exist
-  (Supabase leaderboard): in-app account deletion + a public web deletion URL declared in
-  Data safety. Build the delete endpoint with the leaderboard, not after. The site's
-  /support/ "Data deletion" section flips from "nothing to delete" to the real mechanism.
-- Privacy policy → accounts/leaderboard section; redeploy.
+### T-009 — Supabase profiles + leaderboard (post-v1.0, Update 1)
+> Redefined 3 Sep 2026: anonymous-first Supabase identity, **no Play Games sign-in in this
+> phase** (that would be Phase 2 account linking). Spec: `docs/PROFILE_LEADERBOARD_PLAN.md`;
+> paste-ready policy/support copy is HELD BACK in that plan's §8 — it must not ride the
+> versionCode-5 T-020 flip, whose site text is already staged.
+- App access → no new restricted content (profile is created silently, no login form, no
+  credentials exist). Update the instruction note only: "anonymous player profile created
+  automatically for leaderboards; no sign-in exists."
+- Data safety → three rows, reconciled 18 Sep against Google's definitions (review R3/checklist):
+  - **Personal info → User IDs = collected, REQUIRED** (Google's User IDs definition expressly
+    includes account ids; the Supabase player UUID and the generated handle are that — do not
+    assume the existing "Device or other IDs" row covers them). Purposes: app functionality,
+    account management, fraud prevention/security.
+  - **App activity → Other actions = collected, REQUIRED, and SHARED** (finished-run results
+    uploaded automatically — there is no in-app choice, so "optional" is wrong; "shared"
+    because handle+score are displayed publicly to other players, which is distinct from
+    Supabase acting as processor). Purpose: app functionality.
+  - Device/other IDs stays as declared since the T-020 flip.
+- **Account-deletion policy is LIVE with this release** (server-side profiles exist):
+  in-app PROFILE → DELETE ONLINE PROFILE (immediate; `delete-account` deletes the Supabase
+  user + cascades AND requests RevenueCat customer deletion when the RC_API_KEY function
+  secret is configured — owner action) **plus** the public web deletion URL
+  `https://veyro.ferrabled.com/support/#delete`, which **exists in the repo site copy since
+  18 Sep** (version-scoped, so it is truthful whenever deployed) — deploy the site BEFORE
+  the profile build reaches any user, or the Data safety form points at a URL without the
+  anchor. The in-app PROFILE tab shows a copyable Player ID as the support identifier for
+  app-less requests (an ID locates a record; ownership is verified before acting on it).
+- **19 Sep review correction:** deploy migration `0007` before the recovery/deletion Edge
+  Functions. Provider cleanup now includes pre-recovery UUIDs and retains failed work in a
+  service-only retry queue; the owner retry procedure is in PROFILE_LEADERBOARD_PLAN §5.
+  Privacy copy dated 19 Sep describes the actual opportunistic flagged-run retention and
+  pending provider-deletion identifiers. Redeploy that copy with the corrected profile build.
+- Content rating → **unchanged**: handles are server-generated (no free text), so there is
+  no UGC to declare. This is load-bearing — free-text names would reopen the questionnaire.
+- Privacy policy → "Profiles and leaderboards" section + effective-date bump + redeploy
+  (copy in the plan §8).
+- Phase 2 (Google/Apple account linking, separate release): App access gains the optional-
+  login note, Data safety adds account identifiers, Apple build must offer Sign in with
+  Apple (guideline 4.8) the moment Google login exists on iOS.
 
 ### If camera data EVER leaves the device (any form, any reason)
 - Prominent disclosure + runtime consent before the transmission, Data safety camera
@@ -131,3 +160,15 @@ be the same URL.
   count), with genuine usage — then "Apply for production access."
 - App updates during the window are fine and do NOT reset the clock; dropping below 12
   opted-in testers or pausing the track does hurt it.
+
+
+### T-009 latest review follow-up (19 Sep)
+
+Migration 0008 makes account deletion transactional with profile recovery; deploy it after
+0007 before the changed deletion/recovery functions. The privacy source and site pages now
+state the eight-entry offline queue and discarded older pending runs. A blocked foreign
+recovery code is retained separately on the device for support until the current profile is
+deleted or app data is cleared; the current profile receives its own code. Both are secrets
+on the device, never public leaderboard data. No SDK, permission, or collected-data category
+is added by these corrections. The existing T-009 atomic binary/Console/policy flip remains
+required; this review made no Console or production deployment changes.

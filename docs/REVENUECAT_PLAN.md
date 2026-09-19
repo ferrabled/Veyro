@@ -292,8 +292,12 @@ Signatures verified against `RevenueCat/Scripts/Purchases.cs` @ 9.8.1 [S27]:
 Notes that belong in the adapter's header comment when it is written:
 
 - **Anonymous app user IDs are correct for v1.0.** Pass `null` and let RevenueCat generate one [S28].
-  D10 says no backend; there is no login. T-009 later adds Play Games sign-in, whose stable player ID
-  becomes the app user ID via `LogIn(appUserId, …)` — do not invent an ID scheme before then.
+  D10 says no backend; there is no login. ~~T-009 later adds Play Games sign-in, whose stable player ID
+  becomes the app user ID via `LogIn(appUserId, …)`~~ **Updated 3 Sep 2026 (T-009 redefinition):
+  the stable ID is the Supabase user UUID**, not a Play Games player ID — it works on iOS and the
+  Galaxy Store too. `IStore` gains `Identify(string)`; `RevenueCatStore` calls `LogIn(supabaseUserId)`
+  once configured. Spec: `docs/PROFILE_LEADERBOARD_PLAN.md` §1; recorded as **D14**
+  (19 Sep). Do not invent any other ID scheme.
 - `SetOnesignalUserID(string)` exists on `Purchases` [S27]. Wire it in T-021, not now, but the seam
   should not make it awkward.
 - The whole thing must be **fail-open**. Network down, store unavailable, SDK not configured → the

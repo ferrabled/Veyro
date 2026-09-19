@@ -1,6 +1,8 @@
 using MotionRunner.Commerce;
 using MotionRunner.Commerce.RevenueCat;
 using MotionRunner.Gameplay;
+using MotionRunner.Social;
+using MotionRunner.Social.Supabase;
 using MotionRunner.Track;
 using UnityEngine;
 
@@ -57,6 +59,20 @@ namespace MotionRunner.Core
             var store = CreateStore();
             var skins = new SkinService(store, runner.GetComponent<Renderer>());
 
+            // Profile/leaderboard backend (T-009): same fail-open shape as the store. Once the
+            // profile loads, its user id becomes the RevenueCat app user id too (D13), so one
+            // stable id spans purchases and boards.
+            var profile = CreateProfileService();
+            profile.ProfileChanged += () =>
+            {
+                // Profile loaded -> alias the store to it. Profile DELETED (Current null) ->
+                // reset the store identity too, so the deleted UUID stops accruing provider
+                // data (18 Sep review R2).
+                if (profile.Current != null) store.Identify(profile.Current.UserId);
+                else store.ResetIdentity();
+            };
+            if (profile.Current != null) store.Identify(profile.Current.UserId);
+
             // Session last: it drives everything above in a fixed order. Disabled until the
             // player has picked a control scheme.
             var session = new GameObject("RunSession").AddComponent<RunSession>();
@@ -64,11 +80,31 @@ namespace MotionRunner.Core
             session.Runner = controller;
             session.Director = director;
             session.Hud = hud;
+            session.Profile = profile;
 
             // Everything from here is transitions rather than construction: which screen is up,
             // which control scheme the run uses, when the camera is allowed to be on, and whether
             // the track is being driven by a run or by the menu's attract loop.
-            RunFlow.Create(session, hud, store, skins);
+            RunFlow.Create(session, hud, store, skins, profile);
+        }
+
+        /// Mirrors CreateStore: the Editor exercises the profile tab against a ready fake, a
+        /// build without Supabase coordinates gets a never-ready fake (boards read as sample
+        /// data, submissions queue nowhere, game untouched), and a configured build talks to
+        /// the real backend. Coordinates ship in SupabaseKeys - public by design, like the
+        /// RevenueCat public keys.
+        static IProfileService CreateProfileService()
+        {
+#if UNITY_EDITOR
+            return FakeProfileService.Ready();
+#else
+            if (!SupabaseKeys.IsConfigured)
+            {
+                Debug.LogWarning("[Profile] No Supabase coordinates in this build - boards offline, game fully playable.");
+                return new FakeProfileService(); // never ready: fail-open
+            }
+            return SupabaseProfileService.Create(SupabaseKeys.Url, SupabaseKeys.AnonKey);
+#endif
         }
 
         /// The RevenueCat SDK cannot run in the Editor (it NREs - REVENUECAT_PLAN §2.5), so
