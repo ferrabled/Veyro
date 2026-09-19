@@ -9,6 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { readJsonBody } from "../_shared/validate.ts";
+import { cleanupProviderIdentities } from "../_shared/provider-cleanup.ts";
 
 const KEY_RE = /^[0-9a-f]{64}$/;
 
@@ -86,16 +87,16 @@ Deno.serve(async (req) => {
       // has already played as its own profile, so recovery must not destroy it.
       return json(409, { recovered: false, recovery_key: "", reason: "destination_not_empty" });
     case "ok": {
-      // The old auth user now owns nothing; removing it is cleanup, not part of the claim —
-      // a failure here leaves a harmless orphan, never a broken profile.
-      if (result.old_user) {
-        const { error: deleteError } = await admin.auth.admin.deleteUser(result.old_user);
-        if (deleteError) console.error("orphan cleanup failed", deleteError);
-      }
+      // Migration 0007 preserves old_user in a cleanup job in the claim transaction.
+      // Never forget the provider identity just because the profile's UUID changed.
+      const providerDeleted = await cleanupProviderIdentities(
+        admin, newUserId, Deno.env.get("RC_API_KEY"),
+      );
       return json(200, {
         recovered: true,
         recovery_key: result.recovery_key ?? "",
         reason: "",
+        provider_deleted: providerDeleted,
       });
     }
     default:

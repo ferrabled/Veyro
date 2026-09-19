@@ -14,6 +14,7 @@
 // (IStore.ResetIdentity -> Purchases.LogOut). Spec: docs/PROFILE_LEADERBOARD_PLAN.md §5/§8.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { cleanupProviderIdentities } from "../_shared/provider-cleanup.ts";
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -35,35 +36,18 @@ Deno.serve(async (req) => {
   if (userError || !userData?.user) return json(401, { error: "no user" });
   const userId = userData.user.id;
 
-  // Provider record first, while the id is still meaningful. RC's app user id IS the
-  // Supabase UUID (Purchases.LogIn wiring), so one DELETE covers the linked customer.
-  let providerDeleted = false;
-  const rcKey = Deno.env.get("RC_API_KEY");
-  if (rcKey) {
-    try {
-      const rc = await fetch(
-        `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${rcKey}` },
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
-      // 404 = no customer record ever existed for this id — that is also "nothing retained".
-      providerDeleted = rc.ok || rc.status === 404;
-      if (!providerDeleted) {
-        console.error(`revenuecat deletion failed: HTTP ${rc.status}`);
-      }
-    } catch (e) {
-      console.error("revenuecat deletion failed", e);
-    }
-  } else {
-    console.warn("RC_API_KEY not configured - provider deletion skipped (support email fallback)");
-  }
-
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+  // Keep a retryable record even after the auth/profile cascade. Earlier recovery jobs
+  // already carry this owner_id, so those provider UUIDs are included in the result too.
+  const { error: queueError } = await admin.from("provider_cleanup").upsert({
+    user_id: userId, owner_id: userId, delete_auth: false,
+  });
+  if (queueError) return json(500, { error: "could not schedule provider deletion" });
+  const providerDeleted = await cleanupProviderIdentities(
+    admin, userId, Deno.env.get("RC_API_KEY"),
   );
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) {
