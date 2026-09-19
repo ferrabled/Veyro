@@ -115,6 +115,11 @@ the same change that ships a feature listed below.
   the profile build reaches any user, or the Data safety form points at a URL without the
   anchor. The in-app PROFILE tab shows a copyable Player ID as the support identifier for
   app-less requests (an ID locates a record; ownership is verified before acting on it).
+- **19 Sep review correction:** deploy migration `0007` before the recovery/deletion Edge
+  Functions. Provider cleanup now includes pre-recovery UUIDs and retains failed work in a
+  service-only retry queue; the owner retry procedure is in PROFILE_LEADERBOARD_PLAN §5.
+  Privacy copy dated 19 Sep describes the actual opportunistic flagged-run retention and
+  pending provider-deletion identifiers. Redeploy that copy with the corrected profile build.
 - Content rating → **unchanged**: handles are server-generated (no free text), so there is
   no UGC to declare. This is load-bearing — free-text names would reopen the questionnaire.
 - Privacy policy → "Profiles and leaderboards" section + effective-date bump + redeploy

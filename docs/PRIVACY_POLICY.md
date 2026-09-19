@@ -46,7 +46,7 @@ permalink: /privacy/
 
 # Veyro Run — Privacy Policy
 
-**Effective date:** 18 September 2026
+**Effective date:** 19 September 2026
 **App:** Veyro Run (`com.ferrabled.veyro.run`), published by Fernando Rabasco ("ferrabled")
 **Contact:** ferrabled+veyro@gmail.com
 
@@ -85,7 +85,7 @@ The recovery code is written to the app's own storage folder, and on some Androi
 - **What other players see:** your generated name and your scores, on the public leaderboards. Nothing else — never your player ID, and never anything from the camera or sensors.
 - **The profile ID is also your purchase identifier.** The same random ID is used with RevenueCat (see Purchases below) so that your cosmetics and your profile belong to one identity. It remains a pseudonymous identifier: it is not linked to your name, email, or Google account by us, but records attached to it are your records, and we treat them that way — they are deletable, not "anonymous and unaccountable".
 - **Retention and deletion:** profile and runs are kept while the profile exists. **PROFILE → DELETE ONLINE PROFILE** deletes the profile, every run, and every leaderboard entry immediately and permanently, and asks RevenueCat to delete its customer record for the same ID. Local device stats stay on the device (they are yours, on your hardware) until you clear the app's data. Without the app, see [data deletion on the support page](https://veyro.ferrabled.com/support/#delete).
-- **Fair-play and security processing:** submitted runs are checked server-side against what the game can physically produce, and submission is rate-limited per profile. Implausible submissions are stored flagged (kept briefly for tuning, never shown on boards). This processing exists to keep the leaderboard honest and the service available.
+- **Fair-play and security processing:** submitted runs are checked server-side against what the game can physically produce, and submission is rate-limited per profile. Implausible submissions are stored flagged (never shown on boards; entries over 30 days old are removed when the same profile submits another flagged run, and otherwise may remain until profile deletion). This processing exists to keep the leaderboard honest and the service available. For provider-deletion retries, former Player IDs may remain in a restricted cleanup queue until cleanup succeeds.
 
 ## Purchases (optional)
 
@@ -126,7 +126,7 @@ This website (veyro.ferrabled.com) sets no cookies and runs no analytics or trac
 
 ## Changes
 
-The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. If a future version of the game starts any further data collection (for example push notifications), this policy will be updated here first, and the app's store listing will reflect it.
+The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. If a future version of the game starts any further data collection (for example push notifications), this policy will be updated here first, and the app's store listing will reflect it.
 
 ## Contact
 

@@ -1,5 +1,48 @@
 # Status journal (newest at top)
 
+## 2026-09-19 — T-009 Copilot findings verified and corrected (copilot-review session; uncommitted)
+
+Checked all 17 Copilot comments on PR #10 against the implementation. All were valid;
+the two flagged-retention comments described the same issue in the two policy copies.
+
+- Profile deletion confirmation resets whenever the tab is shown. Board requests expose
+  loading/error completion, and fallback rows stay explicitly labelled as samples.
+- Restore feedback compares entitlement IDs, including equal-count replacements.
+- RevenueCat identity transitions serialize login/logout, discard stale customer info,
+  remember a stale successful login for the required logout, and retry failures without
+  forgetting the applied ID. Anonymous SDK state is handled without a failing logout loop.
+- Runs queued without a session now schedule draining with the session backoff. A pending
+  recovery no longer prevents the drain from retrying that recovery. Duplicate responses
+  preserve both ranks. Imports missing a rotated recovery key request and persist one before
+  reporting success; issuance failure remains unsettled and retries during the same boot.
+- Forward migration `0007_review_corrections.sql` checks app-version/platform replay drift
+  and computes new-run/replay ranks from the board score actually retained. Score economy,
+  XP rules, seed generation and board keys are unchanged.
+- Recovery queues the old provider UUID transactionally before transferring the profile.
+  Recovery/deletion functions retry provider cleanup before removing old auth users, retain
+  failed jobs across account deletion, and preserve a successful recovery response even if
+  cleanup throws. Owner retry script and deployment order documented in the profile plan.
+- Corrected reroll/day-label contracts, current backlog count and the contradictory question
+  headline. Both privacy copies now describe opportunistic flagged-run retention accurately
+  and disclose pending cleanup identifiers; effective date is 19 September.
+
+**Verified:** 428/428 Unity EditMode tests (17 new), including actual adapter coroutines with
+only their HTTP leaf scripted: offline scheduling/drain, pending recovery, duplicate ranks,
+import key issuance and retry. Menu regressions exercise the actual compiled menu classes.
+9/9 Deno tests cover validator limits, provider success/failure/retry, and the actual SQL
+migration chain/RPCs in disposable PGlite PostgreSQL. PGlite's unavailable pgcrypto extension
+setup/random-byte issuance is shimmed only in tests; PostgreSQL SHA-256 remains real. This is
+not a hosted Supabase/concurrency/device verification. Edge Functions and retry script pass
+`deno check`; `hob git diff --check` passes. Nothing committed or deployed.
+
+**Next / needs human device test:** owner applies migration 0007, deploys both changed Edge
+Functions and the policy copy, and checks RC_API_KEY. On the phone: arm delete, switch tabs,
+return and confirm two fresh taps are needed; go offline, finish a run, restore connectivity
+without backgrounding and confirm it drains; import a profile and confirm a recovery code is
+immediately copyable; buy/restore a licensed cosmetic across recovery/deletion and verify the
+old RevenueCat identity is deleted and pending cleanup clears. Previously orphaned IDs are
+not backfilled by 0007; include them in the already-planned pre-tester test-data cleanup.
+
 ## 2026-09-19 — T-009 owner decisions recorded (D13–D18), overflow + restore-honesty fixes, validator tests run (profile-integration session)
 
 **Headline: the four owner calls this PR encodes are no longer proposals** — D13 (Supabase
@@ -8,7 +51,7 @@ RevenueCat app user ID, reset on delete), D15 (server-generated handles only; un
 rerolls per the 17 Sep amendment) and D16 (Daily + All-time, keyed and split standard vs
 camera) are in DECISIONS.md, together with **D17 score formula FROZEN** and **D18 CAPTCHA
 deliberately off**. OPEN_QUESTIONS 6, 15, 16 and 17 struck; **18 (attestation / replay
-validation) stays open at the owner's request** — it is the only T-009 question left.
+validation) is tracked as T-041 at the owner's request** — T-009 has no open questions left.
 
 **D17 is binding on three files at once:** the formula (`ScoreState`), `game_config`, and
 `supabase/functions/_shared/validate.ts` now move together or not at all. Changing one alone

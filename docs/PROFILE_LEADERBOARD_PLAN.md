@@ -153,8 +153,11 @@ concurrent claims of one key serialize and exactly one wins; **the destination m
 profile** (no runs, no XP, untouched rerolls) — a recovery key can never silently destroy a
 played profile (`destination_not_empty`, 409; merging is an unmade owner decision); transfer +
 key rotation happen in the same transaction (handle, XP, runs and board rows follow via
-`ON UPDATE CASCADE`). The orphaned old auth user is deleted afterwards as best-effort cleanup —
-a failure there leaves a harmless empty auth row, never a broken profile. Unknown key → uniform
+`ON UPDATE CASCADE`). Migration `0007` also queues the old RevenueCat UUID in that same
+transaction. The Edge Function requests provider deletion before removing the old auth user;
+failed work stays in the service-only `provider_cleanup` table across further recoveries and
+account deletion. Every recovery/deletion retries up to eight jobs. Purchases remain restorable
+from the store receipt; a device purchase/restore pass is required before release. Unknown key → uniform
 `{recovered:false}`. Keys are issued by **`rotate_recovery_key()`** (authenticated): always
 rotates and returns a fresh key for the caller — **retry-safe by design**: a lost response just
 means the next call issues another valid key, and the superseded key stops working (old
@@ -164,6 +167,17 @@ holding your session.
 **`delete-account`** — `auth.admin.deleteUser(user_id from JWT)`; cascades wipe
 profile/runs/boards (true deletion — Play forbids deactivation-as-deletion). Client then drops
 local session + recovery key and calls `Purchases.logOut()`.
+
+**19 Sep review deployment:** apply `0007_review_corrections.sql` before deploying both
+`recover-session` and `delete-account` with their shared provider-cleanup helper. Set the existing
+`RC_API_KEY` secret before testing. Cleanup uses RevenueCat's retry-safe DELETE semantics
+(HTTP 200 or 404); errors remain pending instead of losing the provider UUID. There is no
+scheduled provider worker: on a quiet project, the owner retries with
+`deno run --allow-env --allow-net supabase/scripts/retry-provider-cleanup.ts`, supplying
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `RC_API_KEY` through the environment.
+Check this queue during deletion support and before the documented 30-day support deadline.
+Previously orphaned provider IDs from recoveries before `0007` cannot be reconstructed by
+this migration; include them in the existing pre-tester dashboard/test-data cleanup.
 
 Handle reroll and profile creation are **not** Edge Functions: `security definer` RPC + auth
 trigger (same security, zero function invocations).
