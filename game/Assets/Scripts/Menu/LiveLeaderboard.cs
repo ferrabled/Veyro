@@ -28,6 +28,8 @@ namespace MotionRunner.Menu
         }
 
         public bool IsLive => _board != null;
+        public bool IsLoading { get; private set; }
+        public SocialError LastError { get; private set; }
 
         /// The caller's rank on the cached board, 0 when unknown or unranked.
         public int MyRank => _board?.MyRank ?? 0;
@@ -53,10 +55,15 @@ namespace MotionRunner.Menu
 
             // Stale-response guard: only the newest request may write the cache.
             int generation = ++_generation;
+            IsLoading = true;
+            LastError = null;
+            Changed?.Invoke();
             _service.FetchBoard(_query, (board, error) =>
             {
-                if (generation != _generation || board == null) return;
-                _board = board;
+                if (generation != _generation) return;
+                IsLoading = false;
+                LastError = error ?? (board == null ? new SocialError("unavailable", "no board") : null);
+                if (LastError == null) _board = board;
                 Changed?.Invoke();
             });
         }

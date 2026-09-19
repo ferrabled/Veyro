@@ -15,8 +15,8 @@ namespace MotionRunner.Menu
     /// disk through ProgressStore; the leaderboard comes from the shared Supabase board (T-009)
     /// through LiveLeaderboard when the backend answers, and falls back to MockLeaderboard —
     /// still labelled as sample data — when it does not (no key, offline, first frames). The
-    /// player card shows the server-generated handle once a profile exists, with its reroll
-    /// budget, and the links card carries the account-deletion path Play policy requires.
+    /// player card shows the server-generated handle once a profile exists, with unlimited
+    /// rerolls, and the links card carries the account-deletion path Play policy requires.
     public sealed class ProfilePage : MenuPage
     {
         const float TopOffset = 12f;
@@ -277,6 +277,9 @@ namespace MotionRunner.Menu
 
         public override void OnShown()
         {
+            _deleteArmed = false;
+            _delete.text = "DELETE ONLINE PROFILE";
+            _delete.color = MenuTheme.Dim;
             var utcNow = DateTime.UtcNow;
             string todayLabel = DailySeed.LabelForDate(utcNow);
             int streak = DailyStreak.LengthOn(ProgressStore.Streak, DailyStreak.DayNumber(utcNow));
@@ -455,13 +458,11 @@ namespace MotionRunner.Menu
         /// live → the player's rank, or a nudge to finish a run.
         void RefreshBoardNote()
         {
-            var service = Menu.Profile;
-
             if (!_live.IsLive)
             {
-                _boardNote.text = service != null && service.IsReady
-                    ? "loading the shared board…"
-                    : "sample board — the shared one arrives with online scores";
+                _boardNote.text = _live.IsLoading
+                    ? "sample board — loading online scores…"
+                    : "sample board — online scores unavailable";
                 _boardNote.color = MenuTheme.Faint;
                 return;
             }

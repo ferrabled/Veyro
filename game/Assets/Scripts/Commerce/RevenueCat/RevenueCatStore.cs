@@ -82,61 +82,59 @@ namespace MotionRunner.Commerce.RevenueCat
             }
             _configured = true;
             RefreshCustomerInfo();
-            if (_pendingIdentity != null) ApplyIdentity(_pendingIdentity);
+            SyncIdentity();
         }
 
         /// Identify arriving before the SDK is configured (profile backend answered first) is
         /// held and applied right after Configure - the same one-frame dance as everything else.
-        string _pendingIdentity;
-        string _appliedIdentity;
+        readonly StoreIdentity _identity = new StoreIdentity();
+        float _identityRetryAt;
 
         public void Identify(string userId)
         {
-            if (string.IsNullOrEmpty(userId) || userId == _appliedIdentity) return;
-            if (!SdkConfigured())
-            {
-                _pendingIdentity = userId;
-                return;
-            }
-            ApplyIdentity(userId);
+            _identity.Identify(userId);
+            SyncIdentity();
         }
 
         /// Account deletion's identity reset: LogOut returns the SDK to a fresh anonymous app
         /// user id, so the deleted player's UUID stops accruing provider data (the server-side
-        /// customer record is deleted by the delete-account Edge Function). Fail-open: a
-        /// failure leaves the alias in place, which the support path can still clean up.
+        /// customer record is deleted by the delete-account Edge Function). Failed operations
+        /// remain pending and retry; an in-flight login must finish before logout starts.
         public void ResetIdentity()
         {
-            _pendingIdentity = null;
-            if (!SdkConfigured() || _appliedIdentity == null) return;
-            _appliedIdentity = null;
-            _purchases.LogOut((customerInfo, error) =>
-            {
-                if (error != null)
-                {
-                    Debug.LogWarning("[Store] LogOut failed - identity unchanged: " + error.Message);
-                    return;
-                }
-                if (customerInfo != null) ApplyCustomerInfo(customerInfo);
-            });
+            _identity.Reset();
+            _identityRetryAt = 0f;
+            SyncIdentity();
         }
 
-        /// LogIn aliases the current anonymous app user id to the stable one server-side, so
-        /// entitlements bought before and after identification stay one customer (T-009/D13).
-        void ApplyIdentity(string userId)
+        void Update() => SyncIdentity();
+
+        void SyncIdentity()
         {
-            _pendingIdentity = null;
-            _purchases.LogIn(userId, (customerInfo, created, error) =>
+            if (!SdkConfigured() || Time.realtimeSinceStartup < _identityRetryAt ||
+                !_identity.TryBegin(out var userId, out var generation)) return;
+
+            void Completed(Purchases.CustomerInfo customerInfo, Purchases.Error error)
             {
+                bool current = _identity.Complete(userId, generation, error == null);
                 if (error != null)
                 {
-                    // Fail-open: identity stays anonymous, receipts still restore everything.
-                    Debug.LogWarning("[Store] LogIn failed - staying anonymous: " + error.Message);
+                    _identityRetryAt = Time.realtimeSinceStartup + 5f;
+                    Debug.LogWarning("[Store] Identity update failed - will retry: " + error.Message);
                     return;
                 }
-                _appliedIdentity = userId;
-                if (customerInfo != null) ApplyCustomerInfo(customerInfo);
-            });
+                _identityRetryAt = 0f;
+                if (current && customerInfo != null) ApplyCustomerInfo(customerInfo);
+                SyncIdentity();
+            }
+
+            if (userId == null && _purchases.IsAnonymous())
+            {
+                Completed(null, null);
+                RefreshCustomerInfo();
+            }
+            else if (userId == null) _purchases.LogOut((info, error) => Completed(info, error));
+            else _purchases.LogIn(userId, (info, created, error) => Completed(info, error));
         }
 
         /// Listener path: fires on launch, after purchases, and after out-of-app changes
@@ -365,6 +363,7 @@ namespace MotionRunner.Commerce.RevenueCat
 
         void ApplyCustomerInfo(Purchases.CustomerInfo customerInfo)
         {
+            if (!_identity.Settled) return;
             if (customerInfo?.Entitlements?.Active == null) return;
 
             bool firstAnswer = !IsReady;

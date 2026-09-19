@@ -244,13 +244,13 @@ namespace MotionRunner.Menu
             // player takes after DELETE ONLINE PROFILE resets the store identity (T-009).
             // The adapter applies the customer info before invoking this callback, so
             // comparing the entitlement set across the call says what actually happened.
-            int before = _store.ActiveEntitlements.Count;
+            var before = new HashSet<string>(_store.ActiveEntitlements);
             _store.Restore(outcome =>
             {
                 if (!StillBuilt) return;
                 _busy = false;
                 _status.text = outcome.Succeeded
-                    ? DescribeRestore(before, _store.ActiveEntitlements.Count)
+                    ? DescribeRestore(before, _store.ActiveEntitlements)
                     : Describe(outcome, "restore");
                 Refresh();
             });
@@ -259,10 +259,10 @@ namespace MotionRunner.Menu
         /// What a successful restore actually did. "Nothing to restore" is the honest answer
         /// when the store account owns nothing - it is not a failure, and it is not a
         /// restoration either.
-        static string DescribeRestore(int before, int after)
+        static string DescribeRestore(HashSet<string> before, IReadOnlyCollection<string> after)
         {
-            if (after > before) return "purchases restored";
-            if (after > 0) return "everything you own is already unlocked";
+            if (after.Count > 0 && !before.SetEquals(after)) return "purchases restored";
+            if (after.Count > 0) return "everything you own is already unlocked";
             return "nothing to restore on this account";
         }
 

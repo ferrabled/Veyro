@@ -218,7 +218,7 @@ namespace MotionRunner.Tests
             Assert.That(outcome?.Status, Is.EqualTo(SubmitStatus.Queued));
             Assert.That(service.Pending.Count, Is.EqualTo(1));
 
-            service.BecomeReady(new Profile("u", "SWIFT-FOX-42", 3, 0));
+            service.BecomeReady(new Profile("u", "SWIFT-FOX-42", 0));
             Assert.That(service.Pending, Is.Empty);
             Assert.That(service.Submitted.Count, Is.EqualTo(1));
         }

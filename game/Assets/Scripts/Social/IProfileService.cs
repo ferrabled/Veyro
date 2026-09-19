@@ -32,7 +32,7 @@ namespace MotionRunner.Social
         /// One board page: top rows plus the caller's own rank on that board.
         void FetchBoard(BoardQuery query, Action<BoardResult, SocialError> done);
 
-        /// Server-generated replacement handle; decrements the lifetime reroll budget.
+        /// Server-generated replacement handle; unlimited rerolls, with a server burst throttle.
         void RerollHandle(Action<Profile, SocialError> done);
 
         /// True deletion of the profile and every run/board row (Play account-deletion policy).
@@ -58,14 +58,12 @@ namespace MotionRunner.Social
     {
         public readonly string UserId;
         public readonly string Handle;
-        public readonly int RerollsLeft;
         public readonly int Xp;
 
-        public Profile(string userId, string handle, int rerollsLeft, int xp)
+        public Profile(string userId, string handle, int xp)
         {
             UserId = userId ?? string.Empty;
             Handle = handle ?? string.Empty;
-            RerollsLeft = rerollsLeft;
             Xp = xp;
         }
     }

@@ -15,7 +15,7 @@ namespace MotionRunner.Social
         public int seed;
         public string content_version;
         public string world_id;
-        public string day_label;       // "2026-09-09" — the server cross-checks, never trusts
+        public string day_label;       // Display-only "2026-09-09"; server derives the date from seed.
         public string input_mode;      // InputModes.Tilt | Camera | CameraFallback
         public int score;
         public float distance_m;

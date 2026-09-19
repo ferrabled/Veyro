@@ -96,7 +96,8 @@ namespace MotionRunner.Social.Supabase
                              Time.realtimeSinceStartup < _accessExpiresAt;
 
         /// Everything is settled: nothing for EnsureSession to do.
-        bool SessionSettled => HasLiveToken && IsReady && !_recoveryPending;
+        bool SessionSettled => HasLiveToken && IsReady && !_recoveryPending &&
+            (_recoveryBlocked || !string.IsNullOrEmpty(RecoveryCode));
 
         /// The one entry point for session work. Serialized, backoff-gated, and it never
         /// invents a new anonymous identity while a transient failure hides the old one.
@@ -222,6 +223,13 @@ namespace MotionRunner.Social.Supabase
 
             // Retry-safe key issuance - but ONLY when it cannot destroy a pending road back
             // (RecoveryGate.MayRotate). A key tagged with the current user needs nothing.
+            yield return EnsureRecoveryKey();
+            ScheduleDrain(0f);
+        }
+
+        IEnumerator EnsureRecoveryKey()
+        {
+            string previousCode = RecoveryCode;
             var afterLoad = ReadRecoveryKey();
             if (RecoveryGate.MayRotate(afterLoad.UserId, afterLoad.Key, _userId))
             {
@@ -246,8 +254,29 @@ namespace MotionRunner.Social.Supabase
                         WriteRecoveryKey(_userId, response.recovery_key);
                 });
             }
+            if (!_recoveryBlocked && string.IsNullOrEmpty(RecoveryCode))
+            {
+                ApplyBackoff(0f);
+                if (!_keyRetryScheduled)
+                {
+                    _keyRetryScheduled = true;
+                    StartCoroutine(RetryRecoveryKey());
+                }
+            }
+            else if (IsReady && RecoveryCode != previousCode)
+            {
+                // A background retry can finish while the profile tab remains open.
+                ProfileChanged?.Invoke();
+            }
+        }
 
-            ScheduleDrain(0f);
+        bool _keyRetryScheduled;
+
+        IEnumerator RetryRecoveryKey()
+        {
+            yield return new WaitForSecondsRealtime(SessionRetryDelay);
+            _keyRetryScheduled = false;
+            yield return EnsureSession();
         }
 
         /// POST /auth/v1/signup with an empty body is GoTrue's anonymous sign-in (enabled in
@@ -317,14 +346,14 @@ namespace MotionRunner.Social.Supabase
             // and stay within the column-level SELECT grant (0004): recovery_key_hash is
             // deliberately not readable by clients.
             yield return SendJson(UnityWebRequest.kHttpVerbGET,
-                _url + "/rest/v1/profiles?select=handle,rerolls_left,xp", null, true,
+                _url + "/rest/v1/profiles?select=handle,xp", null, true,
                 (status, body, _) =>
                 {
                     if (status != 200) return;
                     var row = JsonUtility.FromJson<ProfileRow>(body);
                     if (row == null || string.IsNullOrEmpty(row.handle)) return;
 
-                    Current = new Profile(_userId, row.handle, row.rerolls_left, row.xp);
+                    Current = new Profile(_userId, row.handle, row.xp);
                     IsReady = true;
                     ProfileChanged?.Invoke();
                 },
@@ -368,6 +397,7 @@ namespace MotionRunner.Social.Supabase
             if (_recoveryPending || !HasLiveToken || _dormantAfterDeletion)
             {
                 if (queueOnFailure) Enqueue(run);
+                ScheduleDrain(SessionRetryDelay);
                 done?.Invoke(new SubmitOutcome(queueOnFailure ? SubmitStatus.Queued : SubmitStatus.Rejected,
                     error: new SocialError("offline",
                         _recoveryPending ? "recovery pending" : "no session")));
@@ -403,7 +433,8 @@ namespace MotionRunner.Social.Supabase
                 }
                 if (response.duplicate)
                 {
-                    done?.Invoke(new SubmitOutcome(SubmitStatus.Duplicate));
+                    done?.Invoke(new SubmitOutcome(SubmitStatus.Duplicate,
+                        response.daily_rank, response.alltime_rank));
                     yield break;
                 }
                 done?.Invoke(response.accepted
@@ -517,7 +548,7 @@ namespace MotionRunner.Social.Supabase
                     done?.Invoke(Current, new SocialError("throttled", "one moment between name changes"));
                     return;
                 }
-                Current = new Profile(Current.UserId, response.handle, response.rerolls_left, Current.Xp);
+                Current = new Profile(Current.UserId, response.handle, Current.Xp);
                 ProfileChanged?.Invoke();
                 done?.Invoke(Current, null);
             });
@@ -575,14 +606,22 @@ namespace MotionRunner.Social.Supabase
                     if (!string.IsNullOrEmpty(response.recovery_key))
                         WriteRecoveryKey(_userId, response.recovery_key);
                     else
-                        DeleteRecoveryKeyFile(); // MayRotate reissues one next settle
+                        DeleteRecoveryKeyFile();
+                    _recoveryPending = false;
+                    _recoveryBlocked = false;
+                    // A successful self-import may have no rotated key. Obtain and persist
+                    // one before reporting success; failed issuance keeps retrying this boot.
+                    yield return EnsureRecoveryKey();
                     // The profile under this user changed identity: reload it.
                     IsReady = false;
                     Current = null;
                     yield return LoadProfile();
                     ScheduleDrain(0f);
-                    done?.Invoke(IsReady ? null
-                        : new SocialError("offline", "imported — profile loads on next launch"));
+                    done?.Invoke(!IsReady
+                        ? new SocialError("offline", "imported — profile loads on next launch")
+                        : string.IsNullOrEmpty(RecoveryCode)
+                            ? new SocialError("offline", "imported — recovery code pending; keep app data until it appears")
+                            : null);
                     yield break;
                 case RecoveryGate.Resolution.Blocked:
                     done?.Invoke(new SocialError("destination_not_empty",
@@ -672,7 +711,7 @@ namespace MotionRunner.Social.Supabase
 
         IEnumerator DrainPending()
         {
-            if (_draining || _recoveryPending || _dormantAfterDeletion) yield break;
+            if (_draining || _dormantAfterDeletion) yield break;
             _draining = true;
             try
             {
@@ -699,7 +738,7 @@ namespace MotionRunner.Social.Supabase
                         // Transient again: keep the rest queued and try later on the submit
                         // gate's own schedule.
                         float delay = Mathf.Max(_submitNotBefore - Time.realtimeSinceStartup,
-                            RetrySchedule.FirstDelaySeconds);
+                            SessionRetryDelay);
                         _draining = false;
                         ScheduleDrain(delay);
                         yield break;
@@ -725,6 +764,9 @@ namespace MotionRunner.Social.Supabase
             StartCoroutine(EnsureSession());
             ScheduleDrain(1f);
         }
+
+        float SessionRetryDelay => Mathf.Max(_retryNotBefore - Time.realtimeSinceStartup,
+            RetrySchedule.FirstDelaySeconds);
 
         // ---------------- recovery key storage ----------------
         // A file under persistentDataPath: covered by Android Auto Backup (the mechanism that
@@ -861,7 +903,6 @@ namespace MotionRunner.Social.Supabase
         class ProfileRow
         {
             public string handle;
-            public int rerolls_left;
             public int xp;
         }
 
@@ -900,7 +941,6 @@ namespace MotionRunner.Social.Supabase
         class RerollResponse
         {
             public string handle;
-            public int rerolls_left;
         }
 
         [Serializable]

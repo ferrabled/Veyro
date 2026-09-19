@@ -34,7 +34,7 @@ namespace MotionRunner.Social
         public static FakeProfileService Ready()
         {
             var fake = new FakeProfileService();
-            fake.BecomeReady(new Profile("fake-user", DefaultHandle, 3, 0));
+            fake.BecomeReady(new Profile("fake-user", DefaultHandle, 0));
             return fake;
         }
 
@@ -94,8 +94,7 @@ namespace MotionRunner.Social
             }
 
             _rerolls++;
-            Current = new Profile(Current.UserId, "NEW-" + _rerolls,
-                Current.RerollsLeft, Current.Xp);
+            Current = new Profile(Current.UserId, "NEW-" + _rerolls, Current.Xp);
             ProfileChanged?.Invoke();
             done?.Invoke(Current, null);
         }
@@ -123,7 +122,7 @@ namespace MotionRunner.Social
                     "this install has already played"));
                 return;
             }
-            Current = new Profile("imported-user", "IMPORTED-FOX-1", 3, 42);
+            Current = new Profile("imported-user", "IMPORTED-FOX-1", 42);
             ProfileChanged?.Invoke();
             done?.Invoke(null);
         }
