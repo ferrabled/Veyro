@@ -8,14 +8,14 @@ namespace MotionRunner.Art
     /// Visual-only effects. One instance per runner/preview; nothing touches gameplay RNG or bounds.
     public sealed class RunnerCosmetics : MonoBehaviour
     {
-        GameObject _hat;
-        CosmeticRibbon _ribbon;
+        GameObject _hat,_back;
+        CosmeticTrail _trail;
         ParticleSystem _aura, _crash;
         Material _auraMaterial, _crashMaterial;
         string _appearance;
         public bool HasCrashEffect => _crash!=null;
-        public int LiveParticleLimit => (_aura!=null ? 24:0)+(_crash!=null ? 30:0);
-        public void Apply(CosmeticLoadout loadout, Animator animator, Material outfit)
+        public int LiveParticleLimit => (_aura!=null ? 24:0)+(_crash!=null ? 30:0)+(_trail!=null ? 36:0);
+        public void Apply(CosmeticLoadout loadout, Animator animator, Material outfit, CharacterRig rig)
         {
             string appearance=loadout.Serialize();
             if(_appearance==appearance) return;
@@ -29,23 +29,29 @@ namespace MotionRunner.Art
             var art=SeasonArt.Load();
             if(art==null) return;
             var prefab=art.Hat(loadout.Headwear);
-            if(prefab!=null && animator!=null)
+            rig?.Dress(prefab!=null,!string.IsNullOrEmpty(loadout.Back));
+            if(prefab!=null && rig!=null && rig.HatSocket!=null)
             {
-                var head=animator.GetBoneTransform(HumanBodyBones.Head);
-                _hat=Instantiate(prefab,head,false);
-                _hat.name="Cosmetic "+loadout.Headwear;
-                // The imported Kenney skeleton carries an FBX unit scale. Normalize against the
-                // head's world scale instead of inheriting that scale a second time.
-                var boneScale=head.lossyScale;
-                _hat.transform.localScale=new Vector3(RunnerVisual.PresentationScale/Mathf.Abs(boneScale.x),
-                    RunnerVisual.PresentationScale/Mathf.Abs(boneScale.y),RunnerVisual.PresentationScale/Mathf.Abs(boneScale.z));
-                _hat.transform.position=head.position+head.up*0.34f;
-                _hat.transform.localRotation=Quaternion.Euler(0,loadout.Headwear=="cap" ? -90:0,0);
+                _hat=Instantiate(prefab,rig.HatSocket,false);_hat.name="Cosmetic "+loadout.Headwear;
+                // Hat meshes are authored around their opening, not around the brim's bounding box.
+                var scale=rig.HatSocket.lossyScale;
+                var fit=rig.Fit(loadout.Headwear);
+                _hat.transform.localScale=new Vector3(fit.Size.x*RunnerVisual.PresentationScale/Mathf.Abs(scale.x),
+                    fit.Size.y*RunnerVisual.PresentationScale/Mathf.Abs(scale.y),fit.Size.z*RunnerVisual.PresentationScale/Mathf.Abs(scale.z));
+                _hat.transform.localPosition=rig.HatSocket.InverseTransformVector(rig.transform.TransformVector(fit.Offset));
+            }
+            var attachment=CharacterArt.Load()?.Attachment(loadout.Back);
+            if(attachment!=null && rig!=null && rig.BackSocket!=null)
+            {
+                _back=Instantiate(attachment,rig.BackSocket,false);_back.name="Cosmetic "+loadout.Back;
+                var scale=rig.BackSocket.lossyScale;
+                _back.transform.localScale=Vector3.Scale(attachment.transform.localScale,new Vector3(RunnerVisual.PresentationScale/Mathf.Abs(scale.x),
+                    RunnerVisual.PresentationScale/Mathf.Abs(scale.y),RunnerVisual.PresentationScale/Mathf.Abs(scale.z)));
             }
             if(!string.IsNullOrEmpty(loadout.Trail))
             {
-                var go=new GameObject("Cosmetic ribbon"); go.transform.SetParent(transform,false);
-                _ribbon=go.AddComponent<CosmeticRibbon>(); _ribbon.Configure(loadout.Trail,art.Effects,art.Trace);
+                var go=new GameObject("Cosmetic foot sparks");go.transform.SetParent(transform,false);
+                _trail=go.AddComponent<CosmeticTrail>();_trail.Configure(loadout.Trail,art);
             }
             if(!string.IsNullOrEmpty(loadout.Aura))
             {
@@ -94,86 +100,54 @@ namespace MotionRunner.Art
             return system;
         }
         public void Crash() { if(_crash!=null) { _crash.Play(); _crash.Emit(28); } }
-        public void ResetEffects() { _ribbon?.ResetTrail(); _crash?.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear); if(_aura!=null) { _aura.Clear();_aura.Play(); } }
+        public void ResetEffects() { _trail?.ResetTrail(); _crash?.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear); if(_aura!=null) { _aura.Clear();_aura.Play(); } }
+        public void Release(){_appearance=null;Clear();}
         void Clear()
         {
-            Dispose(_hat); if(_ribbon!=null) Dispose(_ribbon.gameObject);
+            Dispose(_hat);Dispose(_back);if(_trail!=null)Dispose(_trail.gameObject);
             if(_aura!=null) Dispose(_aura.gameObject); if(_crash!=null) Dispose(_crash.gameObject);
             Dispose(_auraMaterial); Dispose(_crashMaterial);
-            _hat=null; _ribbon=null; _aura=null; _crash=null;
+            _hat=null;_back=null;_trail=null; _aura=null; _crash=null;
         }
         public static void SetLayerRecursively(GameObject root,int layer)
         {
             root.layer=layer;
             foreach(Transform child in root.transform) SetLayerRecursively(child.gameObject,layer);
         }
-        static void Dispose(Object obj) { if(obj==null)return; if(Application.isPlaying) Destroy(obj); else DestroyImmediate(obj); }
+        static void Dispose(Object obj) { if(obj==null)return;if(obj is GameObject go)go.SetActive(false); if(Application.isPlaying) Destroy(obj); else DestroyImmediate(obj); }
         void OnDestroy() => Clear();
     }
 
-    /// A bounded ribbon for the scrolling-world runner. History is sampled at fixed time intervals,
-    /// so 30/60/90 FPS renderers have the same trail length. Never allocates in Update.
-    public sealed class CosmeticRibbon : MonoBehaviour
+    /// Short, sparse foot sparks express forward travel in a scrolling world without a floating ribbon.
+    public sealed class CosmeticTrail : MonoBehaviour
     {
-        const int Points=16;
-        readonly Vector3[] _history=new Vector3[Points];
-        Vector3[] _vertices;
-        Color[] _colors;
-        Mesh _mesh;
+        ParticleSystem _particles;
         Material _material;
-        string _id;
-        int _ribbons;
-        float _sample;
-        public void Configure(string id,Material source,Texture texture)
+        public void Configure(string id,SeasonArt art)
         {
-            _id=id; _ribbons=id=="twin" ? 2:1;
-            _vertices=new Vector3[Points*2*_ribbons]; _colors=new Color[_vertices.Length];
-            var uv=new Vector2[_vertices.Length]; var indices=new int[(Points-1)*6*_ribbons];
-            for(int r=0;r<_ribbons;r++) for(int i=0;i<Points;i++)
-            {
-                int v=(r*Points+i)*2; uv[v]=new Vector2(0,i/(float)(Points-1)); uv[v+1]=new Vector2(1,i/(float)(Points-1));
-                if(i==Points-1)continue;
-                int t=(r*(Points-1)+i)*6;
-                indices[t]=v;indices[t+1]=v+2;indices[t+2]=v+1;indices[t+3]=v+1;indices[t+4]=v+2;indices[t+5]=v+3;
-            }
-            _mesh=new Mesh { name="Cosmetic ribbon" }; _mesh.MarkDynamic();
-            _mesh.vertices=_vertices;_mesh.uv=uv;_mesh.triangles=indices;
-            gameObject.AddComponent<MeshFilter>().sharedMesh=_mesh;
-            _material=new Material(source);_material.SetTexture("_BaseMap",texture);_material.SetFloat("_Ribbon",1);
-            var renderer=gameObject.AddComponent<MeshRenderer>();renderer.sharedMaterial=_material;
+            transform.localPosition=new Vector3(0,-0.44f,-0.12f);
+            _material=new Material(art.Effects);_material.SetTexture("_BaseMap",id=="aurora" || id=="frost" ? art.Star : art.Spark);
+            _particles=gameObject.AddComponent<ParticleSystem>();_particles.Stop(true,ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main=_particles.main;main.loop=true;main.playOnAwake=false;main.maxParticles=36;
+            main.simulationSpace=ParticleSystemSimulationSpace.Local;main.startLifetime=new ParticleSystem.MinMaxCurve(0.35f,0.65f);
+            main.startSpeed=0;main.startSize=new ParticleSystem.MinMaxCurve(id=="shadow" ? 0.045f:0.025f,id=="shadow" ? 0.13f:0.075f);
+            var item=CosmeticCatalog.Find(id);
+            Color color=item!=null ? SkinService.ToColor(item.BodyColor) : id=="ember" ? ParkTheme.Hex(0xFFA759) : ParkTheme.Hex(0xC3F1FF);
+            color.a=id=="shadow" ? 0.30f:0.75f;
+            main.startColor=new ParticleSystem.MinMaxGradient(color,id=="aurora" || id=="twin" ? ParkTheme.Pink:color);
+            var emission=_particles.emission;emission.rateOverTime=28;
+            var shape=_particles.shape;shape.shapeType=ParticleSystemShapeType.Box;shape.scale=new Vector3(0.28f,0.03f,0.06f);
+            var velocity=_particles.velocityOverLifetime;velocity.enabled=true;velocity.space=ParticleSystemSimulationSpace.Local;
+            velocity.z=-1.6f;velocity.y=0.12f;
+            var size=_particles.sizeOverLifetime;size.enabled=true;size.size=new ParticleSystem.MinMaxCurve(1,AnimationCurve.EaseInOut(0,1,1,0));
+            var colorLife=_particles.colorOverLifetime;colorLife.enabled=true;
+            var fade=new Gradient();fade.SetKeys(new[]{new GradientColorKey(Color.white,0),new GradientColorKey(Color.white,1)},
+                new[]{new GradientAlphaKey(0,0),new GradientAlphaKey(0.85f,0.12f),new GradientAlphaKey(0,1)});colorLife.color=fade;
+            var renderer=_particles.GetComponent<ParticleSystemRenderer>();renderer.sharedMaterial=_material;
             renderer.shadowCastingMode=ShadowCastingMode.Off;renderer.receiveShadows=false;
-            ResetTrail();
+            _particles.Play();
         }
-        public void ResetTrail() { for(int i=0;i<Points;i++) _history[i]=transform.position; _sample=0; }
-        void LateUpdate() => StepVisual(Time.deltaTime,Time.time);
-        public void StepVisual(float deltaTime,float elapsedTime)
-        {
-            if(_mesh==null || deltaTime<=0)return;
-            _sample+=deltaTime;
-            if(_sample>=1f/30f)
-            {
-                _sample%=1f/30f;
-                for(int i=Points-1;i>0;i--)_history[i]=_history[i-1];
-                _history[0]=transform.position;
-            }
-            var item=CosmeticCatalog.Find(_id); Color color=item==null ? (_id=="ember" ? new Color(1,0.4f,0.1f) : new Color(0.2f,0.72f,0.95f)) : SkinService.ToColor(item.BodyColor);
-            for(int r=0;r<_ribbons;r++)for(int i=0;i<Points;i++)
-            {
-                float age=i/(float)(Points-1);
-                var p=transform.InverseTransformPoint(_history[i]);
-                p+=new Vector3(_ribbons==2 ? (r==0 ? -0.22f:0.22f) : 0,-0.26f,-0.2f-age*2.4f);
-                float width=(1-age)*0.18f;
-                int v=(r*Points+i)*2;_vertices[v]=p+Vector3.left*width;_vertices[v+1]=p+Vector3.right*width;
-                Color tint=_id=="aurora" ? Color.Lerp(ParkTheme.Mint,ParkTheme.Pink,0.5f+0.5f*Mathf.Sin(elapsedTime*2-age*5)) : color;
-                tint.a=(1-age)*(_id=="cyan" ? 0.6f+0.25f*Mathf.Sin(elapsedTime*5) : 0.8f);
-                _colors[v]=_colors[v+1]=tint;
-            }
-            _mesh.vertices=_vertices;_mesh.colors=_colors;_mesh.RecalculateBounds();
-        }
-        void OnDestroy()
-        {
-            if(Application.isPlaying) { Destroy(_mesh);Destroy(_material); }
-            else { DestroyImmediate(_mesh);DestroyImmediate(_material); }
-        }
+        public void ResetTrail(){if(_particles!=null){_particles.Clear();_particles.Play();}}
+        void OnDestroy(){if(Application.isPlaying)Destroy(_material);else DestroyImmediate(_material);}
     }
 }

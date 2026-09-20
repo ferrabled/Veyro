@@ -38,7 +38,7 @@ namespace MotionRunner.Menu
             content.anchorMin=new Vector2(0,1);content.anchorMax=Vector2.one;content.pivot=new Vector2(0.5f,1);
             content.sizeDelta=Vector2.zero;scroll.content=content;return content;
         }
-        public static string SlotName(CosmeticSlot slot) => slot==CosmeticSlot.CrashFx ? "CRASH FX" : slot.ToString().ToUpperInvariant();
+        public static string SlotName(CosmeticSlot slot) => slot==CosmeticSlot.Back ? "BACK ACCESSORY" : slot==CosmeticSlot.Skin ? "CHARACTER" : slot==CosmeticSlot.CrashFx ? "CRASH FX" : slot.ToString().ToUpperInvariant();
         public static RectTransform Area(string name,Transform parent,Vector2 min,Vector2 max,Vector2? inset=null)
         {
             RuntimeUi.Element(name,parent,out var rect);

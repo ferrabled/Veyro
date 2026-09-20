@@ -4,9 +4,8 @@ namespace MotionRunner.Commerce
 {
     public enum CosmeticSlot
     {
-        /// A preset that fills every slot at once (COSMETICS_CATALOG §3 "Item slots").
-        /// T-020 ships skins as body-colour swaps; T-025 grows them into full presets.
-        Skin, Body, Trail, Headwear, Aura, CrashFx
+        /// Character identity is independent of accessory slots. Append new slots to preserve saves.
+        Skin, Body, Trail, Headwear, Aura, CrashFx, Back
     }
 
     public enum SeasonTrack
@@ -92,6 +91,7 @@ namespace MotionRunner.Commerce
     {
         public string Id { get; }
         public string DisplayName { get; }
+        public bool Legacy => Id=="sunset" || Id=="sky" || Id=="plum" || Id=="chrome";
         public CosmeticSlot Slot { get; }
         public UnlockRule Rule { get; }
 
@@ -152,7 +152,11 @@ namespace MotionRunner.Commerce
             Reward("crown", "Crown", CosmeticSlot.Headwear, SeasonTrack.Pass, 7, 0xE4B83F),
             Reward("aurora", "Aurora", CosmeticSlot.Trail, SeasonTrack.Pass, 8, 0x68D6B7),
             Reward("comet", "Comet", CosmeticSlot.Aura, SeasonTrack.Pass, 9, 0xB9B4F5),
-            Reward("prism", "Prism", CosmeticSlot.Skin, SeasonTrack.Pass, 10, 0xBAE4D4)
+            Reward("prism", "Prism", CosmeticSlot.Skin, SeasonTrack.Pass, 10, 0xBAE4D4),
+            Reward("quiver", "Wayfinder Quiver", CosmeticSlot.Back, SeasonTrack.Free, 3, 0xBC8354),
+            Reward("spellbook", "Moonbound Tome", CosmeticSlot.Back, SeasonTrack.Free, 4, 0x656EA3),
+            Reward("shield", "Sunshield", CosmeticSlot.Back, SeasonTrack.Free, 6, 0xD8AC43),
+            Reward("wings", "Sky Wings", CosmeticSlot.Back, SeasonTrack.Pass, 5, 0xDDEEEB)
         };
 
         static CosmeticItem Reward(string id, string name, CosmeticSlot slot, SeasonTrack track, int level, int rgb) =>
@@ -162,7 +166,7 @@ namespace MotionRunner.Commerce
         public static CosmeticItem RewardAt(SeasonTrack track, int level)
         {
             foreach (var item in Items)
-                if (item.Rule.Kind == UnlockKind.SeasonLevel && item.Rule.Track == track && item.Rule.Level == level)
+                if (!item.Legacy && item.Rule.Kind == UnlockKind.SeasonLevel && item.Rule.Track == track && item.Rule.Level == level)
                     return item;
             return null;
         }

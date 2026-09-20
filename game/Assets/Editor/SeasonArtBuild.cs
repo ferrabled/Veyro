@@ -50,7 +50,8 @@ namespace MotionRunner.EditorTools
             art.Effects.SetTexture("_BaseMap",art.Spark);
             EditorUtility.SetDirty(art); EditorUtility.SetDirty(art.Effects);
             AssetDatabase.SaveAssets();
-            Debug.Log("[SeasonArt] Three fitted CC0 hats and bounded effect assets ready.");
+            CosmeticCharacterBuild.Build();
+            Debug.Log("[SeasonArt] Fitted CC0 headwear, characters, attachments and bounded effects ready.");
         }
         static GameObject Hat(string name,float width)
         {

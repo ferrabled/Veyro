@@ -44,6 +44,9 @@ namespace MotionRunner.Menu
         public static readonly Color PreviewTop = Art.ParkTheme.Hex(0xB9E5DC);
         public static readonly Color PreviewBottom = Art.ParkTheme.Hex(0xE9EFD5);
         public static readonly Color ItemCard = Art.ParkTheme.Hex(0xFFFCF4);
+        public static readonly Color PassGradient = Art.ParkTheme.Hex(0x296461);
+        public static readonly Color EmberCard = Art.ParkTheme.Hex(0xFFDEB5);
+        public static readonly Color FrostCard = Art.ParkTheme.Hex(0xC4E8F5);
         public static readonly Color Premium = Art.ParkTheme.Hex(0xEEDDAE);
 
         /// The header and tab bars, which frame the live scene rather than sitting on it.

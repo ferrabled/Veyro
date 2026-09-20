@@ -14,6 +14,8 @@ namespace MotionRunner.Art
         Transform _model;
         Transform _shadow;
         Material _outfit;
+        string _character;
+        CharacterRig _rig;
         RunnerCosmetics _cosmetics;
         string _playing;
         float _previousX;
@@ -23,34 +25,46 @@ namespace MotionRunner.Art
 
         public static RunnerVisual Create(Transform parent)
         {
-            var assets=ParkAssets.Load();
             var visual=parent.gameObject.AddComponent<RunnerVisual>();
-            var model=Instantiate(assets.Runner,parent,false);
-            visual._model=model.transform;
-            // Scale about the feet, while leaving the controller's established AABB intact.
-            model.transform.localScale=Vector3.one*PresentationScale;
-            model.transform.localPosition=Vector3.up*(PresentationScale-1f)*TrackMetrics.RunnerRestY;
-            visual._outfit=new Material(assets.RunnerMaterial);
-            foreach(var renderer in model.GetComponentsInChildren<Renderer>()) renderer.sharedMaterial=visual._outfit;
-            visual._animation=model.GetComponentInChildren<Animator>();
-            var shadow=GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            shadow.name="Runner ground shadow";
-            shadow.transform.SetParent(parent,false);
-            shadow.transform.localScale=new Vector3(0.64f,0.003f,0.44f);
-            if(Application.isPlaying) Destroy(shadow.GetComponent<Collider>());
-            else DestroyImmediate(shadow.GetComponent<Collider>());
-            shadow.GetComponent<Renderer>().sharedMaterial=Core.RuntimeMaterials.Shared(ParkTheme.Hex(0x9DAB97));
+            visual.SetCharacter("runner");
+            // A transparent feathered contact shadow has no raised geometry or opaque platform.
+            var shadow=GameObject.CreatePrimitive(PrimitiveType.Quad);
+            shadow.name="Runner ground shadow";shadow.transform.SetParent(parent,false);
+            shadow.transform.localRotation=Quaternion.Euler(90,0,0);
+            if(Application.isPlaying) Destroy(shadow.GetComponent<Collider>());else DestroyImmediate(shadow.GetComponent<Collider>());
+            shadow.GetComponent<Renderer>().sharedMaterial=SeasonArt.Load().Shadow;
             visual._shadow=shadow.transform;
             visual.ResetPose();
             return visual;
         }
 
+        void SetCharacter(string id)
+        {
+            string character=id=="ember" || id=="frost" ? id : "runner";
+            if(_character==character)return;
+            _character=character;
+            if(_cosmetics!=null)_cosmetics.Release();
+            if(_model!=null){_model.gameObject.SetActive(false);Dispose(_model.gameObject);}
+            Dispose(_outfit);
+            var art=CharacterArt.Load();
+            var model=Instantiate(art!=null ? art.Character(character) : ParkAssets.Load().Runner,transform,false);
+            _model=model.transform;_model.localScale=Vector3.one*PresentationScale;
+            _model.localPosition=Vector3.up*(PresentationScale-1)*TrackMetrics.RunnerRestY;
+            _outfit=new Material(art!=null ? art.Outfit(character) : ParkAssets.Load().RunnerMaterial);
+            foreach(var renderer in model.GetComponentsInChildren<Renderer>())renderer.sharedMaterial=_outfit;
+            _animation=model.GetComponentInChildren<Animator>();_rig=model.GetComponent<CharacterRig>();
+            _playing=null;_animation.Rebind();_animation.Play("idle",0,0);_animation.Update(0);
+            RunnerCosmetics.SetLayerRecursively(model,gameObject.layer);
+            ResetPose();
+        }
+        static void Dispose(Object value){if(value==null)return;if(Application.isPlaying)Destroy(value);else DestroyImmediate(value);}
         public void SetOutfit(Color color) => _outfit.SetColor("_OutfitColor",color);
 
         public void ApplyLoadout(CosmeticLoadout loadout)
         {
+            SetCharacter(loadout.Skin);
             if(_cosmetics==null) _cosmetics=gameObject.AddComponent<RunnerCosmetics>();
-            _cosmetics.Apply(loadout,_animation,_outfit);
+            _cosmetics.Apply(loadout,_animation,_outfit,_rig);
         }
         public bool HasCrashEffect => _cosmetics!=null && _cosmetics.HasCrashEffect;
         public void Crash() => _cosmetics?.Crash();
@@ -92,7 +106,7 @@ namespace MotionRunner.Art
             if(_shadow==null) return;
             _shadow.position=new Vector3(transform.position.x,0.012f,transform.position.z);
             float scale=Mathf.Lerp(1,0.6f,Mathf.Clamp01(transform.position.y-TrackMetrics.RunnerRestY));
-            _shadow.localScale=new Vector3(0.64f*scale*PresentationScale,0.003f,0.44f*scale*PresentationScale);
+            _shadow.localScale=new Vector3(0.60f*scale*PresentationScale,0.42f*scale*PresentationScale,1);
         }
 
         void Play(string clip)

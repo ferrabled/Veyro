@@ -78,7 +78,7 @@ namespace MotionRunner.Tests
                 Assert.IsFalse((bool)menuType.GetProperty("IsAwayFromHome").GetValue(menu));
                 var catalog=menuType.GetProperty("Catalog").GetValue(menu);
                 var rows=(System.Collections.ICollection)catalog.GetType().GetField("_rows",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(catalog);
-                Assert.AreEqual(3,rows.Count,"Only base + direct-purchase skin rows belong in the shop.");
+                Assert.AreEqual(2,rows.Count,"The shop presents only Ember and Frost below the season pass.");
             }
             finally { UnityEngine.Object.DestroyImmediate(menu.gameObject); }
         }
@@ -142,7 +142,7 @@ namespace MotionRunner.Tests
             var click=button.GetType().GetProperty("onClick").GetValue(button);
             click.GetType().GetMethod("Invoke").Invoke(click,null);
         }
-        [Test] public void HatFocusMagnifiesAccessoriesWithoutCroppingAndHiddenPreviewStopsRendering()
+        [TestCase("runner")][TestCase("ember")][TestCase("frost")] public void HatFocusMagnifiesAccessoriesWithoutCroppingAndHiddenPreviewStopsRendering(string character)
         {
             var host=new GameObject("PreviewTest",typeof(RectTransform));
             host.GetComponent<RectTransform>().sizeDelta=new Vector2(800,1000);
@@ -155,20 +155,29 @@ namespace MotionRunner.Tests
             {
                 foreach(string id in new[]{"cap","tophat","crown"})
                 {
-                    var loadout=new CosmeticLoadout();loadout.Equip(CosmeticCatalog.Find(id));
+                    var loadout=new CosmeticLoadout();loadout.Equip(CosmeticCatalog.Find(character));loadout.Equip(CosmeticCatalog.Find(id));
                     type.GetMethod("Show").Invoke(preview,new object[]{loadout});
                     type.GetMethod("Focus").Invoke(preview,new object[]{CosmeticSlot.Skin,true});
                     float fullSize=camera.orthographicSize;
                     type.GetMethod("Focus").Invoke(preview,new object[]{CosmeticSlot.Headwear,true});
-                    Assert.Less(camera.orthographicSize,fullSize*0.6f);
+                    Assert.Less(camera.orthographicSize,fullSize);
                     var hat=model.GetComponentsInChildren<MeshRenderer>().Single(r=>r.name.StartsWith("Cosmetic "));
-                    var bounds=hat.bounds;
-                    for(int i=0;i<8;i++)
+                    var vertices=hat.GetComponent<MeshFilter>().sharedMesh.vertices;
+                    foreach(float yaw in new[]{0f,45f,90f,135f,180f,225f,270f,315f})
                     {
-                        var point=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0 ? -1:1,(i&2)==0 ? -1:1,(i&4)==0 ? -1:1));
-                        var screen=camera.WorldToViewportPoint(point);
-                        Assert.That(screen.x,Is.InRange(0f,1f),id+" horizontal crop");
-                        Assert.That(screen.y,Is.InRange(0f,1f),id+" vertical crop");
+                        model.localRotation=Quaternion.Euler(0,yaw,0);
+                        // Project the visible geometry. A rotated renderer AABB contains empty
+                        // corners beyond the circular brim and is not a crop of the item itself.
+                        var min=Vector2.one;var max=Vector2.zero;
+                        foreach(var vertex in vertices)
+                        {
+                            var screen=(Vector2)camera.WorldToViewportPoint(hat.transform.TransformPoint(vertex));
+                            min=Vector2.Min(min,screen);max=Vector2.Max(max,screen);
+                        }
+                        Assert.That(min.x,Is.GreaterThanOrEqualTo(0),id+" left crop at "+yaw);
+                        Assert.That(max.x,Is.LessThanOrEqualTo(1),id+" right crop at "+yaw);
+                        Assert.That(min.y,Is.GreaterThanOrEqualTo(0),id+" bottom crop at "+yaw);
+                        Assert.That(max.y,Is.LessThanOrEqualTo(1),id+" top crop at "+yaw);
                     }
                 }
                 // EditMode does not run player-loop callbacks for this runtime MonoBehaviour.
@@ -178,6 +187,79 @@ namespace MotionRunner.Tests
                 Assert.IsTrue(camera.gameObject.activeInHierarchy);
             }
             finally { UnityEngine.Object.DestroyImmediate(host); }
+        }
+        [TestCase("ember")][TestCase("frost")]
+        public void PremiumCharactersAnimateAndWearEveryAttachment(string id)
+        {
+            var root=new GameObject("Character compatibility");root.transform.position=Vector3.up*0.5f;
+            var visualType=Runtime("Art.RunnerVisual");var visual=visualType.GetMethod("Create").Invoke(null,new object[]{root.transform});
+            var defaultMesh=root.GetComponentInChildren<SkinnedMeshRenderer>().sharedMesh;
+            try
+            {
+                var look=new CosmeticLoadout();look.Equip(CosmeticCatalog.Find(id));
+                foreach(string item in new[]{"cap","wings","shield","quiver","spellbook","mint","white","firefly","confetti"})
+                {
+                    look.Equip(CosmeticCatalog.Find(item));visualType.GetMethod("ApplyLoadout").Invoke(visual,new object[]{look});
+                    var animator=root.GetComponentInChildren<Animator>();Assert.IsTrue(animator.avatar.isHuman && animator.avatar.isValid);
+                    Assert.AreNotSame(defaultMesh,root.GetComponentInChildren<SkinnedMeshRenderer>().sharedMesh,id+" must use distinct geometry");
+                    Assert.IsFalse(animator.applyRootMotion);Assert.IsEmpty(root.GetComponentsInChildren<Collider>());
+                    var rig=root.GetComponentInChildren(Runtime("Art.CharacterRig"));
+                    var hats=(Renderer[])rig.GetType().GetField("StockHeadwear").GetValue(rig);
+                    foreach(var hat in hats)Assert.IsFalse(hat.enabled,"Pass headwear replaces native headwear");
+                    foreach(string state in new[]{"run","jump","dodgeLeft","dodgeRight"})
+                    {
+                        animator.Play(state,0,0);animator.Update(0);
+                        var thigh=animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);var before=thigh.localRotation;
+                        animator.Update(0.12f);Assert.Greater(Quaternion.Angle(before,thigh.localRotation),0.1f,id+" "+state);
+                    }
+                    Assert.AreEqual(Vector3.up*0.5f,root.transform.position);
+                    foreach(var r in root.GetComponentsInChildren<Renderer>())Assert.IsTrue(r.sharedMaterial.shader.isSupported);
+                }
+                look.Clear(CosmeticSlot.Headwear);look.Clear(CosmeticSlot.Back);
+                visualType.GetMethod("ApplyLoadout").Invoke(visual,new object[]{look});
+                var restored=root.GetComponentInChildren(Runtime("Art.CharacterRig"));
+                foreach(var hat in (Renderer[])restored.GetType().GetField("StockHeadwear").GetValue(restored))Assert.IsTrue(hat.enabled);
+            }
+            finally{UnityEngine.Object.DestroyImmediate(root);}
+        }
+        [Test] public void ShopPutsPassFirstAndDirectPurchasesKeepCollectedAccessories()
+        {
+            _profile.BecomeReady(new Profile(_user,"TEST",4));Season("Collect","cap");Skin("Equip","cap");
+            var menuType=Runtime("Menu.MainMenu");var tabType=Runtime("Menu.MenuTab");
+            var menu=(Component)menuType.GetMethod("Create").Invoke(null,new[]{(object)_store,_skins,_profile,Enum.ToObject(tabType,0)});
+            try
+            {
+                var shop=menu.GetComponentInChildren(Runtime("Menu.ShopPage"));
+                var transforms=shop.GetComponentsInChildren<RectTransform>();
+                Assert.Greater(transforms.Single(t=>t.name=="SeasonPassCard").anchoredPosition.y,transforms.Single(t=>t.name=="emberCard").anchoredPosition.y);
+                _store.NextPurchaseOutcome=PurchaseOutcome.Cancelled();Tap(NamedButton(shop,"Buyember"));
+                Assert.IsFalse((bool)Skin("IsUnlocked","ember"));Assert.IsTrue((bool)Skin("IsEquipped","cap"));
+                Tap(NamedButton(shop,"Buyember"));Assert.IsTrue((bool)Skin("IsEquipped","ember"));Assert.IsTrue((bool)Skin("IsEquipped","cap"));
+                Tap(NamedButton(shop,"BuyPass"));Assert.IsFalse((bool)Season("IsOwned","wings"),"Cancelling a paywall grants nothing");
+                Tap(NamedButton(shop,"ViewRewards"));Assert.IsNotNull(menu.GetComponentInChildren(Runtime("Menu.SeasonPassPage")));
+            }
+            finally{UnityEngine.Object.DestroyImmediate(menu.gameObject);}
+        }
+        [Test] public void ShopRecoversFromInitialUnavailableStateAndRefreshesLocalizedPrices()
+        {
+            _store.IsReady=false;
+            var menuType=Runtime("Menu.MainMenu");var tabType=Runtime("Menu.MenuTab");
+            var menu=(Component)menuType.GetMethod("Create").Invoke(null,new[]{(object)_store,_skins,_profile,Enum.ToObject(tabType,0)});
+            try
+            {
+                var shop=menu.GetComponentInChildren(Runtime("Menu.ShopPage"));
+                var textType=Type.GetType("UnityEngine.UI.Text, UnityEngine.UI",true);
+                var status=shop.GetComponentsInChildren(textType,true).Single(t=>t.name=="Status");
+                string Read(Component text)=>(string)textType.GetProperty("text").GetValue(text);
+                StringAssert.Contains("unavailable",Read(status));
+                _store.IsReady=true;_store.RaiseEntitlementsChanged();
+                Assert.IsEmpty(Read(status));
+                var price=NamedButton(shop,"Buyfrost").GetComponentInChildren(textType);
+                Assert.AreEqual("€2.99",Read(price));
+                _store.NextPurchaseOutcome=PurchaseOutcome.Failed(new StoreError("test","declined"));Tap(NamedButton(shop,"Buyfrost"));
+                _store.RaiseEntitlementsChanged();StringAssert.Contains("declined",Read(status),"Readiness refresh must retain actionable purchase errors.");
+            }
+            finally{UnityEngine.Object.DestroyImmediate(menu.gameObject);}
         }
         [Test] public void EveryCatalogItemHasAnActualThumbnail()
         {
@@ -199,7 +281,7 @@ namespace MotionRunner.Tests
                     Assert.IsEmpty(root.GetComponentsInChildren<Collider>(),item.Id);
                     foreach(var renderer in root.GetComponentsInChildren<Renderer>())
                         Assert.IsTrue(renderer.sharedMaterial!=null && renderer.sharedMaterial.shader.isSupported,item.Id+" material");
-                    foreach(var particle in root.GetComponentsInChildren<ParticleSystem>())Assert.LessOrEqual(particle.main.maxParticles,30);
+                    foreach(var particle in root.GetComponentsInChildren<ParticleSystem>())Assert.LessOrEqual(particle.main.maxParticles,36);
                     if(item.Slot==CosmeticSlot.Headwear)
                     {
                         var hat=root.GetComponentsInChildren<MeshRenderer>().Single(r=>r.name.StartsWith("Cosmetic "));

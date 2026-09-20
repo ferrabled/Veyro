@@ -1,6 +1,6 @@
 Shader "Veyro/CosmeticEffect"
 {
-    Properties { _BaseMap("Sprite",2D)="white"{} _BaseColor("Tint",Color)=(1,1,1,1) _Ribbon("Ribbon",Float)=0 }
+    Properties { _BaseMap("Sprite",2D)="white"{} _BaseColor("Tint",Color)=(1,1,1,1) _Ribbon("Ribbon",Float)=0 _Contact("Contact shadow",Float)=0 }
     SubShader
     {
         Tags { "RenderType"="Transparent" "Queue"="Transparent" "RenderPipeline"="UniversalPipeline" }
@@ -16,13 +16,14 @@ Shader "Veyro/CosmeticEffect"
             struct V { float4 positionCS:SV_POSITION; float2 uv:TEXCOORD0; half4 color:COLOR; };
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
             CBUFFER_START(UnityPerMaterial)
-            half4 _BaseColor; half _Ribbon;
+            half4 _BaseColor; half _Ribbon; half _Contact;
             CBUFFER_END
             V vert(A i) { V o; o.positionCS=TransformObjectToHClip(i.positionOS.xyz); o.uv=i.uv; o.color=i.color*_BaseColor; return o; }
             half4 frag(V i):SV_Target
             {
                 half alpha=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,i.uv).a;
                 half3 color=i.color.rgb;
+                if(_Contact>0.5)alpha=pow(saturate(1-length((i.uv-0.5)*2)),2);
                 if(_Ribbon>0.5)
                 {
                     half edge=min(i.uv.x,1-i.uv.x);

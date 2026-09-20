@@ -15,7 +15,7 @@ namespace MotionRunner.Tests
         [Test]
         public void EveryLevelHasOneFreeAndOnePassReward()
         {
-            var rows=CosmeticCatalog.Items.Where(x=>x.Rule.Kind==UnlockKind.SeasonLevel).ToList();
+            var rows=CosmeticCatalog.Items.Where(x=>!x.Legacy && x.Rule.Kind==UnlockKind.SeasonLevel).ToList();
             Assert.AreEqual(20,rows.Count);
             for(int level=1;level<=10;level++)foreach(var track in new[]{SeasonTrack.Free,SeasonTrack.Pass})
                 Assert.AreEqual(1,rows.Count(x=>x.Rule.Level==level && x.Rule.Track==track));
@@ -65,16 +65,35 @@ namespace MotionRunner.Tests
             Assert.AreEqual("runner",selected.Validated(id=>inventory.IsOwned(id,None)).Skin);
         }
         [Test]
-        public void SlotChoicesComposeAndRoundTripButPresetPartsCannotBeUnbundled()
+        public void CharactersKeepAccessoriesAndRoundTripIndependently()
         {
             var selected=new CosmeticLoadout();
-            foreach(string id in new[]{"mint","crown","aurora","firefly","confetti"})selected.Equip(CosmeticCatalog.Find(id));
+            foreach(string id in new[]{"ember","mint","crown","aurora","firefly","confetti","wings"})selected.Equip(CosmeticCatalog.Find(id));
             var restored=CosmeticLoadout.Read(selected.Serialize());
-            Assert.AreEqual("mint",restored.Body);Assert.AreEqual("crown",restored.Headwear);
-            Assert.AreEqual("aurora",restored.Trail);Assert.AreEqual("firefly",restored.Aura);Assert.AreEqual("confetti",restored.CrashFx);
-            restored.Equip(CosmeticCatalog.Find("ember"));Assert.AreEqual("ember",restored.Aura);
-            restored.Equip(CosmeticCatalog.Find("cap"));
-            Assert.AreEqual("cap",restored.Headwear);Assert.IsEmpty(restored.Aura);Assert.IsEmpty(restored.Trail);
+            Assert.AreEqual("ember",restored.Skin);Assert.AreEqual("mint",restored.Body);
+            Assert.AreEqual("wings",restored.Back);Assert.AreEqual("crown",restored.Headwear);
+            restored.Equip(CosmeticCatalog.Find("frost"));Assert.AreEqual("firefly",restored.Aura);Assert.AreEqual("aurora",restored.Trail);
+            restored.Clear(CosmeticSlot.Trail);restored.Clear(CosmeticSlot.Headwear);
+            restored=CosmeticLoadout.Read(restored.Serialize());Assert.IsEmpty(restored.Trail);Assert.IsEmpty(restored.Headwear);
+            Assert.AreEqual("frost",restored.Skin);Assert.AreEqual("wings",restored.Back);
+        }
+        [Test]
+        public void SixSlotSaveMigratesAndCharacterRevocationKeepsEarnedAccessories()
+        {
+            var original=CosmeticLoadout.Read("|charcoal|shadow|cap||confetti");
+            Assert.AreEqual("runner",original.Skin);Assert.AreEqual("charcoal",original.Body);Assert.AreEqual("cap",original.Headwear);
+            original.Equip(CosmeticCatalog.Find("ember"));
+            var valid=original.Validated(id=>id!="ember");
+            Assert.AreEqual("runner",valid.Skin);Assert.AreEqual("cap",valid.Headwear);Assert.AreEqual("shadow",valid.Trail);
+            var restored=original.Validated(id=>true);Assert.AreEqual("ember",restored.Skin);
+        }
+        [Test]
+        public void LegacyDyeClaimsKeepTheirDyesAndMigrateEquivalentAttachmentWithSameGates()
+        {
+            var inventory=new SeasonInventory(SeasonCurve.Testing,4,"sunset,chrome");
+            Assert.IsTrue(inventory.IsOwned("sunset",None));Assert.IsTrue(inventory.IsOwned("quiver",None));
+            Assert.IsFalse(inventory.IsOwned("wings",None));Assert.IsTrue(inventory.IsOwned("wings",Pass));
+            inventory.SetRecordedXp(0);Assert.IsFalse(inventory.IsOwned("quiver",None));Assert.IsFalse(inventory.IsOwned("wings",Pass));
         }
         [Test]
         public void RevokingOneSlotDoesNotEraseOtherEarnedSlots()

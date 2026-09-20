@@ -16,6 +16,7 @@ MonoBehaviour:
   TopHat: {fileID: 302189243088972403, guid: 309211cf775c06444bda2ebd296b05e5, type: 3}
   Crown: {fileID: 6486494925017782859, guid: f551b93762430984a871f514db5c2d75, type: 3}
   Effects: {fileID: 2100000, guid: 0851069e0b9d7bd45a86569e676f1586, type: 2}
+  Shadow: {fileID: 2100000, guid: b8db4c95a98bc754cb483380468ada5a, type: 2}
   Spark: {fileID: 2800000, guid: d41108a15434f9441aaddbc2f530e96b, type: 3}
   Star: {fileID: 2800000, guid: f5fef1ce5475d1d419a6a90aaf5869b2, type: 3}
   Trace: {fileID: 2800000, guid: 926635ee0d27273489f6a07fdcddd427, type: 3}

@@ -37,15 +37,17 @@ namespace MotionRunner.Menu
             _description=CosmeticUi.Text("Description",CosmeticUi.Rect("SelectedDescription",sheet,0.025f,0.65f,88,36),"",22,MenuTheme.Dim);
             _equip=CosmeticUi.Pill(CosmeticUi.Rect("Equip",sheet,0.66f,0.975f,36,78),"",Activate,MenuTheme.Accent,26);
             _equipLabel=_equip.GetComponentInChildren<Text>();_equipLabel.color=MenuTheme.OnAccent;
-            var names=new[]{"OUTFITS","BODY","TRAILS","HATS","AURAS","CRASH FX"};
-            var icons=new[]{"runner","mint","aurora","cap","comet","confetti"};
-            for(int i=0;i<6;i++)
+            var names=new[]{"RUNNER","DYES","TRAILS","HATS","AURAS","CRASH","BACK"};
+            var icons=new[]{"runner","mint","aurora","cap","comet","confetti","wings"};
+            for(int i=0;i<names.Length;i++)
             {
                 var slot=(CosmeticSlot)i;
-                var rect=CosmeticUi.Rect("Category"+i,sheet,0.02f+i*0.16f,0.02f+(i+1)*0.16f,142,112);
+                var rect=CosmeticUi.Rect("Category"+i,sheet,0.015f+i*0.138f,0.015f+(i+1)*0.138f,142,112);
                 var button=CosmeticUi.Pill(rect,"",()=>ChooseSlot(slot),MenuTheme.Card);
                 CosmeticUi.Thumbnail(CosmeticUi.Area("Icon",rect,new Vector2(0.25f,0.35f),new Vector2(0.75f,0.98f)),icons[i]);
-                CosmeticUi.Text("CategoryName",CosmeticUi.Area("NameSlot",rect,Vector2.zero,new Vector2(1,0.33f)),names[i],21,MenuTheme.Text,TextAnchor.MiddleCenter);
+                var label=CosmeticUi.Text("CategoryName",CosmeticUi.Area("NameSlot",rect,Vector2.zero,new Vector2(1,0.33f)),names[i],18,MenuTheme.Text,TextAnchor.MiddleCenter);
+                label.horizontalOverflow=HorizontalWrapMode.Overflow;
+                label.resizeTextForBestFit=true;label.resizeTextMinSize=14;label.resizeTextMaxSize=18;
                 _categories.Add(button);
             }
             _all=CosmeticUi.Pill(CosmeticUi.Rect("All",sheet,0.025f,0.24f,272,52),"ALL ITEMS",()=>Filter(false),size:21);
@@ -67,7 +69,8 @@ namespace MotionRunner.Menu
             int index=0;
             foreach(var card in _cards)
             {
-                bool visible=card.Item.Slot==_slot && (!_onlyOwned || Menu.Skins.IsUnlocked(card.Item.Id));
+                bool owned=Menu.Skins.IsUnlocked(card.Item.Id);
+                bool visible=card.Item.Slot==_slot && (!card.Item.Legacy || owned) && (!_onlyOwned || owned);
                 card.Rect.gameObject.SetActive(visible);if(!visible)continue;
                 RuntimeUi.Stretch(card.Rect,new Vector2(index%3/3f,1),new Vector2((index%3+1)/3f,1),
                     new Vector2(10,0),new Vector2(-10,0));
@@ -129,7 +132,7 @@ namespace MotionRunner.Menu
             }
             for(int i=0;i<_categories.Count;i++)_categories[i].image.color=i==(int)_slot ? MenuTheme.Owned:MenuTheme.Card;
             _all.image.color=_onlyOwned ? MenuTheme.Slot:MenuTheme.Owned;_owned.image.color=_onlyOwned ? MenuTheme.Owned:MenuTheme.Slot;
-            _clear.interactable=_slot==CosmeticSlot.Skin || !string.IsNullOrEmpty(Menu.Skins.Effective.Item(_slot));
+            _clear.interactable=true;
             var selected=CosmeticCatalog.Find(_selected);
             if(selected==null)
             {
@@ -145,9 +148,6 @@ namespace MotionRunner.Menu
         }
         public override void OnShown()
         {
-            // Open on the actual outfit, including composed loadouts without a skin preset.
-            if(string.IsNullOrEmpty(Menu.Skins.Effective.Skin) && _slot==CosmeticSlot.Skin)
-                for(int i=1;i<6;i++)if(!string.IsNullOrEmpty(Menu.Skins.Effective.Item((CosmeticSlot)i))){_slot=(CosmeticSlot)i;break;}
             ChooseSlot(_slot,true);
         }
         void OnDestroy() { if(_listening)Menu.Skins.Changed-=OnInventoryChanged; }

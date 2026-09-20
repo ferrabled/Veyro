@@ -92,3 +92,26 @@ free), KayKit paid character extras/source files, or Mixamo/account-dependent ac
 An alternative [CC0 magician hat by Lucian Pavel](https://opengameart.org/content/magician-hat-stick)
 was downloaded but is less convenient here: its archive supplies Blender models and PBR maps,
 whereas the selected top hat already has an FBX and suits a flat-color treatment.
+
+
+## 20 Sep refinement — distinct characters and back accessories
+
+Owner requested character silhouettes for Ember/Frost, a better cap fit/trail and fewer shirt rewards.
+The **free KayKit Adventurers 2.0** pack above supplies Barbarian → Ember and Mage → Frost, plus a quiver, shield and book. [DevMops’ Angel Wing](https://opengameart.org/content/angel-wing) supplies Sky Wings. All are CC0 with commercial use allowed; licenses/provenance are retained beside the sources.
+
+The revised timeline replaces Free Lv3 Sunset with **Wayfinder Quiver**, Free Lv4 Sky with **Moonbound Tome**, Free Lv6 Plum with **Sunshield**, and Pass Lv5 Chrome with **Sky Wings**. Old dyes remain addressable and wearable. Saved claims for those four milestones also recognize the replacement reward, subject to the same current XP and entitlement checks. No XP is manufactured, and a new reward never removes an old one.
+
+Characters and accessories now compose. Ember/Frost keep their actual model when wearing hats, dyes, back items, trails, auras or crash effects. Selecting pass headwear hides the model’s native headdress; a back item hides Frost’s native cape. Clear Slot restores the native character part. The original six-field saves are accepted; Back appends a seventh field.
+
+Trail ribbons are replaced with short, bounded foot particles (36 maximum); the opaque cylinder is replaced with an alpha-faded contact shadow. The new models and attachments are visual only.
+
+| Free download | SHA-256 |
+|---|---|
+| kaykit-adventurers-2-free.zip | `abe48f4763fba0896bab486ee9e6d08ca6b5b3884b9601f235c8847ae94dc479` |
+| angel-wing.zip | `e74d05802079513863981667335d054fb419c12ab9b18d19a532b9e86600d9cc` |
+
+### Fitting follow-up — 20 September
+
+Character proportions now use a smaller head and slimmer body, normalized to the original Runner's actual foot/head range. Cap, top hat and crown have independent seating and opening measurements; the accepted original Runner cap dimensions are preserved. Back items face outward and follow the central torso's slope; the quiver sits diagonally beside the neck. Frost's existing cape has an inside surface. These are adaptations of the same CC0 sources, with no new downloads or license changes. Reproducible four-angle reviews: CosmeticFitReview (24 sheets, all three characters and all attachment types).
+
+20 Sep proportion refinement: softened Ember/Frost compression to 86% width / 90% depth, with an 80% head scale before uniform height normalization. This replaces the overly slender first fitting pass; all hat/back fitting data and thumbnails are regenerated from the balanced models. The original Runner is unchanged.

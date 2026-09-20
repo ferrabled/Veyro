@@ -41,6 +41,10 @@ namespace MotionRunner.Commerce
             Curve=curve; SetRecordedXp(xp);
             foreach(string id in (savedClaims ?? "").Split(','))
                 if(CosmeticCatalog.Find(id)?.Rule.Kind == UnlockKind.SeasonLevel) _collected.Add(id);
+            // Earlier test builds awarded dyes at these same XP milestones. Keep the dyes and
+            // recognize the equivalent attachment claim without granting any XP or entitlement.
+            foreach(var pair in new[]{("sunset","quiver"),("sky","spellbook"),("plum","shield"),("chrome","wings")})
+                if(_collected.Contains(pair.Item1))_collected.Add(pair.Item2);
         }
         public void SetRecordedXp(int xp) => Xp=Math.Max(0,xp);
         public bool IsCollected(string id)
@@ -64,58 +68,56 @@ namespace MotionRunner.Commerce
         public string SaveClaims() => string.Join(",",_collected.OrderBy(id=>id,StringComparer.Ordinal));
     }
 
-    /// Presets and slot choices are mutually exclusive: customizing starts with the base outfit,
-    /// so the exclusive parts of Ember/Frost cannot become independently equipped rewards.
+    /// Character identity and accessory choices persist independently. Old six-slot saves migrate
+    /// without losing colours or ownership; a clear marker suppresses a character's default FX.
     public sealed class CosmeticLoadout
     {
         readonly Dictionary<CosmeticSlot,string> _slots=new Dictionary<CosmeticSlot,string>();
         public string Skin { get; private set; }=CosmeticCatalog.DefaultSkinId;
-        public string Item(CosmeticSlot slot) => slot==CosmeticSlot.Skin ? Skin :
-            _slots.TryGetValue(slot,out var value) ? value : "";
+        string Raw(CosmeticSlot slot) => slot==CosmeticSlot.Skin ? Skin : _slots.TryGetValue(slot,out var value) ? value : "";
+        public string Item(CosmeticSlot slot) => Raw(slot)=="-" ? "" : Raw(slot);
         public void Equip(CosmeticItem item)
         {
-            if(item.Slot==CosmeticSlot.Skin) { Skin=item.Id; _slots.Clear(); }
-            else { Skin=""; _slots[item.Slot]=item.Id; }
+            if(item==null)return;
+            if(item.Slot==CosmeticSlot.Skin) Skin=item.Id;
+            else _slots[item.Slot]=item.Id;
         }
         public void Clear(CosmeticSlot slot)
         {
-            if(slot==CosmeticSlot.Skin) { Skin=CosmeticCatalog.DefaultSkinId; _slots.Clear(); }
-            else { Skin=""; _slots.Remove(slot); }
+            if(slot==CosmeticSlot.Skin)Skin=CosmeticCatalog.DefaultSkinId;
+            else _slots[slot]="-";
         }
-        public string Serialize() => string.Join("|",Enum.GetValues(typeof(CosmeticSlot)).Cast<CosmeticSlot>().Select(Item));
+        public string Serialize() => string.Join("|",Enum.GetValues(typeof(CosmeticSlot)).Cast<CosmeticSlot>().Select(Raw));
         public static CosmeticLoadout Read(string encoded)
         {
             var result=new CosmeticLoadout();
-            if(string.IsNullOrEmpty(encoded)) return result;
+            if(string.IsNullOrEmpty(encoded))return result;
             var ids=encoded.Split('|');
-            if(ids.Length!=6) return result;
-            result.Skin="";
+            if(ids.Length!=6 && ids.Length!=7)return result;
             for(int i=0;i<ids.Length;i++)
             {
+                if(i>0 && ids[i]=="-"){result._slots[(CosmeticSlot)i]="-";continue;}
                 var item=CosmeticCatalog.Find(ids[i]);
-                if(item==null || item.Slot!=(CosmeticSlot)i) continue;
-                if(i==0) { result.Equip(item); return result; }
-                result._slots[(CosmeticSlot)i]=item.Id;
+                if(item!=null && item.Slot==(CosmeticSlot)i)result.Equip(item);
             }
             return result;
         }
         public CosmeticLoadout Validated(Func<string,bool> owned)
         {
             var result=new CosmeticLoadout();
-            if(!string.IsNullOrEmpty(Skin))
-            {
-                if(owned(Skin)) result.Equip(CosmeticCatalog.Find(Skin));
-                return result;
-            }
+            if(owned(Skin))result.Equip(CosmeticCatalog.Find(Skin));
             foreach(var pair in _slots)
-                if(owned(pair.Value)) result.Equip(CosmeticCatalog.Find(pair.Value));
+                if(pair.Value=="-")result._slots[pair.Key]="-";
+                else if(owned(pair.Value))result.Equip(CosmeticCatalog.Find(pair.Value));
             return result;
         }
+        string Resolve(CosmeticSlot slot,string fallback) => _slots.TryGetValue(slot,out var value) ? value=="-" ? "" : value : fallback;
         public string Body => Item(CosmeticSlot.Body);
-        public string Trail => Skin=="prism" ? "aurora" : Skin=="ember" ? "ember" : Skin=="frost" ? "frost" : Item(CosmeticSlot.Trail);
-        public string Headwear => Skin=="prism" ? "crown" : Item(CosmeticSlot.Headwear);
-        public string Aura => Skin=="prism" ? "comet" : Skin=="ember" ? "ember" : Skin=="frost" ? "frost" : Item(CosmeticSlot.Aura);
+        public string Trail => Resolve(CosmeticSlot.Trail,Skin=="prism" ? "aurora" : Skin=="ember" ? "ember" : Skin=="frost" ? "frost" : "");
+        public string Headwear => Resolve(CosmeticSlot.Headwear,Skin=="prism" ? "crown" : "");
+        public string Aura => Resolve(CosmeticSlot.Aura,Skin=="prism" ? "comet" : Skin=="ember" ? "ember" : Skin=="frost" ? "frost" : "");
         public string CrashFx => Item(CosmeticSlot.CrashFx);
-        public CosmeticItem Outfit => CosmeticCatalog.Find(string.IsNullOrEmpty(Skin) ? Body : Skin) ?? CosmeticCatalog.Find("runner");
+        public string Back => Item(CosmeticSlot.Back);
+        public CosmeticItem Outfit => CosmeticCatalog.Find(Body) ?? CosmeticCatalog.Find(Skin) ?? CosmeticCatalog.Find("runner");
     }
 }

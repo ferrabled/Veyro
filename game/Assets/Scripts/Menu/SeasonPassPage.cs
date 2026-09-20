@@ -90,7 +90,8 @@ namespace MotionRunner.Menu
         void Select(string id,bool immediate=false)
         {
             _selected=id;var item=CosmeticCatalog.Find(id);
-            _preview.Show(CosmeticUi.Preview(id));_preview.Focus(item.Slot,immediate);Refresh();
+            var look=CosmeticLoadout.Read(Menu.Skins.Effective.Serialize());look.Equip(item);
+            _preview.Show(look);_preview.Focus(item.Slot,immediate);Refresh();
         }
         void Activate()
         {

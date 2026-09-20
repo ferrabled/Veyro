@@ -28,7 +28,7 @@ The confusion this section settles: *"should every pass item be a product?"* **N
 | **Product** | Play Console, mirrored in RevenueCat | The thing money buys. Has a price, an immutable id, and promo codes are generated per-product. | **3** |
 | **Entitlement** | RevenueCat | An unlock flag on a *customer*. Buying any product attached to it grants it. The app reads **only** these. | **3** |
 | **Offering / package** | RevenueCat | Presentation: which products the paywall shows, in what order. Pure display layer. | 1 offering, 3 packages |
-| **Cosmetic item** | Game code (`CosmeticCatalog`, pure C#) | A colour, trail, hat, aura, or skin. Unlocked by a *rule*: default, owns-entitlement, or reached-level-on-track. | ~25 |
+| **Cosmetic item** | Game code (`CosmeticCatalog`, pure C#) | A character, dye, trail, hat, aura, crash effect or back accessory. Unlocked by a *rule*: default, owns-entitlement, or reached-level-on-track. | 27 (20 current rewards, 3 characters, 4 preserved dyes) |
 
 **The rule: money buys products → products grant entitlements → the app checks entitlements →
 items are game data with unlock rules.** Play and RevenueCat never hear about individual pass
@@ -155,35 +155,46 @@ with the implemented rendering approach recorded in §5.
 |---|---|---|
 | 1 | **Mint** body colour | **Neon Lime** glow body |
 | 2 | **White** trail | **Cyan Pulse** glow trail |
-| 3 | **Sunset Orange** body colour | **Top Hat** (headwear) |
-| 4 | **Sky Blue** body colour | **Firefly** aura |
-| 5 | **Disc Cap** (headwear) | **Chrome** body finish |
-| 6 | **Plum** body colour | **Twin** trail |
+| 3 | **Wayfinder Quiver** back accessory | **Top Hat** (headwear) |
+| 4 | **Moonbound Tome** back accessory | **Firefly** aura |
+| 5 | **Disc Cap** (headwear) | **Sky Wings** back accessory |
+| 6 | **Sunshield** back accessory | **Twin** trail |
 | 7 | **Shadow** trail | **Crown** (headwear) |
 | 8 | **Charcoal** body colour | **Aurora** trail (colour-cycling) |
 | 9 | **Confetti** crash burst | **Comet** aura |
 | 10 | **Matte Gold** body colour | ⭐ **Prism skin** (season exclusive) |
 
-Free track is deliberately generous (colour-heavy, one headwear, one trail, one FX) so the ladder
-is worth engaging with unpaid; the pass column is where glow, metal, layered trails, auras and the
-exclusive skin live. **Prism** = chrome body + colour-cycling emission + Aurora trail + Crown +
-Comet aura; its combination is season-exclusive.
+The free track includes three back accessories, a hat, dyes and effects. The pass adds Sky Wings,
+headwear, glow, auras and the Prism finish/preset. Sunset, Sky, Plum and Chrome remain as legacy
+locker dyes. Existing claims for the replaced milestones recognize the corresponding new reward,
+while retaining the old dye and the same XP/entitlement gates.
 
 ### Item slots
 
-An equipped loadout is one choice per slot, selectable independently in the locker UI:
-**Body** (colour/finish) · **Trail** · **Headwear** · **Aura** · **Crash FX**. A **skin** is a
-preset that fills every slot at once (and is the only way to wear its exclusive parts in v1.0 —
-no per-part unbundling, keeps the locker simple).
+**Character** (persisted as `Skin`) is independent of **Body dye**, **Trail**, **Headwear**,
+**Aura**, **Crash FX** and **Back accessory**. Equipping an accessory keeps Ember/Frost's actual
+model; changing character keeps the collected accessories. A pass hat replaces native headwear;
+a back item replaces a native cape. Clear Slot restores that native part. Explicitly clearing a
+trail/aura suppresses a character's default effect until another one is selected.
+
+The seventh save field appends Back; old six-field loadouts and old empty-character composed
+loadouts migrate without losing their slot selections. Ownership validation checks each choice
+independently: revoking a purchased character falls back to Runner while preserving earned slots.
+Character-exclusive default effects remain attached to that character's ownership.
 
 ---
 
 ## 4. Direct-purchase skins (the two products)
 
-| Skin | Preset |
+| Skin | Character and default effects |
 |---|---|
-| **Ember** | Charcoal body + orange emissive glow + fire-gradient trail + rising-spark aura |
-| **Frost** | Ice-white body + pale-blue emissive glow + crystal-fade trail + drifting-snow aura |
+| **Ember** | KayKit Barbarian: broad explorer with beard, bear headdress and warm accents, short fire foot sparks and rising-spark aura |
+| **Frost** | KayKit Mage: separate robed character, pointed hat and cape with icy fabric, short crystal foot sparks and drifting aura |
+
+Owner requested these distinct meshes on 20 Sep. Both are from the free CC0 Adventurers 2.0
+pack, share the existing humanoid idle/run/jump/dodge controller, and accept every season slot.
+The shop presents a season-pass card first and the two character cards beneath it, using the
+existing localized store prices, direct character purchases and pass paywall.
 
 Names ★ are non-automotive on purpose (the VEYRON caution in OPEN_QUESTIONS "App name"). The ids
 bake the names in (`veyro.skin.ember`) — acceptable because *display* names stay mutable; renaming
@@ -198,11 +209,12 @@ material assets, so Android shader stripping cannot fall back to a primitive's S
 
 - **Body colours, glow and metal finishes** — the shipped Runner shader changes only the shirt
   atlas region. Stylized rim/shine and Prism's animated tint leave skin, hair and shoes intact.
-- **Trails** — a fixed 16-sample scrolling-world ribbon with an analytic soft edge. The runner
-  stays near z=0, so a stationary TrailRenderer would not express forward travel. Twin uses
-  two offset ribbons; Aurora cycles the palette. No per-frame mesh-buffer allocation.
+- **Trails** — short foot-level particles with local backward drift for the scrolling world;
+  maximum 36 per runner, no ribbon mesh, no per-frame managed allocations. The ground contact
+  shadow is a translucent feathered quad with no raised cylinder.
 - **Headwear** — curated CC0 cap, top-hat and crown meshes fitted to the actual Humanoid head
-  bone, accounting for the FBX unit scale. Prefabs contain no colliders.
+  bone, accounting for each model’s head dimensions and FBX unit scale. Cap normalization uses its crown/opening rather than its brim bounds. Prefabs contain no colliders.
+- **Back accessories** — CC0 wing, quiver, shield and book meshes on a fitted chest socket; no colliders, one material per item, small transform-only wing flex.
 - **Auras / crash FX** — the existing ParticleSystem module with referenced CosmeticEffect
   material and CC0 Kenney sprite alpha. Maximum 24 aura / 30 crash particles. With Confetti,
   the result panel briefly reveals the burst before appearing; scoring remains immediate.

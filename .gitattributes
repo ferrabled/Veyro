@@ -2,3 +2,5 @@ game/Assets/Art/**/*.png filter=lfs diff=lfs merge=lfs -text
 game/Assets/Art/**/*.fbx filter=lfs diff=lfs merge=lfs -text
 game/Assets/Art/Season/*Mesh.asset filter=lfs diff=lfs merge=lfs -text
 game/Assets/Resources/Art/CosmeticThumbnails/*.png filter=lfs diff=lfs merge=lfs -text
+game/Assets/Art/Attachments/*Mesh.asset filter=lfs diff=lfs merge=lfs -text
+game/Assets/Art/KayKit/Adventurers/*Cape.asset filter=lfs diff=lfs merge=lfs -text
