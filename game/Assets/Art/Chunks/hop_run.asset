@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e14e0e783b532934eac2749fdabfdd96, type: 3}
+  m_Name: hop_run
+  m_EditorClassIdentifier: Assembly-CSharp::MotionRunner.Art.TrackChunkAsset
+  ChunkId: hop_run
+  Biome: 0
+  DifficultyMin: 4
+  DifficultyMax: 8
+  Length: 32
+  EntryType: 0
+  ExitType: 0
+  RequiredSkills: 1
+  Tags: 2
+  Rarity: 0.9
+  Obstacles:
+  - Kind: 0
+    Lane: -1
+    Z: 8
+  - Kind: 0
+    Lane: 0
+    Z: 8
+  - Kind: 0
+    Lane: 1
+    Z: 8
+  - Kind: 0
+    Lane: -1
+    Z: 16
+  - Kind: 0
+    Lane: 0
+    Z: 16
+  - Kind: 0
+    Lane: 1
+    Z: 16
+  - Kind: 0
+    Lane: -1
+    Z: 24
+  - Kind: 0
+    Lane: 0
+    Z: 24
+  - Kind: 0
+    Lane: 1
+    Z: 24
+  Coins:
+  - Lane: 0
+    Z: 12
+  - Lane: 0
+    Z: 20
+  SceneryVariant: 5

@@ -3,7 +3,7 @@
 Read this before changing anything about the track: chunks, obstacles, difficulty, speed, or the
 art that sits on top of it. Not needed for other work.
 
-Everything described here is code as of 21 Aug 2026 (T-003, T-005, T-008).
+Gameplay rules below describe T-003/T-005/T-008. T-006 art and authoring update: 19 Sep 2026; see `docs/GAME_ART.md`.
 
 ## The model in one paragraph
 
@@ -218,7 +218,7 @@ Right now there are **no art assets at all**. Every visible thing is a primitive
 `ChunkView`, tinted with `RuntimeMaterials.Shared(color)`: deck segments (6 m, 0.12 m gaps), lane
 stripes, bridge railings, tunnel arches, obstacle boxes, and coin cubes rotated 45° to read as gems.
 
-When T-006 brings real art, four things have to survive:
+Four things have to survive:
 
 1. **Never primitive default materials.** Player builds hand `CreatePrimitive` objects the built-in
    Standard material, which URP cannot render (CLAUDE.md gotcha 3). Always go through

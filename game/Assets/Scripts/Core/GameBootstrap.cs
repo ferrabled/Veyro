@@ -5,6 +5,7 @@ using MotionRunner.Social;
 using MotionRunner.Social.Supabase;
 using MotionRunner.Track;
 using UnityEngine;
+using MotionRunner.Art;
 
 namespace MotionRunner.Core
 {
@@ -17,6 +18,9 @@ namespace MotionRunner.Core
         {
             Application.targetFrameRate = 60;
             Screen.orientation = ScreenOrientation.Portrait;
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+            new GameObject("Art performance probe").AddComponent<ArtPerformanceProbe>();
+#endif
 
             // Light
             var lightGo = new GameObject("Sun");
@@ -35,20 +39,21 @@ namespace MotionRunner.Core
             cam.farClipPlane = 220f;
             camGo.transform.position = new Vector3(0f, 4.2f, -6.2f);
             camGo.transform.rotation = Quaternion.Euler(24f, 0f, 0f);
+            ParkTheme.Apply(cam, light);
 
             // Track (T-003): owns generation, spawning and recycling.
             var director = new GameObject("Track").AddComponent<TrackDirector>();
 
             // Runner
-            var runner = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            var runner = new GameObject("Runner");
             runner.name = "Runner";
             runner.transform.position = new Vector3(0f, TrackMetrics.RunnerRestY, 0f);
-            runner.transform.localScale = new Vector3(0.6f, 0.5f, 0.6f);
-            runner.GetComponent<Renderer>().sharedMaterial = RuntimeMaterials.Lit(new Color(1f, 0.55f, 0.15f));
             // Collisions are resolved against deterministic AABBs, not PhysX (CLAUDE.md rule 4).
             var runnerCollider = runner.GetComponent<Collider>();
             if (runnerCollider != null) Object.Destroy(runnerCollider);
             var controller = runner.AddComponent<RunnerController>();
+            var visual = RunnerVisual.Create(runner.transform);
+            controller.Visual = visual;
 
             var hud = RunHud.Create();
 
@@ -57,7 +62,7 @@ namespace MotionRunner.Core
             // The store UI itself lives on the main menu's shop tab now, so what is built here is
             // only the seam; RunFlow hands both to the menu.
             var store = CreateStore();
-            var skins = new SkinService(store, runner.GetComponent<Renderer>());
+            var skins = new SkinService(store, visual.SetOutfit);
 
             // Profile/leaderboard backend (T-009): same fail-open shape as the store. Once the
             // profile loads, its user id becomes the RevenueCat app user id too (D13), so one

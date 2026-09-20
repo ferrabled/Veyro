@@ -16,12 +16,15 @@ namespace MotionRunner.Core
         const int SeasonLevel = 1;
 
         readonly IStore _store;
-        readonly Renderer _renderer;
+        readonly System.Action<Color> _applyColor;
 
-        public SkinService(IStore store, Renderer runnerRenderer)
+        public SkinService(IStore store, Renderer runnerRenderer) : this(store,
+            color => { if (runnerRenderer != null) runnerRenderer.sharedMaterial = RuntimeMaterials.Shared(color); }) { }
+
+        public SkinService(IStore store, System.Action<Color> applyColor)
         {
             _store = store;
-            _renderer = runnerRenderer;
+            _applyColor = applyColor;
             _store.EntitlementsChanged += Apply;
             Apply();
         }
@@ -47,8 +50,7 @@ namespace MotionRunner.Core
             var item = CosmeticCatalog.Find(EquippedId);
             if (item == null || !item.Rule.IsUnlocked(_store.ActiveEntitlements, SeasonLevel))
                 item = CosmeticCatalog.Find(CosmeticCatalog.DefaultSkinId);
-            if (_renderer != null)
-                _renderer.sharedMaterial = RuntimeMaterials.Shared(ToColor(item.BodyColor));
+            _applyColor?.Invoke(ToColor(item.BodyColor));
         }
 
         public static Color ToColor(CosmeticColor c) => new Color(c.R, c.G, c.B);
