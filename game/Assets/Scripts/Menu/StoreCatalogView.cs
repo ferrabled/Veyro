@@ -62,6 +62,7 @@ namespace MotionRunner.Menu
             float y = -104f;
             foreach (var item in CosmeticCatalog.Items)
             {
+                if(item.Slot != CosmeticSlot.Skin || item.Rule.Kind == UnlockKind.SeasonLevel) continue;
                 string packageId = PackageForItem(item);
                 var (state, row) = BuildRow(slot, ref y, item.DisplayName.ToUpperInvariant(),
                     SkinService.ToColor(item.BodyColor), () => OnSkinTapped(item.Id, packageId));
@@ -79,7 +80,7 @@ namespace MotionRunner.Menu
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(pad + 20f, y - 52f), new Vector2(-pad - 20f, y),
                 28, TextAnchor.UpperLeft, MenuTheme.Faint).text =
-                "reward ladder arrives with the Season 1 update";
+                "10 levels · earn XP, collect rewards in the timeline";
             y -= 72f;
 
             BuildButton(slot, ref y, "RESTORE PURCHASES", OnRestore);

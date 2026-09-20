@@ -1,4 +1,5 @@
 using MotionRunner.Gameplay;
+using MotionRunner.Commerce;
 using MotionRunner.Track;
 using UnityEngine;
 
@@ -13,6 +14,7 @@ namespace MotionRunner.Art
         Transform _model;
         Transform _shadow;
         Material _outfit;
+        RunnerCosmetics _cosmetics;
         string _playing;
         float _previousX;
         float _dodgeRemaining;
@@ -45,8 +47,16 @@ namespace MotionRunner.Art
 
         public void SetOutfit(Color color) => _outfit.SetColor("_OutfitColor",color);
 
+        public void ApplyLoadout(CosmeticLoadout loadout)
+        {
+            if(_cosmetics==null) _cosmetics=gameObject.AddComponent<RunnerCosmetics>();
+            _cosmetics.Apply(loadout,_animation,_outfit);
+        }
+        public bool HasCrashEffect => _cosmetics!=null && _cosmetics.HasCrashEffect;
+        public void Crash() => _cosmetics?.Crash();
         public void ResetPose()
         {
+            _cosmetics?.ResetEffects();
             _previousX=transform.position.x;
             _dodgeRemaining=0;
             _moveDirection=0;

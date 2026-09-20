@@ -1,10 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using MotionRunner.CameraInput;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using MotionRunner.Social;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MotionRunner.Menu
 {
@@ -37,6 +39,8 @@ namespace MotionRunner.Menu
         /// to read StorePanel.IsOpen: a tap that lands while the menu is coming up must never also
         /// be read as "restart the run behind it".
         public static bool IsOpen => _current != null;
+        public static string PerformanceState => _current==null ? "game" :
+            _current._detail!=null ? _current._detail.GetType().Name : _current.Tab.ToString();
 
         /// Raised once with the chosen scheme; the rig is non-null only for camera mode.
         public event Action<bool, FaceTrackingRig> Chosen;
@@ -53,12 +57,18 @@ namespace MotionRunner.Menu
         /// The online profile seam, for the profile tab. May be a never-ready fake (no
         /// backend configured) - pages must treat that as "boards are sample data".
         public IProfileService Profile { get; private set; }
+        public SkinService Skins { get; private set; }
+        public SeasonService Season => Skins.Season;
+        Coroutine _geometryRefresh;
+        SeasonPassPage _seasonPage;
+        CosmeticsPage _cosmeticsPage;
+        MenuPage _detail;
 
         public MenuTab Tab { get; private set; } = MenuTab.Run;
 
         /// True on the shop or the profile - the state back should undo by coming home rather than
         /// by falling through to Android.
-        public bool IsAwayFromHome => Tab != MenuTab.Run;
+        public bool IsAwayFromHome => Tab != MenuTab.Run || _detail != null;
 
         public bool IsStagingCamera => _home != null && _home.IsStagingCamera;
 
@@ -67,6 +77,8 @@ namespace MotionRunner.Menu
         IStore _store;
         HomePage _home;
         MenuTabBar _bar;
+        RectTransform _content;
+        GameObject _header;
         bool _done;
 
         public static MainMenu Create(IStore store, SkinService skins, IProfileService profile,
@@ -76,6 +88,7 @@ namespace MotionRunner.Menu
             var menu = go.AddComponent<MainMenu>();
             menu._store = store;
             menu.Profile = profile;
+            menu.Skins = skins;
             menu.Catalog = new StoreCatalogView(store, skins);
             _current = menu;
             menu.Build(tab);
@@ -86,11 +99,17 @@ namespace MotionRunner.Menu
         {
             RuntimeUi.PortraitCanvas(gameObject, SortingOrder);
 
+            RuntimeUi.Panel("MenuBackdrop", transform, MenuTheme.Card);
             BuildHeader();
+#if VEYRO_COSMETIC_QA && DEVELOPMENT_BUILD
+            RuntimeUi.Label("QaFixture",transform,new Vector2(0,1),Vector2.one,
+                new Vector2(24,-200),new Vector2(-24,-172),20,TextAnchor.MiddleCenter,MenuTheme.Accent).text="ISOLATED QA · FAKE OWNERSHIP & 9 XP FIXTURE";
+#endif
 
             // The content area is what is left between the header and the tab bar. Pages fill it;
             // none of them knows how tall it is.
             RuntimeUi.Element("Content", transform, out var content);
+            _content=content;
             RuntimeUi.Stretch(content, Vector2.zero, Vector2.one,
                 new Vector2(0f, MenuTheme.TabBarHeight), new Vector2(0f, -MenuTheme.HeaderHeight));
 
@@ -100,6 +119,9 @@ namespace MotionRunner.Menu
             AddPage<ProfilePage>(MenuTab.Profile, content);
 
             Catalog.Changed += _home.RefreshCards;
+            Skins.Changed += _home.RefreshCards;
+            _seasonPage = DetailPage<SeasonPassPage>(content);
+            _cosmeticsPage = DetailPage<CosmeticsPage>(content);
 
             _bar = MenuTabBar.Create(transform);
             _bar.Tapped += Show;
@@ -113,6 +135,7 @@ namespace MotionRunner.Menu
         void BuildHeader()
         {
             RuntimeUi.Element("Header", transform, out var header);
+            _header=header.gameObject;
             RuntimeUi.Stretch(header, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -MenuTheme.HeaderHeight), Vector2.zero);
             RuntimeUi.Panel("Backdrop", header, MenuTheme.Bar);
@@ -145,12 +168,58 @@ namespace MotionRunner.Menu
         public void Show(MenuTab tab)
         {
             if (_done) return;
+            _detail?.SetVisible(false);
+            _detail = null;
+            SetImmersive(false);
 
             Tab = tab;
             foreach (var pair in _pages) pair.Value.SetVisible(pair.Key == tab);
             _bar?.SetSelected(tab);
+            RefreshGeometry();
         }
 
+        TPage DetailPage<TPage>(Transform content) where TPage : MenuPage
+        {
+            var go=new GameObject(typeof(TPage).Name);
+            var page=go.AddComponent<TPage>();page.Attach(this,content);go.SetActive(false);return page;
+        }
+        void ShowDetail(MenuPage page)
+        {
+            if(_done)return;
+            foreach(var pair in _pages)pair.Value.SetVisible(false);
+            _detail?.SetVisible(false);SetImmersive(true);_detail=page;page.SetVisible(true);
+            RefreshGeometry();
+        }
+        void SetImmersive(bool enabled)
+        {
+            _header.SetActive(!enabled);if(_bar!=null)_bar.gameObject.SetActive(!enabled);
+            _content.offsetMin=enabled ? Vector2.zero:new Vector2(0,MenuTheme.TabBarHeight);
+            _content.offsetMax=enabled ? Vector2.zero:new Vector2(0,-MenuTheme.HeaderHeight);
+        }
+        void RefreshGeometry()
+        {
+            RebuildGeometry();
+            if(!Application.isPlaying)return;
+            if(_geometryRefresh!=null)StopCoroutine(_geometryRefresh);
+            _geometryRefresh=StartCoroutine(RefreshNextFrame());
+        }
+        IEnumerator RefreshNextFrame()
+        {
+            // CanvasScaler/layout finish after code-built pages are enabled. Invalidate the
+            // cached geometry once more then, including cold Home, not only after a button tap.
+            yield return null;
+            RebuildGeometry();_geometryRefresh=null;
+        }
+        void RebuildGeometry()
+        {
+            Canvas.ForceUpdateCanvases();
+            foreach(var graphic in GetComponentsInChildren<Graphic>()) graphic.SetAllDirty();
+            Canvas.ForceUpdateCanvases();
+        }
+        public void ShowSeason() => ShowDetail(_seasonPage);
+        public void ShowSeasonReward(string id) { ShowDetail(_seasonPage);_seasonPage.SelectReward(id); }
+        public void ShowCosmetics() => ShowDetail(_cosmeticsPage);
+        public void ShowCosmetic(string id) { ShowDetail(_cosmeticsPage);_cosmeticsPage.SelectItem(id); }
         public void GoHome() => Show(MenuTab.Run);
 
         public void CancelStaging() => _home?.CancelStaging();
@@ -184,7 +253,7 @@ namespace MotionRunner.Menu
             if (_current == this) _current = null;
             if (Catalog != null)
             {
-                if (_home != null) Catalog.Changed -= _home.RefreshCards;
+                if (_home != null) { Catalog.Changed -= _home.RefreshCards; Skins.Changed -= _home.RefreshCards; }
                 Catalog.Dispose();
             }
         }

@@ -337,10 +337,15 @@ namespace MotionRunner.Social.Supabase
             }
         }
 
+        bool _xpRefreshPending, _xpRefreshWork;
+        int _profileRequest;
+
         IEnumerator LoadProfile()
         {
             if (!HasLiveToken) yield break;
 
+            string requestedUser = _userId;
+            int request=++_profileRequest;
             // The object accept header makes PostgREST return ONE json object, not a one-
             // element array — JsonUtility cannot parse a top-level array. Columns are explicit
             // and stay within the column-level SELECT grant (0004): recovery_key_hash is
@@ -349,10 +354,11 @@ namespace MotionRunner.Social.Supabase
                 _url + "/rest/v1/profiles?select=handle,xp", null, true,
                 (status, body, _) =>
                 {
-                    if (status != 200) return;
+                    if (status != 200 || requestedUser != _userId || _dormantAfterDeletion || request!=_profileRequest) return;
                     var row = JsonUtility.FromJson<ProfileRow>(body);
                     if (row == null || string.IsNullOrEmpty(row.handle)) return;
 
+                    _xpRefreshPending=false;
                     Current = new Profile(_userId, row.handle, row.xp);
                     IsReady = true;
                     ProfileChanged?.Invoke();
@@ -431,6 +437,12 @@ namespace MotionRunner.Social.Supabase
                         error: new SocialError("bad_response", "unparseable")));
                     yield break;
                 }
+                if (response.accepted || response.duplicate)
+                {
+                    _xpRefreshPending=true;
+                    yield return LoadProfile();
+                    if(_xpRefreshPending && !_xpRefreshWork) StartCoroutine(RetryXpRefresh(_userId));
+                }
                 if (response.duplicate)
                 {
                     done?.Invoke(new SubmitOutcome(SubmitStatus.Duplicate,
@@ -462,6 +474,26 @@ namespace MotionRunner.Social.Supabase
             // A definitive 4xx said no — retrying the same payload will say no again.
             done?.Invoke(new SubmitOutcome(SubmitStatus.Rejected,
                 error: new SocialError("http_" + resultStatus, resultBody ?? string.Empty)));
+        }
+
+        IEnumerator RetryXpRefresh(string user)
+        {
+            if(_xpRefreshWork) yield break;
+            _xpRefreshWork=true;
+            float delay=5;
+            try
+            {
+                while(_xpRefreshPending && user==_userId && !_dormantAfterDeletion)
+                {
+                    yield return new WaitForSecondsRealtime(delay);
+                    if(user!=_userId || _dormantAfterDeletion) yield break;
+                    yield return EnsureSession();
+                    if(user!=_userId || _dormantAfterDeletion) yield break;
+                    yield return LoadProfile();
+                    delay=Mathf.Min(60,delay*2);
+                }
+            }
+            finally { _xpRefreshWork=false; }
         }
 
         public void FetchBoard(BoardQuery query, Action<BoardResult, SocialError> done)

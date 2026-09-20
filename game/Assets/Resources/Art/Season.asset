@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98125ca946453d745a21fbd15f1c9033, type: 3}
+  m_Name: Season
+  m_EditorClassIdentifier: Assembly-CSharp::MotionRunner.Art.SeasonArt
+  Cap: {fileID: 8827657448930101509, guid: 07e263937f3133b4fa791c775f5ccf7c, type: 3}
+  TopHat: {fileID: 302189243088972403, guid: 309211cf775c06444bda2ebd296b05e5, type: 3}
+  Crown: {fileID: 6486494925017782859, guid: f551b93762430984a871f514db5c2d75, type: 3}
+  Effects: {fileID: 2100000, guid: 0851069e0b9d7bd45a86569e676f1586, type: 2}
+  Spark: {fileID: 2800000, guid: d41108a15434f9441aaddbc2f530e96b, type: 3}
+  Star: {fileID: 2800000, guid: f5fef1ce5475d1d419a6a90aaf5869b2, type: 3}
+  Trace: {fileID: 2800000, guid: 926635ee0d27273489f6a07fdcddd427, type: 3}

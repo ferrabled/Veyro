@@ -1,5 +1,107 @@
 # Status journal (newest at top)
 
+## 2026-09-20 — T-025 horizontal pass and focused wardrobe (horizontal-season session)
+
+Owner requested Rocket Pass-style horizontal rewards and a Pokemon Go-style locker with
+larger, category-focused previews. Implemented a shared tier scroller (premium above free),
+actual item thumbnails, current-XP rail, My Level recentering, explicit selected-reward
+collection and direct navigation to that item in the locker. The locker has a large model
+above a wardrobe sheet, six visual categories, an All/Owned filter and a three-column grid.
+Detail pages use the full menu area; Back restores SHOP/RUN/PROFILE.
+
+A shared preview eases between head, torso, full-body/effects and an angled trail view.
+Dragging rotates the model; Confetti replays in preview. Static 256-pixel thumbnails are
+baked from the existing assets, with no reference-game artwork or additional asset license.
+Only the visible page renders its preview camera. Earned XP, entitlement/collection rules,
+profile-scoped saves and the development/production curve boundary are unchanged.
+
+**Verified:** 467/467 EditMode tests pass (`builds/horizontal-tests-polished.xml`),
+including earned collection through the new action, exact-item locker navigation, locked
+preview isolation, headwear framing and all 23 thumbnail assets. On the Nord 2, checked
+horizontal swipes, My Level, free/premium selection, locked hat preview, smooth category
+framing, drag rotation, vertical grid scrolling, All/Owned and empty-filter states, and Back
+to the unchanged three-tab shell. Phone review led to a higher head/torso crop and a separate
+rotation-hint label. Equipped the free cap through the new locker and verified it in a run;
+that accepted Daily run moved real XP 104→105. Collected earned Matte Gold using the final
+pass action and followed In Locker to its exact category. Restored the current Runner
+selection; the game is left on Home. No purchase or fake XP/ownership was used.
+
+**Installed:** `1.0.0-dev.20260920-1906.71e7c7f`, versionCode 5,
+`builds/MotionRunnerDev.apk`, 88,735,776 bytes (+675,742 versus the previous season APK).
+Installed with `adb install -r`; existing profile/claims preserved. Android permissions and
+GameActivity match the baseline. Final screenshots: `builds/horizontal-review/pass-final.png`,
+`pass-final-hat.png`, `locker-final.png`, `locker-final-body.png`, `home-final.png`.
+
+**Performance:** pass/locker/Home and return-from-background samples remained around
+16.8 ms p50/p95 (occasional 16.9 ms p95); no reproduced sustained 30 FPS state. No new
+NullReference/MissingReference/index/shader errors found in the Unity device log. Filtered
+frame evidence is `builds/horizontal-review/performance.txt`. The earlier intermittent FPS
+issue remains open, and the existing human Tilt/Camera and real commerce release checks
+still apply. Owner visual acceptance of the new portrait layout/camera motion is next.
+
+
+## 2026-09-20 — T-025 season timeline, collection and cosmetic locker (season-pass session)
+
+**Implemented:** server-recorded XP now drives a separate SeasonPassPage with a ten-level
+free/paid timeline, current XP, next-level progress and explicit Collect actions after level 1.
+Collection checks earned XP and the current entitlement; buying a pass never grants XP.
+The existing level-1 starter rule is retained. Development thresholds are cumulative 0–9 XP;
+production has a separate claims/loadout namespace and remains gated pending curve approval
+(OPEN_QUESTIONS 19). No server migration or store product was changed in this session.
+
+The Home character replaces the attract run and opens CosmeticsPage. SHOP/RUN/PROFILE stay
+the three tabs. The locker supports Skin, Body, Trail, Headwear, Aura and Crash FX, with
+preview/equip/clear and ownership revalidation. All 20 ladder items plus Runner/Ember/Frost
+use the same RunnerVisual in preview and gameplay. Imported CC0 cap/top hat/crown meshes
+are fitted to the real head bone; shirt finishes, bounded ribbons, 24-particle auras and
+30-particle confetti are visual only. Physics, steering, scoring and track determinism are
+unchanged. With Confetti, results reveal after a brief burst; score/XP recording is immediate.
+
+**Review fixes:** accepted/duplicate submissions refresh the profile, including queued runs;
+failed XP refreshes retry only the read, with backoff. Stale responses cannot roll XP back.
+Claims and loadout are profile-scoped, survive relaunch and revalidate on entitlement changes.
+Recovered server XP/store ownership permits re-collection; claims/loadout do not cloud-sync.
+Accessories account for FBX bone scale; auras resume after hidden-menu activation. On-device
+UI testing caught incorrect first-display geometry: each page now owns its Canvas batches
+and raycaster, retaining the common shell scale/sorting. Cold locker, category switches,
+timeline and repeated navigation were checked after the fix. Hidden previews stop rendering.
+
+**Verified:** 464/464 EditMode tests pass (`builds/season-tests-final.xml`). The isolated
+`Veyro Cosmetic QA` app uses an explicitly labelled 9-XP/FakeStore fixture, separate package
+and preferences, with no RevenueCat/profile traffic. Collected rewards, equip, composed
+Chrome/Crown/Aurora/Comet/Confetti, cold relaunch persistence and real runner rendering were
+checked there. Crash-window captures show the trail and Confetti before the results card.
+Three real-account Daily Tilt runs scored 153 each, synced, and moved the timeline from
+101 to 104 XP. Cap, Shadow and Confetti were collected from earned free rewards; Mint +
+Cap + Shadow + Confetti equipped and rendered in the final regular build. Paid rewards
+stayed locked without the pass. No purchase, refund or restore was performed.
+Evidence and APKs are ignored under `builds/season-review/` and `builds/`.
+
+**Performance — still open:** added local development CPU/GPU/presentation timings, target,
+refresh, render interval and focus/pause/surface logs. Samples during Home, timeline, locker,
+runs/results and repeated background/resume+screenshot checks held p50/p95 about 16.8 ms.
+The phone briefly reported 90 Hz at resume, then 60 Hz, while the game target stayed 60.
+The earlier intermittent 30 FPS behavior was not reproduced; this is not a proven FPS fix.
+No speculative frame-rate policy or phone setting was changed. Filtered evidence:
+`builds/season-review/performance.txt`.
+
+**Needs human device test / release follow-up:** collect an earned reward, tap the Home
+character, equip it, and judge a ten-minute Tilt & Touch run including rapid lane reversals
+and jumps. Repeat Camera mode with a person in frame, lost tracking, pause/raise-hand resume,
+countdown and return Home. Exercise the existing real Test Store pass purchase/restore/refund
+acceptance. Tune/approve production XP thresholds; confirm the existing backend rollout,
+including migration 0008 for Free-run XP, plus T-009's declaration/privacy flip. Detailed
+review and steps: `docs/SEASON_PASS_IMPLEMENTATION.md`. Website and T-018 icons/avatar are
+unchanged.
+
+**Final installed build:** `1.0.0-dev.20260920-1748.71e7c7f`, versionCode 5,
+`builds/MotionRunnerDev.apk` (88,060,034 bytes; +919,850 bytes versus the previous art APK).
+`aapt2` permissions match the baseline exactly; the Unity GameActivity launcher is retained.
+Installed with `adb install -r`, preserving the real profile. Restored the owner's Frost
+selection and confirmed it on Home after a cold relaunch. The separate cosmetic QA app
+remains installed for paid-item preview/testing. Final screenshots, including 104 XP and
+the free outfit in a run, are under `builds/season-review/main-final-*.png`.
+
 ## 2026-09-20 — T-006 runner/camera polish and T-025 asset research (feat-game-design session)
 
 Owner likes the park direction and requested a larger character, lateral animation,

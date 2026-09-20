@@ -44,7 +44,10 @@ namespace MotionRunner.Gameplay
         Text _mode;
         Text _resultScore;
         Text _resultBest;
+        Text _resultXp;
         GameObject _resultPanel;
+        CanvasGroup _resultCanvas;
+        float _resultRevealAt;
         GameObject _pauseButton;
 
         int _shownScore = -1;
@@ -91,7 +94,9 @@ namespace MotionRunner.Gameplay
                          + " · " + SchemeName(scheme);
         }
 
-        public void ShowResult(in RunSummary summary)
+        public void SetXpStatus(string status) { if(_resultXp!=null) _resultXp.text=status; }
+
+        public void ShowResult(in RunSummary summary, bool showCrashEffect=false)
         {
             _resultScore.text = summary.Score.ToString();
 
@@ -105,6 +110,9 @@ namespace MotionRunner.Gameplay
 
             _resultBest.text = bestLine + "\n" + summary.Distance + "m   coins " + summary.Coins +
                                "   best combo " + summary.BestCombo;
+            _resultRevealAt=Time.unscaledTime+(showCrashEffect ? 0.35f:0);
+            _resultCanvas.alpha=showCrashEffect ? 0:1;
+            _resultCanvas.interactable=!showCrashEffect;
             _resultPanel.SetActive(true);
             _pauseButton.SetActive(false); // nothing to pause once the run is over
         }
@@ -112,9 +120,18 @@ namespace MotionRunner.Gameplay
         static string SchemeName(ControlScheme scheme) =>
             scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
 
+        void Update()
+        {
+            if(_resultCanvas==null || !_resultPanel.activeSelf || _resultCanvas.alpha>=1)return;
+            _resultCanvas.alpha=Mathf.Clamp01((Time.unscaledTime-_resultRevealAt)/0.18f);
+            _resultCanvas.interactable=_resultCanvas.alpha>=1;
+        }
+
         public void HideResult()
         {
+            _resultCanvas.alpha=1;_resultCanvas.interactable=true;
             _resultPanel.SetActive(false);
+            SetXpStatus("");
             _pauseButton.SetActive(true);
             _shownScore = -1;
             _shownCoins = -1;
@@ -186,6 +203,7 @@ namespace MotionRunner.Gameplay
         void BuildResultPanel()
         {
             _resultPanel = RuntimeUi.FullScreenPanel("Result", transform, DimColor);
+            _resultCanvas=_resultPanel.AddComponent<CanvasGroup>();
 
             // 1120 tall rather than 920: the buttons below are the pause menu's stack, and QUIT
             // TO MENU is the third row it grew by. The card grew by exactly what the stack did
@@ -207,6 +225,9 @@ namespace MotionRunner.Gameplay
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(24f, -570f), new Vector2(-24f, -355f),
                 38, TextAnchor.UpperCenter, TextColor);
+
+            _resultXp=RuntimeUi.Label("SeasonXp",card.transform,new Vector2(0,1),Vector2.one,
+                new Vector2(24,-613),new Vector2(-24,-543),26,TextAnchor.MiddleCenter,Menu.MenuTheme.Dim);
 
             // One primary and two secondaries, at the pause menu's exact sizes and y positions
             // (520x140 at 430, 480x110 at 270 and 130): the two screens offer the same kind of

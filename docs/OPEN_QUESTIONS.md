@@ -178,3 +178,10 @@ the question. Keep this file short; it is read every session.
     standing constraint survives either way: **no document, listing or pitch may describe the
     board as cheat-proof.** The cheapest first step lives in that task — a top-N sanity query
     before submission day, since nothing currently alerts on an implausible score.
+
+19. **Production Season 1 XP curve (T-025, before release).** Owner requested a tiny temporary
+    cap for testing. Development builds now use cumulative thresholds 0–9; actual server XP
+    is unchanged. Choose production pacing after device acceptance. Suggested tuning starting
+    point: 0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP, not yet approved. Production builds
+    of the game are gated until this is resolved; development/device verification can proceed.
+    Level-1 Mint and owned-pass Neon Lime retain their immediate catalog unlock.

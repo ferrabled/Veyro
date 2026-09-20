@@ -103,3 +103,14 @@ materials, shader treatment, composition and generated prefabs are Veyro's addit
 See the dated STATUS entry for measured tests, device evidence and remaining human checks.
 T-006's final acceptance still needs a stranger to recognize the game from ten seconds of footage.
 An app startup splash image is optional, not an obstacle to completing the biome.
+
+
+## T-025 cosmetic integration — 20 September
+
+The home screen now displays the actual equipped character and opens a separate locker.
+SeasonPassPage shows the ten-level free/paid timeline and manual collection. The same
+RunnerVisual and bounded cosmetic renderer serve preview and gameplay: shirt finishes,
+CC0 cap/top hat/crown, ribbons, auras and crash confetti. No art changes the collision box,
+steering, score or track seed. Full source records are in `Assets/Art/Season/SOURCES.md`;
+integration details and remaining acceptance steps are in `docs/SEASON_PASS_IMPLEMENTATION.md`.
+The website is unchanged. T-018's tab icons/profile avatar remain separate unfinished work.

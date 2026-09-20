@@ -30,7 +30,9 @@ namespace MotionRunner.Progression
         {
             get
             {
-                if (!IsLive || XpForNextLevel <= 0) return 0f;
+                if (!IsLive) return 0f;
+                if (IsMaxLevel) return 1f;
+                if (XpForNextLevel <= 0) return 0f;
                 float fraction = (float)Xp / XpForNextLevel;
                 return fraction < 0f ? 0f : fraction > 1f ? 1f : fraction;
             }

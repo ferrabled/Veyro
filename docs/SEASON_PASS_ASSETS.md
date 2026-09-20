@@ -1,6 +1,6 @@
 # Season 1 asset shortlist — zero purchase cost, commercial use
 
-20 September 2026 · feat-game-design · research for T-025, not a live catalog change.
+20 September 2026 · feat-game-design · T-025 source research; implementation follow-up recorded in SEASON_PASS_IMPLEMENTATION.md.
 
 The existing design is ten levels with one free and one paid-track reward at each level.
 Both columns can use the same free source assets. The paid track buys the curated in-game
@@ -30,27 +30,28 @@ hat meshes with our own materials and no stock logo. Avoid importing the bundled
 
 ## How the current 10 × 2 ladder maps to these assets
 
-These are proposed treatments for the existing item names in COSMETICS_CATALOG, not new
-products, entitlements, purchase promises or a shipped reward system.
+The T-025 implementation uses the existing item names in COSMETICS_CATALOG. These remain
+in-game rewards, not individual store products. The table records the art direction;
+STATUS and SEASON_PASS_IMPLEMENTATION record implementation and verification.
 
 | Level | Free reward | Paid-track reward |
 |---|---|---|
 | 1 | **Mint** — matte mint shirt on the existing runner | **Neon Lime** — lime shirt with a bright accent treatment; make its value visible without relying on bloom |
 | 2 | **White trail** — one short soft white ribbon using a Kenney trace/circle | **Cyan Pulse** — cyan ribbon with a restrained pulsing accent |
-| 3 | **Sunset Orange** — warm shirt variant | **Top Hat** — Teh_Bucket mesh, teal body and pink band |
-| 4 | **Sky Blue** — cool shirt variant | **Firefly** — a few gold/mint orbiting light sprites |
-| 5 | **Disc Cap** — recommend the downloaded snapback mesh for a more recognizable sporty cap; keep or revise the display name when the item mix is approved | **Chrome** — metallic outfit panels; keep human skin/hair unchanged |
+| 3 | **Sunset Orange** — warm shirt variant | **Top Hat** — Teh_Bucket mesh, teal fitted mesh |
+| 4 | **Sky Blue** — cool shirt variant | **Firefly** — a few gold drifting light sprites |
+| 5 | **Disc Cap** — downloaded snapback mesh fitted as a sporty teal cap; existing display name retained | **Chrome** — metallic outfit panels; keep human skin/hair unchanged |
 | 6 | **Plum** — deep purple shirt | **Twin** — two short offset ribbons, reusing the same source texture |
 | 7 | **Shadow** — short dark-teal trail | **Crown** — BullHornGames crown in warm gold |
 | 8 | **Charcoal** — dark shirt | **Aurora** — teal/pink/lime gradient trail, controlled so it does not hide hazards |
 | 9 | **Confetti** — one short crash burst of small colored shapes/sprites | **Comet** — sparse star/spark tail and aura |
-| 10 | **Matte Gold** — warm gold shirt finish | **Prism** — existing proposed combination: Chrome + Aurora + Crown + Comet; distinguish the outfit with authored accents |
+| 10 | **Matte Gold** — warm gold shirt finish | **Prism** — existing proposed combination: Chrome + Aurora + Crown + Comet; animated iridescent outfit finish |
 
 The free track should look intentional and include a real accessory and effect. The paid
 track should add distinct silhouettes and animation, with short trails and sparse particles
 that preserve obstacle visibility. No reward changes runner size, hitbox, speed or jump timing.
-The paid pass's level-1 reward still unlocks immediately. Unlock rules/XP/locker implementation
-remain T-025; do not create individual store products for these items.
+The paid pass's level-1 reward still unlocks immediately. T-025 implements the recorded-XP gates, collection and locker; do not create individual
+store products for these items.
 
 ## Lane-change animation research and integration
 
@@ -71,10 +72,12 @@ tiers would need checking per clip before choosing a replacement.
 
 ## Provenance and delivery boundary
 
-Downloads are under ignored `builds/art-source/`. Only KayKit's selected animation source and
-license were added to `Assets/Art/KayKit/` for this follow-up. Pass hats/particles are researched
-and downloaded, **not wired into rewards or included in the APK**. Licenses are confirmed at
-the linked creator pages; final fit, materials and performance await the T-025 implementation.
+Downloads are under ignored `builds/art-source/`. The earlier runner polish imported the
+selected KayKit animation and license into `Assets/Art/KayKit/`. T-025 imports the selected
+three meshes and three particle textures into
+`Assets/Art/Season/`; generated fitted prefabs and effects reference only that curated subset.
+Licenses are confirmed at the linked creator pages; fit/material/performance evidence is recorded
+in STATUS as the implementation is verified.
 
 | Download | SHA-256 |
 |---|---|
