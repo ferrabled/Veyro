@@ -30,8 +30,9 @@ namespace MotionRunner.EditorTools
                 var chunk=ChunkView.Create(definition,world.transform);
                 chunk.PlaceAt(z); z+=definition.Length;
             }
-            var runner=Object.Instantiate(assets.Runner);
+            var runner=new GameObject("Preview runner");
             runner.transform.position=new Vector3(0,0.5f,0);
+            RunnerVisual.Create(runner.transform);
             var animation=runner.GetComponentInChildren<Animator>();
             animation.Play("run",0,0.18f);
             animation.Update(0);

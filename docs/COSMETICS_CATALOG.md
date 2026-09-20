@@ -144,6 +144,12 @@ richest premium surface (paid track + instant level-1 unlock, §3).
 
 ### Season 1 reward ladder (proposal ★)
 
+**Asset sourcing, 20 Sep 2026:** `docs/SEASON_PASS_ASSETS.md` maps this ladder to downloaded
+CC0 cap/top-hat/crown models, Kenney particle sprites and our existing runner. Both tracks use
+free commercial-use assets. This is a research proposal for T-025, not a shipped ladder or a
+change to the three products/entitlements. Outfit finishes now need the runner's custom shader,
+so the original primitive-body implementation notes in §5 are historical starting points.
+
 | Lv | Free track | Pass track (`season1`) |
 |---|---|---|
 | 1 | **Mint** body colour | **Neon Lime** glow body |

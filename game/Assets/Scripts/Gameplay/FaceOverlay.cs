@@ -1,6 +1,7 @@
 using MotionRunner.CameraInput;
 using MotionRunner.Core;
 using MotionRunner.Inputs;
+using MotionRunner.Menu;
 using MotionRunner.Pose;
 using MotionRunner.Track;
 using UnityEngine;
@@ -10,8 +11,8 @@ namespace MotionRunner.Gameplay
 {
     /// A small code-drawn panel that shows the player where the camera thinks they are.
     ///
-    /// It represents the PLAYER, not the runner, and is drawn to look like it: a dim blue-grey
-    /// stickman in the HUD's own palette, never the runner's orange. Nobody should be able to
+    /// It represents the PLAYER, not the runner: a teal person glyph on a paper card,
+    /// independent of the equipped outfit. Nobody should be able to
     /// mistake the glyph for the character they are steering — one is a picture of the person
     /// standing in the room, the other is the thing on the road.
     ///
@@ -84,18 +85,17 @@ namespace MotionRunner.Gameplay
         public const int PickerSortingOrder = 110;
         public const int PauseSortingOrder = 160;
 
-        // ---- palette: the HUD's dim blue-grey, deliberately not the runner's orange -----------
+        // The person stays distinct from the runner and its cosmetic outfit.
+        static readonly Color BackdropColor = MenuTheme.Card;
+        static readonly Color BandIdleColor = MenuTheme.Empty;
+        static readonly Color BandHeldColor = MenuTheme.Owned;
+        static readonly Color EnterTickColor = MenuTheme.Text;
+        static readonly Color HoldTickColor = MenuTheme.Faint;
+        static readonly Color CaptionColor = MenuTheme.Text;
 
-        static readonly Color BackdropColor = new Color(0.05f, 0.06f, 0.10f, 0.55f);
-        static readonly Color BandIdleColor = new Color(0.16f, 0.18f, 0.26f, 0.60f);
-        static readonly Color BandHeldColor = new Color(0.28f, 0.42f, 0.58f, 0.85f);
-        static readonly Color EnterTickColor = new Color(0.62f, 0.70f, 0.84f, 0.75f);
-        static readonly Color HoldTickColor = new Color(0.42f, 0.48f, 0.60f, 0.55f);
-        static readonly Color CaptionColor = new Color(0.64f, 0.70f, 0.82f);
-
-        static readonly Color GlyphTrackingColor = new Color(0.74f, 0.82f, 0.94f);
-        static readonly Color GlyphLostColor = new Color(0.90f, 0.36f, 0.34f);
-        static readonly Color GlyphTooFarColor = new Color(0.96f, 0.76f, 0.30f);
+        static readonly Color GlyphTrackingColor = MenuTheme.Text;
+        static readonly Color GlyphLostColor = MenuTheme.Accent;
+        static readonly Color GlyphTooFarColor = MenuTheme.Gold;
 
         /// A lost face re-calibrates the framing preview's neutral rather than keeping a neutral
         /// captured before the player was in position. Only in framing mode: mid-run, resetting
@@ -358,6 +358,12 @@ namespace MotionRunner.Gameplay
             backdrop.color = BackdropColor;
             backdrop.raycastTarget = false;
 
+            var title = RuntimeUi.Label("CameraLabel", panel.transform,
+                new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(12f*k, -19f*k), new Vector2(-12f*k, -3f*k),
+                Mathf.RoundToInt(14f*k), TextAnchor.MiddleCenter, MenuTheme.Dim);
+            title.text = "YOU · CAMERA";
+
             // Padding wide enough that the glyph's arms stay inside the backdrop when it sits at
             // full deflection, which is what lets the glyph's centre line up exactly with the
             // threshold ticks instead of being squeezed inside them.
@@ -366,8 +372,8 @@ namespace MotionRunner.Gameplay
             _innerHalfWidth = innerWidth * 0.5f;
 
             float stripHeight = size.y * 0.52f;
-            _stripCenterY = size.y * 0.10f;
-            _liftRange = size.y * 0.12f;
+            _stripCenterY = size.y * 0.04f;
+            _liftRange = size.y * 0.10f;
 
             BuildBands(panel.transform, innerWidth, stripHeight, k, DeadZone());
             BuildGlyph(panel.transform, size.y);

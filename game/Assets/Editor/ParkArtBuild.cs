@@ -113,6 +113,7 @@ namespace MotionRunner.EditorTools
                 state.motion=pair.Item2;
                 if(pair.Item1=="idle") machine.defaultState=state;
             }
+            RunnerPolishBuild.ConfigureDodges(assets,controller);
             animator.runtimeAnimatorController=controller;
             animator.applyRootMotion=false;
             animator.cullingMode=AnimatorCullingMode.AlwaysAnimate;

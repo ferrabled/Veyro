@@ -1,5 +1,56 @@
 # Status journal (newest at top)
 
+## 2026-09-20 — T-006 runner/camera polish and T-025 asset research (feat-game-design session)
+
+Owner likes the park direction and requested a larger character, lateral animation,
+matching camera guide and free/commercial Season Pass sources.
+
+**Changed:** runner presentation is 1.45× its previous size, scaled about the feet with a
+matching ground shadow. Physics bounds, lane movement, jump timing, seed and scoring are
+unchanged. Two Humanoid dodge takes from KayKit Character Animations 1.1's free CC0 download
+now play on left/right lane changes, with a 0.22-second pose and jump priority. Horizontal
+root travel is extracted and discarded so the animation cannot add a second lane move.
+The source FBX is covered by the existing scoped LFS rule; its license is beside it.
+The explicit editor command updates animation assets without rebuilding authored chunks.
+The camera-position guide uses the shared paper/mint/teal/pink palette and a YOU · CAMERA
+label; it still represents the person in the room. Tracking/thresholds/calibration are unchanged.
+
+**Pass research:** `docs/SEASON_PASS_ASSETS.md` maps the existing ten free + ten paid reward
+slots to downloaded CC0 hats, a crown, Kenney particles and the existing runner's outfit
+materials. Includes creator links, download hashes, licensing evidence and authoring work.
+Only the dodge source ships in this change. Pass hats/particles remain ignored research
+inputs, not live rewards or APK content. No store products, entitlements or pass promises
+changed; implementing XP/unlocks/locker/effects remains T-025.
+
+**Verified:** 442/442 EditMode tests pass (`builds/runner-polish-tests.xml`), including feet/
+scale/collider checks and both retargeted dodge clips moving bones without root travel.
+`BuildAndroidDev` succeeds. Installed with `adb install -r` on the Nord 2, retaining app data.
+Final installed version is `1.0.0-dev.20260920-1350.dc3a24d`; APK is 87,140,184 bytes,
++19,982 bytes over the 19 Sep art build. Android permissions match that build exactly.
+No SDK/package, scene edit, purchase, restore or production deployment. `hob git diff --check`
+passes. Real-device captures under ignored `builds/art-review/` show the larger runner,
+jump, home and themed camera staging guide. Camera gate passed at median 3.7 ms and
+briefly entered a tracked camera run; this is not a physical gesture/feel acceptance test.
+
+**Performance finding — still open:** short fresh-launch samples of the updated build show
+p50/p95 16.8 ms (~60 FPS), allocated Unity memory about 64.6–64.9 MB before camera use.
+An earlier launch and one background/resume + screenshot sequence instead settled at
+p50 33.6 ms (~30 FPS). Reinstalling/relaunching the same APK restored 60 FPS. A later identical
+resume/capture check stayed at 60 FPS, as did the 19 Sep APK comparison. The cause is not
+isolated; do not describe this as a fixed or proven pre-existing issue, or claim an
+unconditional 60 FPS pass. The final updated APK was left installed and foregrounded at
+60 FPS. The bounded investigation made no speculative frame-rate/system-setting changes.
+Filtered evidence is `builds/art-review/runner-polish-performance.txt`. Next profiling step:
+log target frame rate, frame timings and focus/pause transitions while repeating this
+sequence; isolate the presentation changes only if the drop can be reproduced reliably.
+
+**Needs human device test / acceptance:** rapid left/right reversals and lane changes during
+jumps, then a ten-minute Tilt & Touch run; judge the new size/obstacle clearance and dodge
+feel. Repeat Camera mode, verifying guide readability in tracking/lost/too-far states,
+pause, raise-hand resume and countdown. Check resume from Home for smoothness. The
+performance finding and the ten-second stranger-recognition check remain open for T-006.
+T-018 menu icons/avatar and T-037 website figures remain their existing separate tasks.
+
 ## 2026-09-19 — T-006 park art pass built and installed (feat-game-design session)
 
 **Working direction:** a sunlit sculpture garden, using the website's teal, pink and paper

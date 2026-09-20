@@ -17,6 +17,8 @@ MonoBehaviour:
   Run: {fileID: 4188298191382927259, guid: f0d7bfe97b174734cb56ea9c4f5b4b2f, type: 3}
   Jump: {fileID: -8630955994762890147, guid: 163e4843018558541845269a6669de4a, type: 3}
   Idle: {fileID: 2910742486769232160, guid: 55c33dda42392ec499954ca9acd4e8db, type: 3}
+  DodgeLeft: {fileID: -8338831036711338807, guid: 7e9919389f2739e469e66c3ab7a1932f, type: 3}
+  DodgeRight: {fileID: 2188323905074769703, guid: 7e9919389f2739e469e66c3ab7a1932f, type: 3}
   Sky: {fileID: 2100000, guid: 994149341c97d6c418398ee8440a0fb8, type: 2}
   Props:
   - {fileID: 2673539985746612718, guid: ed206a523538cc44780cbc804528beeb, type: 3}

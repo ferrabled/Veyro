@@ -10,6 +10,8 @@ namespace MotionRunner.Art
         public AnimationClip Run;
         public AnimationClip Jump;
         public AnimationClip Idle;
+        public AnimationClip DodgeLeft;
+        public AnimationClip DodgeRight;
         public Material Sky;
         public GameObject[] Props;
         public TrackChunkAsset[] Chunks;
