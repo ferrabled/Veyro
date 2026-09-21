@@ -277,3 +277,14 @@ Do not advertise a scheduled daily reminder or a notification-to-Daily-Run short
 campaign/routing increment is implemented and verified. Registration and session processing begin
 at startup even when receiving notifications is off; the privacy policy and Data safety form
 must reflect this. See ONESIGNAL_SETUP.md and STORE_COMPLIANCE.md for release gates.
+
+## Layers-enabled update — held until T-022 verification and release
+
+Suggested addition alongside the notification text above (not yet submitted to Play):
+
+> Optional gameplay analytics helps improve Daily Run reminders. It stays off until you enable PROFILE → GAMEPLAY ANALYTICS, and you can turn it off there at any time. Camera images and motion readings stay on your device. See our privacy policy for collected data and deletion options.
+
+Publish with the verified SDK build and Data Safety changes, after fitting the complete
+listing within Play's 4,000-character limit. Do not describe a scheduled reminder campaign
+as available until the backend sender exists. The privacy/support website was updated on
+21 Sep; SDK integration and a website deployment are not themselves a new Play release.

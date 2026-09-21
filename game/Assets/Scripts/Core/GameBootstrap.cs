@@ -20,7 +20,9 @@ namespace MotionRunner.Core
         {
             Application.targetFrameRate = 60;
             Screen.orientation = ScreenOrientation.Portrait;
+            var growth = GrowthRuntime.Create();
             var push = OneSignalPushService.Create();
+            growth.Attach(push);
             push.Initialize(PlayerPrefs.GetInt(PushPromptPolicy.EnabledKey, 0) == 1);
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
             new GameObject("Art performance probe").AddComponent<ArtPerformanceProbe>();

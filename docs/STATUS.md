@@ -1,5 +1,95 @@
 # Status journal (newest at top)
 
+## 2026-09-21 — Layers SDK, consent controls and privacy website; release gates remain
+
+`feat-implement-tracks` / T-021 + T-022. Owner supplied Layers App ID
+`app_4cf32e54fc359326`. The Layers project URL is the browser address of the open
+project; useful for dashboard verification, unnecessary for SDK initialization.
+
+Implemented a pinned Layers 3.3.2 adapter with a separate PROFILE → GAMEPLAY ANALYTICS
+choice, off until explicit acceptance. SDK initialization waits for acceptance; off
+revokes consent, cancels transport and clears only the dedicated SDK queue directory.
+The separate random analytics support ID remains copyable for provider deletion.
+Advertising-ID/install-referrer collection, advertising consent, automatic application
+error reports and gameplay performance traces are disabled. Native SDK delivery-health
+reporting is distinct: the public configuration returns health enabled, and the core
+contains queue/delivery/drop/retry/consent counters. The policy and Diagnostics declaration
+include these counters. No synthetic health probe or event was sent.
+
+Real run starts/results and consented notification opens feed Layers. Versioned,
+allowlisted campaign values follow a clicked visit into Daily runs; duplicate clicks,
+abandoned runs, mid-run consent and expiry are covered by tests. Notifications route to
+the Daily menu only when safe, never auto-start gameplay/camera. No Supabase identity
+alias, custom purchase event, sender function or scheduled campaign was enabled.
+
+Replaced OneSignal's default small/large sample graphics with the Veyro V vector.
+The observed deny/retry continuation path now uses bounded Unity Android permission
+callbacks. This addresses the suspected path; its physical deny/retry verification is
+still pending, as are separate foreground/warm/cold notification checks.
+
+**Verified:** 468/468 tests pass. Three SDK consent tests enter Play Mode with the
+official native/network-free mock; initial test-only failures from using a persistent
+MonoBehaviour outside Play Mode were corrected. Android ARM64 release-format APK built:
+`builds/MotionRunner-SponsorSDK-release.apk`, 73,469,525 bytes (+972,600 versus the prior
+OneSignal release check), SHA-256
+`7f4b86a25e4e4664e7e384c533962ce04bf0560d8cea9d76346d7ff41b12a522`.
+Permissions are unchanged from that OneSignal APK: no AD_ID or location permissions.
+UnityPlayerGameActivity remains the launcher. Packaged Layers code matches the pinned
+native library after Unity's debug-symbol stripping; ELF and ZIP 16 KiB alignment pass.
+The compiled drawable contains the V path, and the vendor default large icon is absent.
+246 implementation/resolved-build inputs match the scratch build. EDM4U's generated
+Maven Central entry was synchronized to the source Gradle settings template.
+
+This is an **uncombined verification APK**, existing versionName 1.0.0 / code 5 and the
+keyless-shop local release flavour, not a Play upload. The subsequent development build
+was intentionally cancelled in our isolated scratch project and deferred until combined
+scope is confirmed; it is not recorded as a passing build. Scratch PlayerSettings were
+restored from source. No phone operation occurred, and the owner's latest design build
+and saved loadout remain untouched. No other agent/editor process was stopped.
+
+**Website deployed and verified:** home, privacy, support and terms at
+`https://veyro.ferrabled.com/` match the prepared files byte-for-byte. Current Cloudflare
+version `0242994e-c899-4634-a3cf-c188218cf2f1`; privacy/terms effective 21 September 2026.
+Copy describes separate push/analytics choices, IP-derived country/region, SDK delivery
+diagnostics, US processing, queued data and separate provider deletion. The website
+itself gained no tracking. `STORE_COMPLIANCE.md` contains the revised Play declaration
+table; `SDK_PRIVACY_RELEASE.md` is the ordered owner/integration/release guide.
+
+**Blocked for final release acceptance / needs human device test:** Q19 feature baseline
+(latest design has uncommitted fitting fixes), highest uploaded Play versionCode and
+production status; Q22 advertising-forwarding/account terms and missing upstream SDK
+license confirmation for the documented local privacy patch. Exact next device steps
+are in SDK_PRIVACY_RELEASE: default-off/no traffic, enable + Events receipt, real
+start/result/abandon, targeted push with campaign data, foreground/warm/cold, opt-out
+and no replay. No real Layers event receipt, combined build, signed AAB, Console change,
+Play upload or hackathon experiment result is claimed.
+
+Evidence: `builds/layers-verification.json`, final test XML/build log, compiled icon and
+permission dumps, public SDK-config response and `builds/site-layers-deployment.json`.
+Private API keys/keystore secrets were not read or requested. Public SDK config HTTP
+200 / success is configuration evidence only, not proof of SDK ingestion.
+
+## 2026-09-20 — Owner confirmed OneSignal delivery/open; automation and Layers next-step plan
+
+Owner received the targeted test notification and tapping opened the game. Recorded as
+owner-observed success; no exact message ID, installed build or warm/cold state was supplied.
+This closes the basic delivery/open question, not foreground suppression or every lifecycle
+case. Owner reported OneSignal branding: Veyro small/large default icon replacement is pending.
+The earlier denial/retry hang is still unresolved; no source change or new device call this turn.
+
+Added `docs/REMINDER_AUTOMATION_PLAN.md`: complete the notification UX, integrate consent-gated
+Layers events, carry campaign context from push to Daily start/completion, then use a protected
+Supabase Edge Function and Cron for automatic OneSignal sends. Includes private server secrets,
+dry-run/one-device test, send deduplication/cap, QA exclusion, attribution window and experiment
+evidence. This is proposed implementation work; no function, secret, campaign or schedule was
+deployed. Existing release-baseline question Q19 still applies to identity/release scope.
+
+Verified current official OneSignal API/icons, Layers SDK/events, Supabase scheduling/secrets
+and Layers category documentation. Requested the public Layers SDK App ID/project URL; private
+keys stay out of chat. Updated setup/backlog/prerequisites and Q21 to reflect delivery success.
+Next milestone: one branded push opens the Daily entry and real run events appear once in Layers.
+Documentation-only verification: diff whitespace check; prior binary/test results unchanged.
+
 ## 2026-09-20 — T-021 Nord 2 device pass; permission retry defect and delivery gate
 
 Owner authorized game-only device testing with no uninstall or changes elsewhere on the phone.
@@ -122,6 +212,48 @@ from optional push delivery and explain the separate notification record's delet
 Owner must deploy these before distribution. T-021 remains incomplete until campaign/tag/routing
 work, release-device checks and deployed campaign/public-build evidence are done. P5 is partially
 met (App ID received; FCM confirmation pending); Layers account setup can follow independently.
+
+## 2026-09-20 — T-042 deep SDK feasibility and owner setup guide (feat-implement-tracks)
+
+Owner accepted the shared Daily Run reminder/measurement idea and requested a deeper integration
+review. Added `SPONSOR_SDK_INTEGRATION_GUIDE.md`, updated P5/P6 with exact prerequisites and recorded
+the unresolved release baseline in OPEN_QUESTIONS 19. The guide covers package installation,
+bootstrap/asmdef seams, consent/UI, safe notification routing, a six-tag campaign, event semantics,
+identity/deletion, build/device checks and the short handoff the owner should provide.
+
+**Evidence:** inspected downloaded OneSignal 5.3.5 and Layers v3.3.2 tagged archives outside the
+repo; verified tag commit IDs and OneSignal Android 5.3.5 npm availability. Our Unity 6000.5.9f1,
+API 26/36, ARM64 IL2CPP and existing EDM4U meet published requirements. NDK llvm-readelf verified
+Layers' supplied ARM64 library: 1,857,944 bytes, four LOAD segments aligned to 16 KB, all 62 C#
+native binding names present in its dynamic symbols. This checks that library only, not a final
+APK/AAB. Source review found Layers automatically enables diagnostics/performance and invokes
+GAID lookup at init; consent has no initial config field, the README's thirdPartySharing example
+does not match the two-argument API, and reset/shutdown are not deletion/opt-out shortcuts.
+
+**Outcome:** feasible, with Layers collection/withdrawal behavior an explicit implementation gate.
+No SDK/package/game changes, Unity import/build, campaign send, account mutation, or device test
+were performed. The guide states these limits. Needs human device test **after implementation**:
+follow §6 for consent, cold/warm/foreground notification taps, offline queue, identity where
+applicable, camera pause/resume and real Play purchase/restore. Next: owner provides public App
+IDs, validated FCM setup, release state/baseline and phone availability; implement T-021/T-022.
+
+## 2026-09-20 — T-042 OneSignal/Layers readiness review (feat-implement-tracks)
+
+Reviewed current official Shipaton requirements, vendor Unity SDK documentation and the repo's
+packages, bootstrap, run completion, streak storage and release notes. Neither SDK is installed;
+P5/P6 remain unconfirmed. Added `TRACKS_INTEGRATION_REVIEW.md` with a proposed Daily Run reminder
+loop, Layers-assisted experiment, owner setup, adapter/event plan, device checks, schedule and
+submission evidence. Corrected T-021/T-022 acceptance criteria: a deployed campaign and a
+documented experiment are required beyond the old draft/dashboard checks. T-024 remains separate.
+
+Material findings: the 16 Sep release plan keeps profiles out of the sponsor update although this
+branch contains them; Layers can inject AD_ID and needs release-build attribution checks;
+OneSignal collection disclosures extend beyond the existing push-ID note. SDK versions are
+candidates, not tested pins. No package/code, campaign, account, policy deployment or store state
+changed. Verified by source inspection and official web documentation; Unity tests/builds were
+not run for this documentation-only review. Next: owner confirms OneSignal + FCM/Layers setup
+and production state, then implement T-021/T-022. Future human-device verification steps are in
+the review; no device integration is claimed complete.
 
 ## 2026-09-19 — T-006 park art pass built and installed (feat-game-design session)
 

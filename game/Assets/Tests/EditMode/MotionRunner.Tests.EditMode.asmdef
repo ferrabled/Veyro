@@ -10,7 +10,9 @@
         "MotionRunner.Social",
         "MotionRunner.Notifications",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "MotionRunner.Growth",
+        "Layers.Unity"
     ],
     "includePlatforms": [
         "Editor"

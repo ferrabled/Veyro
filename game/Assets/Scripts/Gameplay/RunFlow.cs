@@ -47,6 +47,7 @@ namespace MotionRunner.Gameplay
         IPushService _push;
         PushPromptPolicy _pushPrompt;
         NotificationPanel _notificationPanel;
+        AnalyticsPanel _analyticsPanel;
 
         public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins,
             IProfileService profile, IPushService push)
@@ -81,6 +82,7 @@ namespace MotionRunner.Gameplay
             _menu.Chosen += StartRun;
             _menu.GuideRequested += ShowGuide;
             _menu.NotificationsRequested += () => ShowNotifications(false);
+            _menu.AnalyticsRequested += ShowAnalytics;
 
             BeginAttract();
 
@@ -302,7 +304,15 @@ namespace MotionRunner.Gameplay
         {
             TickCameraOutage();
             bool safeForOffer = _menu != null && _menu.Tab == MenuTab.Run &&
-                !_menu.IsStagingCamera && _guide == null && _notificationPanel == null;
+                !_menu.IsStagingCamera && _guide == null && _notificationPanel == null && _analyticsPanel == null;
+            if (GrowthRuntime.Tracker != null && GrowthRuntime.Tracker.DailyEntryPending &&
+                _menu != null && !_menu.IsStagingCamera && _guide == null &&
+                _notificationPanel == null && _analyticsPanel == null)
+            {
+                _session.Mode = RunMode.Daily;
+                _menu.GoHome();
+                GrowthRuntime.Tracker.ConsumeDailyEntry();
+            }
             if (_pushPrompt.TryOffer(_push.Status, safeForOffer,
                     ProgressStore.Streak.Length > 0, Debug.isDebugBuild))
             {
@@ -320,6 +330,7 @@ namespace MotionRunner.Gameplay
             // that used to live here would have made back fall through the guide whenever it was
             // opened from the menu.
             if (!UnityEngine.Input.GetKeyDown(KeyCode.Escape)) return;
+            if (_analyticsPanel != null) { _analyticsPanel.Close(); return; }
             if (_notificationPanel != null)
             {
                 _notificationPanel.Close();
@@ -356,8 +367,15 @@ namespace MotionRunner.Gameplay
 
         void ShowNotifications(bool verification)
         {
-            if (_notificationPanel != null || _menu == null || _menu.IsStagingCamera || _guide != null) return;
+            if (_notificationPanel != null || _analyticsPanel != null || _menu == null || _menu.IsStagingCamera || _guide != null) return;
             _notificationPanel = NotificationPanel.Show(_push, verification, () => _notificationPanel = null);
+        }
+
+        void ShowAnalytics()
+        {
+            if (_analyticsPanel != null || _notificationPanel != null || _menu == null ||
+                _menu.IsStagingCamera || _guide != null || GrowthRuntime.Analytics == null) return;
+            _analyticsPanel = AnalyticsPanel.Show(GrowthRuntime.Analytics, () => _analyticsPanel = null);
         }
 
         /// A camera-mode run whose camera has stopped answering PAUSES ITSELF, and the pause menu
@@ -494,6 +512,7 @@ namespace MotionRunner.Gameplay
         void OnDestroy()
         {
             if (_notificationPanel != null) _notificationPanel.Close();
+            if (_analyticsPanel != null) _analyticsPanel.Close();
             DismissOverlay();
             StopAttract();
             if (_hud != null)

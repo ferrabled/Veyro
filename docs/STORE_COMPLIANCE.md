@@ -110,8 +110,38 @@ the same change that ships a feature listed below.
   before enabling the alias. No site deploy or Console change has been performed by this task.
 
 ### Layers analytics
-- Data safety → app interactions / diagnostics = collected. Privacy policy section. Same
-  AD_ID check as OneSignal.
+21 Sep 2026 implementation: consent-gated Layers 3.3.2 with the local privacy patch;
+App ID `app_4cf32e54fc359326`. No Console changes or uploaded release are implied.
+Use this table together with existing RevenueCat/OneSignal/Supabase declarations:
+
+| Play category | Collection / requirement | Purposes and handling |
+| --- | --- | --- |
+| App activity → App interactions | Collected. Layers portion OPTIONAL; combined app's row remains REQUIRED where OneSignal session processing is automatic. | Analytics; retain Developer communications for OneSignal notifications. Runs used for leaderboards remain the existing Other actions row. |
+| Device or other IDs | Collected. Layers portion OPTIONAL; combined row remains REQUIRED due to launch-time purchase/push identifiers. | Analytics plus existing app functionality. SDK installation/session IDs and random analytics support ID are pseudonymous, not anonymous data exempt from disclosure. |
+| Location → Approximate location | Collected, OPTIONAL for Layers; not ephemeral because derived country/region supports analytics. | Analytics. Provider derives region from network IP, then drops raw IP. No GPS permission. OneSignal currently states it does not collect approximate location. |
+| Personal info → User IDs | Keep existing REQUIRED profile declaration if profiles ship. | App functionality/account management/security as already recorded. Review Analytics purpose for the separate Layers custom user ID; do not remove this row merely because identifiers are random. |
+| Purchase history | Preserve existing RevenueCat and OneSignal purchase declarations. | No new custom Layers purchase event in this increment. |
+| App info/performance → Diagnostics | Collected, OPTIONAL for Layers. | Analytics and app functionality (delivery reliability). Public config enables native SDK health reporting; the bundled core contains delivery/queue/drop/retry/consent counters. Application crash/error reports and gameplay performance tracing remain disabled; do not declare crash logs merely because SDK delivery diagnostics exist. |
+
+- Shared vs collected: retain the existing public leaderboard sharing. Provider-only
+  processing may qualify for Google's service-provider sharing exception when done
+  solely on our instructions. Confirm Layers advertising/CAPI destinations are off
+  before relying on that exception; SDK consent alone is not account verification.
+- Advertising ID: expected **No**, subject to final artifact verification. The Layers
+  attribution modules and GAID/install-referrer dependencies are disabled/removed.
+  Inspect the merged release manifest for AD_ID, location and foreground-service
+  changes; preserve the prior OneSignal permission baseline. No ads are added.
+- Network transports use HTTPS. No camera frames, raw motion readings, recovery
+  secrets, email or phone data are sent to Layers. Camera control labels are events,
+  not image collection. Account creation/access answers remain those of profiles.
+- Privacy policy effective **21 September 2026**, with separate opt-in, opt-out,
+  queued-event deletion, US processing and support-ID deletion explanations. Public
+  deletion URL remains `https://veyro.ferrabled.com/support/#delete`. DELETE ONLINE
+  PROFILE does not delete the independent OneSignal/Layers records in this release.
+- Full ordered release procedure, owner/vendor checks and evidence gaps:
+  `SDK_PRIVACY_RELEASE.md`. Do not publish a modified SDK until its missing upstream
+  license/redistribution terms have been clarified. No fixed analytics retention
+  period or one-click provider deletion is promised without an implemented process.
 
 ### T-009 — Supabase profiles + leaderboard (post-v1.0, Update 1)
 > Redefined 3 Sep 2026: anonymous-first Supabase identity, **no Play Games sign-in in this
@@ -197,3 +227,19 @@ deleted or app data is cleared; the current profile receives its own code. Both 
 on the device, never public leaderboard data. No SDK, permission, or collected-data category
 is added by these corrections. The existing T-009 atomic binary/Console/policy flip remains
 required; this review made no Console or production deployment changes.
+
+### 21 Sep 2026 — policy website deployment verified
+
+Cloudflare `veyro-site` version `0242994e-c899-4634-a3cf-c188218cf2f1` is live.
+Home, privacy, support and terms were fetched from `veyro.ferrabled.com` and matched
+the prepared files byte-for-byte. Privacy/terms are effective 21 September 2026;
+`/privacy/#analytics` and `/support/#delete` exist. This supersedes earlier
+"not deployed" statements for website copy only. No Play declaration or upload was
+performed. SDK release checks and the owner/vendor gates above remain open.
+
+21 Sep Android artifact check: `MotionRunner-SponsorSDK-release.apk` is 73,469,525
+bytes (+972,600). Its permission set equals the earlier OneSignal release check;
+AD_ID, ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION are absent. ARM64 native
+Layers and APK ZIP alignment are 16 KiB compatible. This verifies the current SDK
+increment only; repeat on the final combined/signed Play artifact. Code 5 was not
+incremented and this local keyless-shop APK must not be uploaded as a new release.

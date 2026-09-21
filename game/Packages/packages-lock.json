@@ -7,6 +7,12 @@
       "dependencies": {},
       "url": "https://package.openupm.com"
     },
+    "com.layers.analytics": {
+      "version": "file:com.layers.analytics",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.onesignal.unity.android": {
       "version": "5.1.15",
       "depth": 0,

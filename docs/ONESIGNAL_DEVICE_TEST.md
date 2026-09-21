@@ -8,7 +8,7 @@ Package: `com.ferrabled.veyro.run`. Public OneSignal App ID:
 Basic delivery/open is now owner-verified. The exact message ID, installed build and warm/cold
 state were not captured, so the lifecycle-specific checks below remain open. The notification
 showed OneSignal branding; replace the default icon resources and verify the next build. The
-permission-denial/retry defect remains unresolved. Campaign follow-up remains pending.
+permission-denial/retry defect remains unresolved. Next plan: `REMINDER_AUTOMATION_PLAN.md`.
 
 ## Scope and preservation
 

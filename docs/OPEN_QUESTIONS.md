@@ -179,10 +179,14 @@ the question. Keep this file short; it is read every session.
     board as cheat-proof.** The cheapest first step lives in that task — a top-N sanity query
     before submission day, since nothing currently alerts on an implausible score.
 
-19. **Sponsor-update release baseline (20 Sep, feat-implement-tracks).** Confirm which
-    baseline should ship notifications and whether versionCode 5 is public or still in review.
-    The prior release plan excluded profiles, while this branch already contains them and art.
-    *Recommended default: preserve the existing release scope until the owner confirms it.*
+19. **Sponsor-update release baseline (20 Sep, feat-implement-tracks).** The owner accepted
+    the OneSignal-to-Layers Daily Run loop and requested an integration guide. The 16 Sep
+    release plan keeps profiles out of that update, while this branch includes profiles and
+    art. Which baseline should ship the SDKs, and is versionCode 5 now public or still in
+    review? *Recommended default: keep the sponsor update on the existing release baseline
+    until the owner explicitly includes the newer features; adapters can proceed independently.*
+    P5/P6 account/FCM readiness and public SDK IDs remain owner prerequisites, with exact steps
+    in `SPONSOR_SDK_INTEGRATION_GUIDE.md` §1. No production state or release-scope choice was assumed.
 
 20. **Resolved: OneSignal FCM readiness (20 Sep, feat-implement-tracks / T-021).** The owner
     uploaded the Firebase service-account JSON directly to OneSignal and reached SDK onboarding.
@@ -203,5 +207,16 @@ the question. Keep this file short; it is read every session.
     *Recommended default: keep this installation, no credential sharing/data reset, schedule
     one coordinated device window, fix/retest the retry before SDK release.* Full test report:
     `ONESIGNAL_DEVICE_TEST.md`. Retry root cause remains unconfirmed; foreground and separate
-    warm/cold checks remain. **21 Sep:** Veyro icon and bounded permission retry changes are implemented;
-    physical retest remains required. Campaign and Daily-menu routing remain a later increment.
+    warm/cold checks remain. Campaign/Layers implementation can proceed separately under
+    `REMINDER_AUTOMATION_PLAN.md`. **21 Sep:** P6 App ID received; icon and bounded permission
+    retry changes implemented, physical retest remains required on the combined build.
+
+22. **Layers account and SDK distribution checks (21 Sep, feat-implement-tracks / T-022).**
+    App ID `app_4cf32e54fc359326` received; SDK consent and real-run instrumentation implemented.
+    Confirm no advertising/CAPI destinations are enabled. The upstream v3.3.2 archive contains
+    no LICENSE or package license field; ask Layers for terms allowing the documented local
+    consent/privacy patch to be distributed, or an upstream equivalent fix. Patch details are
+    in `game/Packages/com.layers.analytics/VEYRO_PATCH.md`. *Recommended default: SDK analytics
+    only, advertising off, explicit opt-in, verified provider-deletion process; resolve vendor
+    terms before distributing the modified SDK.* Production feature baseline and unused Play
+    versionCode are still owner decisions in Q19; no signed Play release was assumed.

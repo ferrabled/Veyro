@@ -82,6 +82,7 @@ namespace MotionRunner.Gameplay
         int _sessionSalt;
         float _elapsed;
         bool _started;
+        string _runId;
 
         /// True once THIS run's camera gave up and the run fell back to tilt+touch. Scheme
         /// stays Camera for the local boards (Feature D: "still scores as the camera run it
@@ -135,6 +136,7 @@ namespace MotionRunner.Gameplay
         /// bests on disk.
         public void Stop()
         {
+            GrowthRuntime.Tracker?.AbandonRun();
             IsRunning = false;
             Frozen = false;
             enabled = false;
@@ -184,6 +186,10 @@ namespace MotionRunner.Gameplay
             }
 
             IsRunning = true;
+            _runId = Guid.NewGuid().ToString();
+            GrowthRuntime.Tracker?.StartRun(_runId, Mode == RunMode.Daily ? "daily" : "free",
+                InputModes.For(Scheme == ControlScheme.Camera, false), DailyLabel,
+                CurrentSeed.WorldId, CurrentSeed.ContentVersion);
         }
 
         void Update()
@@ -292,6 +298,8 @@ namespace MotionRunner.Gameplay
             ProgressStore.Flush();
 
             SubmitToBoards(score);
+            GrowthRuntime.Tracker?.CompleteRun(_runId, score, Score.Coins, (int)Score.Distance,
+                _elapsed, InputModes.For(Scheme == ControlScheme.Camera, _cameraDropped));
 
             Debug.Log("Run over. mode=" + Mode + " scheme=" + Scheme + " seed=" + CurrentSeed +
                       " score=" + score + " coins=" + Score.Coins +
@@ -313,7 +321,7 @@ namespace MotionRunner.Gameplay
 
             Profile.SubmitRun(new RunSubmission
             {
-                client_run_id = Guid.NewGuid().ToString(),
+                client_run_id = _runId,
                 mode = Mode == RunMode.Daily ? RunSubmission.ModeDaily : RunSubmission.ModeFree,
                 seed = CurrentSeed.Seed,
                 content_version = CurrentSeed.ContentVersion,

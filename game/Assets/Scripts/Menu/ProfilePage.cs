@@ -197,8 +197,14 @@ namespace MotionRunner.Menu
             notifications.rectTransform.anchorMin = new Vector2(.5f, 1f);
             ShrinkToFit(guide, 32);
             ShrinkToFit(notifications, 32);
-            BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
+            var privacy = BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
                 () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
+            privacy.rectTransform.anchorMax = new Vector2(.5f, 1f);
+            var analytics = BuildLink(slot, "Analytics", -30f - LinkSpacing, "GAMEPLAY ANALYTICS",
+                () => Menu.RequestAnalytics());
+            analytics.rectTransform.anchorMin = new Vector2(.5f, 1f);
+            ShrinkToFit(privacy, 28);
+            ShrinkToFit(analytics, 28);
             _delete = BuildLink(slot, "Delete", -30f - 2 * LinkSpacing,
                 "DELETE ONLINE PROFILE", DeleteTapped);
             ShrinkToFit(_delete, 32);

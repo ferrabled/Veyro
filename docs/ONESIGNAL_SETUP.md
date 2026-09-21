@@ -3,10 +3,12 @@
 Implementation: 20 September 2026, `feat-implement-tracks`. This is the initial SDK and
 permission increment of T-021, not a completed hackathon campaign.
 
-**21 Sep OneSignal checkpoint:** The sample icons are replaced by a monochrome Veyro V;
-Unity's bounded Android permission callbacks replace the previously hanging request path.
-Physical retry/lifecycle verification remains pending. Daily-menu payload routing and campaign
-measurement belong to the next increment. The 20 Sep evidence below is historical.
+**21 Sep implementation update:** Layers App ID received and a consent-gated adapter,
+campaign-to-run events and safe Daily-menu routing are implemented. The OneSignal sample
+icons are replaced by a monochrome Veyro V; Unity's bounded Android permission callbacks
+replace the previously hanging request path. These changes still require physical
+verification on the combined release snapshot. The 20 Sep evidence below is historical.
+Current release procedure and gaps: `SDK_PRIVACY_RELEASE.md`.
 
 **Device update (20 Sep evening):** installed release and development builds over the existing
 Nord 2 game without clearing data. Registration, token readiness, allow/deny, in-game off/on,
@@ -14,7 +16,7 @@ restart persistence, gameplay/camera smoke checks and RevenueCat Test Store tran
 checked. **A same-session deny → enable retry can hang; it is not fixed.** The owner subsequently
 confirmed receiving the test push and tapping it to open the game. Separate foreground/warm/cold
 cases remain unverified; OneSignal branding needs replacing with Veyro notification icons.
-See `ONESIGNAL_DEVICE_TEST.md` for evidence and the campaign section below for the next increment.
+See `ONESIGNAL_DEVICE_TEST.md` for evidence and `REMINDER_AUTOMATION_PLAN.md` for the next increment.
 
 **Verified:** 451/451 EditMode tests and an Android ARM64 release build passed. The APK is
 `builds/MotionRunner-OneSignal.apk` (69.14 MiB, versionCode 5), with native/IL2CPP OneSignal
