@@ -44,6 +44,7 @@ namespace MotionRunner.Menu
         /// Raised by the profile tab's "how to play". RunFlow owns which screen is up, so the menu
         /// only announces the tap.
         public event Action GuideRequested;
+        public event Action NotificationsRequested;
 
         /// The store view, built once and shared: the shop tab hosts it, and the season pass card
         /// on the home tab listens to it. One view means one set of SDK callbacks in flight,
@@ -161,6 +162,7 @@ namespace MotionRunner.Menu
             _store != null && Entitlements.Has(_store.ActiveEntitlements, Entitlements.Season1);
 
         public void RequestGuide() => GuideRequested?.Invoke();
+        public void RequestNotifications() => NotificationsRequested?.Invoke();
 
         void OnChosen(bool cameraMode, FaceTrackingRig rig)
         {

@@ -8,6 +8,7 @@
         "MotionRunner.CameraInput",
         "MotionRunner.Progression",
         "MotionRunner.Social",
+        "MotionRunner.Notifications",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

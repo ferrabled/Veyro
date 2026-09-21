@@ -77,12 +77,37 @@ the same change that ships a feature listed below.
   hold a purchasing build while the live policy says "no collection".
 
 ### T-021 — OneSignal push notifications
-- Data safety → device/push identifiers = collected.
+> Initial Android SDK/permission integration added 20 Sep, not yet released. See
+> `ONESIGNAL_SETUP.md` for exact versions and owner/device checks. This increment initializes
+> anonymous OneSignal registration at boot; push delivery is off until the player enables it.
+> **OS permission / TURN OFF do not disable registration and session collection.** No Supabase
+> alias, email, SMS, custom gameplay tags or Layers collection is enabled in this increment.
+- Data safety → device/push identifiers = collected from SDK initialization (required in this
+  build, not optional just because receiving a notification is optional).
+- App activity → App interactions = collected (sessions / notification interactions), with
+  Analytics and Developer communications purposes. OneSignal's
+  [declaration guide](https://documentation.onesignal.com/docs/en/google-play-data-safety-requirements)
+  also requires purchase-history disclosure in an IAP app; retain the existing purchase row
+  and review the SDK-enabled build alongside RevenueCat. This is more than an IDs-only flip.
+- No location permission is requested; location sharing is disabled in the wrapper. Do not
+  equate that with concealing the IP address used to connect to the provider.
 - **Check the merged manifest for `com.google.android.gms.permission.AD_ID`** after adding
   the SDK — if present, the separate Advertising ID declaration becomes mandatory (targeting
   API 33+). Strip the permission if unused.
+- **20 Sep APK verified:** no AD_ID, ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION. New
+  permissions are POST_NOTIFICATIONS, WAKE_LOCK, VIBRATE, RECEIVE_BOOT_COMPLETED, FCM RECEIVE,
+  the app's signature-protected C2D_MESSAGE, launcher badge permissions and base
+  FOREGROUND_SERVICE (the transitive WorkManager SystemForegroundService; no foreground-service
+  type is declared). Reconcile any Console foreground-service declaration with actual use;
+  this permission does not mean the game gained a background camera or tracking feature.
+  Complete dump: `builds/onesignal-permissions.txt`. UnityPlayerGameActivity remains singleTop.
 - POST_NOTIFICATIONS runtime permission → request in context, explain in listing if asked.
-- Privacy policy → push section; redeploy.
+- Privacy policy → push section + notification-support/deletion explanation staged in the
+  Markdown source and site privacy/support pages, dated 20 Sep. Deploy BEFORE this build reaches
+  testers. TURN OFF is not deletion; the current anonymous subscription is not deleted by the
+  Supabase DELETE ONLINE PROFILE path. Manual verified deletion uses the notification support
+  ID and published support contact. Supabase linking requires server-side provider cleanup
+  before enabling the alias. No site deploy or Console change has been performed by this task.
 
 ### Layers analytics
 - Data safety → app interactions / diagnostics = collected. Privacy policy section. Same

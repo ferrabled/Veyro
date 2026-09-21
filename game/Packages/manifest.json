@@ -7,9 +7,18 @@
         "com.revenuecat",
         "com.google.external-dependency-manager"
       ]
+    },
+    {
+      "name": "npmjs",
+      "url": "https://registry.npmjs.org",
+      "scopes": [
+        "com.onesignal"
+      ]
     }
   ],
   "dependencies": {
+    "com.onesignal.unity.core": "5.1.15",
+    "com.onesignal.unity.android": "5.1.15",
     "com.google.external-dependency-manager": "1.2.188",
     "com.revenuecat.purchases-unity": "9.8.1",
     "com.revenuecat.purchases-ui-unity": "9.8.1",

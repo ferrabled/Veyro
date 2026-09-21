@@ -178,3 +178,30 @@ the question. Keep this file short; it is read every session.
     standing constraint survives either way: **no document, listing or pitch may describe the
     board as cheat-proof.** The cheapest first step lives in that task — a top-N sanity query
     before submission day, since nothing currently alerts on an implausible score.
+
+19. **Sponsor-update release baseline (20 Sep, feat-implement-tracks).** Confirm which
+    baseline should ship notifications and whether versionCode 5 is public or still in review.
+    The prior release plan excluded profiles, while this branch already contains them and art.
+    *Recommended default: preserve the existing release scope until the owner confirms it.*
+
+20. **Resolved: OneSignal FCM readiness (20 Sep, feat-implement-tracks / T-021).** The owner
+    uploaded the Firebase service-account JSON directly to OneSignal and reached SDK onboarding.
+    The same public App ID `1f6ba056-efe3-4bfe-a0cd-a9a26150720a` now returns a numeric
+    `android_sender_id` in its public Android configuration. Credential setup is sufficient to
+    proceed to the device test; this does not yet prove push delivery. No private credential
+    entered chat or the repository. Keep the Unity SDK for Android; the dashboard's native
+    Android prompt does not require a second SDK or Firebase database.
+
+21. **T-021 remaining device checks (20 Sep evening, feat-implement-tracks).** The connected
+    Nord 2 registered and is subscribed with a push token; SDK-enabled release/dev APKs were
+    installed without uninstalling or clearing data. The owner restricted interaction to the
+    game. **Test send answered:** the owner received the notification and tapping opened the
+    game; the OneSignal icon needs replacing. Exact build/message ID and warm/cold state were
+    not captured. Remaining owner action: coordinate a device slot and control only Veyro Run's
+    notification permission in Android Settings for further
+    diagnosis of the reproduced denial/retry hang: the phone rejects ADB permission revocation.
+    *Recommended default: keep this installation, no credential sharing/data reset, schedule
+    one coordinated device window, fix/retest the retry before SDK release.* Full test report:
+    `ONESIGNAL_DEVICE_TEST.md`. Retry root cause remains unconfirmed; foreground and separate
+    warm/cold checks remain. **21 Sep:** Veyro icon and bounded permission retry changes are implemented;
+    physical retest remains required. Campaign and Daily-menu routing remain a later increment.

@@ -1,5 +1,128 @@
 # Status journal (newest at top)
 
+## 2026-09-20 — T-021 Nord 2 device pass; permission retry defect and delivery gate
+
+Owner authorized game-only device testing with no uninstall or changes elsewhere on the phone.
+Installed the verified release APK and a newly built development APK over the existing game;
+firstInstallTime remains 18 Sep 13:16:09 and existing profile, scores, streak and history remain.
+Sent a device reservation to the other active game agent before testing. Each tap checked the
+foreground package and install timestamp. Screenshots streamed to local builds; no phone files,
+other apps, global settings, system Settings screen or notification shade were manipulated.
+
+**Passed:** server-assigned subscription registration, FCM token readiness, contextual prompt,
+Android permission ask after a tap, denial without blocking play, allow after game restart,
+in-game off/on, once-only offer, subscription/opt-in persistence after restart, Daily tilt run,
+profile/online-score loading, camera staging/cancel. Development/Test Store checks passed for
+restore, simulated failed purchase, valid Ember purchase/unlock and restart persistence. No
+real payment; sandbox Ember remains owned and original Frost selection restored.
+
+**Failed / unresolved:** after denying the first Android permission request, a second Enable
+in the same process stayed on PLEASE WAIT with no second native permission activity. Close
+still worked; restarting only the game restored the request path. Root cause is unconfirmed.
+Further negative diagnosis is **blocked on owner-controlled game permission state**: ADB revoke
+of this game's POST_NOTIFICATIONS returned SecurityException, leaving permission granted.
+Did not attempt a security workaround or navigate Settings outside the owner's scope. Q21
+records the needed handoff. The existing shop also shows stale "store unavailable" text despite
+working Test Store actions; noted separately for the ongoing shop redesign.
+
+**Build:** BuildAndroidDev succeeded in the verified scratch copy with two native build workers.
+`builds/MotionRunner-OneSignalDev.apk`, 88,380,680 bytes, versionCode 5,
+`1.0.0-dev.20260920-2051.nogit`, SHA-256
+`ac79659175f38d8a6f2502d242f3b4590d6cbbd0b9f8f34b826c8d07b8de2ac1`.
+Verified Development flag and Test Store key presence; log saved in builds. The nogit stamp is
+from the isolated scratch checkout; 183 relevant source/configuration inputs matched before
+building. No source code changed; prior 451/451 EditMode results still apply. No game crash;
+optional Play AssetPackManager lookup and OEM camera-provider warnings are recorded in report.
+
+**Needs owner/dashboard test:** no signed-in OneSignal browser is available to the agent.
+Supplied the exact subscription for a one-device Send test. Actual FCM delivery, foreground
+suppression and background/cold/warm notification taps are not verified. Final phone state is
+the development APK, notifications on, same one-PUSH subscription (SUBSCRIBED with token),
+Frost selected and notification panel open. Test record: `ONESIGNAL_DEVICE_TEST.md`.
+T-021 is not release-ready until the permission retry is fixed/retested and message delivery
+passes; campaign/tags/Daily routing, public-build evidence and privacy/Console release work
+are still outstanding. No campaign, policy deployment or Play upload was performed.
+
+## 2026-09-20 — T-021 Firebase configured; Android onboarding prompt checked
+
+Owner uploaded the Firebase service-account JSON directly to OneSignal and reached the SDK
+integration step. Read both official Android and Unity prompts. Android is the push delivery
+platform; keep the existing Unity SDK and its native dependency, with no second Kotlin/Java
+initializer or package version. The public configuration for the supplied App ID now returns
+a numeric `android_sender_id`, absent at the earlier check. P5 and OPEN_QUESTIONS 20 updated.
+This establishes configured sender settings, not successful delivery.
+
+Rechecked the existing APK against the new prompt: INTERNET, POST_NOTIFICATIONS and
+`com.onesignal.core.activities.PermissionsActivity` are in its merged manifest. SHA-256 still
+matches the previously verified build. Connected Nord 2 runs Android 13 with a development
+versionCode 5 game installed; its signing certificate matches our versionCode 5 test APK.
+Pulled the existing APK to ignored `builds/onesignal-device-before.apk` for signature comparison.
+No device installation, app data reset, notification opt-in or message send occurred.
+
+**Needs human device test:** phone availability was requested because another game-design
+Android build is running on this computer. Leave that test installation intact until available.
+Then install the existing compatible APK preserving data, open PROFILE → NOTIFICATIONS, enable
+notifications, identify the exact subscription, and send a dashboard test to that device. The
+existing release test APK's shop is intentionally keyless; use BuildAndroidDev for the automatic
+vendor dialog and Test Store checks. No second Unity build was launched with only ~469 MiB free
+RAM. Guide updated with this onboarding checkpoint and optional Google Analytics guidance.
+No source code changed; prior 451/451 tests and successful release build remain applicable.
+
+## 2026-09-20 — T-021 initial OneSignal Android integration (feat-implement-tracks)
+
+Owner supplied the OneSignal App ID and asked to follow the vendor's minimal integration
+prompt. Added Core + Android **5.1.15 Stable** (native **5.1.37**), selected from the official
+release index; the earlier T-042 audit's 5.3.5 is the Current channel. Preserved RevenueCat
+9.8.1 and EDM4U 1.2.188, enabled custom Gradle templates, added the native dependency,
+notification resources and IL2CPP preservation. Supabase configuration/backend is unchanged.
+
+The bootstrap initializes one notification service behind `IPushService`; Editor uses a fake.
+Registration observes changes and reads cached state immediately, rejects local placeholder IDs,
+and is distinct from OS permission, opt-in and token readiness. No OS permission request at
+startup. Development builds have the vendor verification dialog after the guide; player builds
+offer notifications after a completed Daily Run when back on the home menu. PROFILE →
+NOTIFICATIONS allows enable/disable and copying a notification support ID. Foreground banners
+are suppressed, remote in-app messages are paused, location sharing is disabled. SDK errors
+leave gameplay available. This initial increment is anonymous per installation: Supabase UUID
+linking, campaign tags and notification payload routing are still the next T-021 increment.
+
+**Verified:** all **451/451 EditMode tests passed**, including 12 new prompt/registration-state
+cases. OneSignal package import and C# compilation succeeded; lock changes are limited to the
+two pinned OneSignal packages. Every scratch Assets/Packages/ProjectSettings input was hash-
+checked against this workspace before testing; asset GUIDs are unique. Reports copied to
+`builds/onesignal-tests.xml` and `builds/onesignal-tests.log`.
+
+**Android verification: PASSED.** Unity 6000.5.9f1 built the ARM64 release APK targeting API 36
+(minimum 26) in `C:\tmp\veyro-onesignal-check-20260920`, with `BEE_BUILD_THREADS=2` and
+`-job-worker-count 2`. Output copied to `builds/MotionRunner-OneSignal.apk`: **72,496,925 bytes
+(69.14 MiB)**; SHA-256 `5c9e8a3ab6ec21858bae79eb80f750438e6d6cf9d52f9adc7a5f9e14c9b60da9`.
+`com.onesignal.OneSignal` exists in classes3.dex; the OneSignalAndroid IL2CPP bridge and the
+owner's exact App ID are present in metadata; both notification icons exist in Android's
+resource table (AAPT shortens their packaged filenames, so ZIP-name matching is not a valid
+icon check). The launcher remains UnityPlayerGameActivity, launchMode **singleTop**. No AD_ID,
+fine-location or coarse-location permission was added. Permissions/manifest/verification JSON
+and the successful build log are under `builds/onesignal-*`.
+
+The preceding baseline-only native build exited with code -1 while Windows had about 400 MB
+free RAM, without a compiler error at the end of its log. A fresh same-tree size delta is not
+available; compared with the last existing release APK (1 Sep, 70,752,715 bytes), this APK is
+1,744,210 bytes larger. That older content baseline includes other differences and is **not a
+pure SDK-overhead measurement**. The permission diff is recorded separately.
+
+**Needs human device test:** validate FCM v1 in the OneSignal dashboard, install a compatible
+APK over the existing app without clearing data, verify the once-only dialog and opt-in, target
+one test subscription, then check background delivery, normal cold/warm tap, permission denial,
+Android-settings revocation and in-app TURN OFF. Full ordered steps: `ONESIGNAL_SETUP.md`.
+The public Android app configuration had no FCM sender/project fields when checked; no live
+delivery is claimed. No SDK-enabled build has been installed on the connected phone by this task.
+
+**Release work:** privacy Markdown + site privacy/support/home text and the store flip table
+are staged, not deployed. They disclose boot-time registration/session processing separately
+from optional push delivery and explain the separate notification record's deletion path.
+Owner must deploy these before distribution. T-021 remains incomplete until campaign/tag/routing
+work, release-device checks and deployed campaign/public-build evidence are done. P5 is partially
+met (App ID received; FCM confirmation pending); Layers account setup can follow independently.
+
 ## 2026-09-19 — T-006 park art pass built and installed (feat-game-design session)
 
 **Working direction:** a sunlit sculpture garden, using the website's teal, pink and paper
