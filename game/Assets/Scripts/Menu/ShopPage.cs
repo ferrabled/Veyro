@@ -20,6 +20,8 @@ namespace MotionRunner.Menu
             RuntimeUi.Panel("Scrim", Root, MenuTheme.Scrim);
 
             _catalog = Menu.Catalog;
+            _catalog.ViewSeason=Menu.ShowSeason;
+            _catalog.PreviewCharacter=Menu.ShowCosmetic;
             _catalog.Build(Root);
         }
 

@@ -28,6 +28,7 @@ namespace MotionRunner.Gameplay
         readonly Dictionary<string, Stack<ChunkView>> _pool = new Dictionary<string, Stack<ChunkView>>();
 
         TrackGenerator _generator;
+        ChunkDefinition[] _definitions;
         float _nextChunkZ;
 
         public IReadOnlyList<ChunkView> ActiveChunks => _active;
@@ -43,7 +44,17 @@ namespace MotionRunner.Gameplay
             for (int i = _active.Count - 1; i >= 0; i--) Release(_active[i]);
             _active.Clear();
 
-            _generator = new TrackGenerator(ChunkLibrary.Greybox(), seed.CreateRandom());
+            if (_definitions == null)
+            {
+                var authored = Art.ParkAssets.Load().Chunks;
+                _definitions = new ChunkDefinition[authored.Length];
+                for (int i = 0; i < authored.Length; i++) _definitions[i] = authored[i].ToDefinition();
+                // Build each unique mesh before motion begins. Later copies share the cached
+                // geometry, so meeting a new chunk never combines scenery during a run.
+                for (int i = 0; i < _definitions.Length; i++)
+                    Release(ChunkView.Create(_definitions[i], transform));
+            }
+            _generator = new TrackGenerator(_definitions, seed.CreateRandom());
             _nextChunkZ = FirstChunkZ;
             ChunksSpawned = 0;
             Difficulty = DifficultyCurve.MinDifficulty;

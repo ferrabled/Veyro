@@ -172,3 +172,14 @@ deleted or app data is cleared; the current profile receives its own code. Both 
 on the device, never public leaderboard data. No SDK, permission, or collected-data category
 is added by these corrections. The existing T-009 atomic binary/Console/policy flip remains
 required; this review made no Console or production deployment changes.
+
+
+### T-025 — Season timeline and cosmetic locker (20 Sep implementation)
+
+Uses the existing `season1` entitlement, existing score-derived server XP and existing profile
+requests; no new SDK, permission, product, login or telemetry. This build still carries every
+T-009 deployment/declaration prerequisite above. Local collected markers and loadouts are
+profile-scoped; recovered XP allows re-collection on a new install. Keep the UI and point-of-sale
+copy clear about that distinction. Test-speed thresholds are development-only and cannot ship
+through the release build guard until the production curve is approved. A separate Cosmetic QA
+package uses a labelled fake profile/store and never generates RevenueCat revenue or server runs.

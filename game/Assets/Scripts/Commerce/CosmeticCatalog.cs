@@ -4,10 +4,8 @@ namespace MotionRunner.Commerce
 {
     public enum CosmeticSlot
     {
-        /// A preset that fills every slot at once (COSMETICS_CATALOG §3 "Item slots").
-        /// T-020 ships skins as body-colour swaps; T-025 grows them into full presets.
-        Skin
-        // Body / Trail / Headwear / Aura / CrashFx arrive with the Season 1 ladder (T-025).
+        /// Character identity is independent of accessory slots. Append new slots to preserve saves.
+        Skin, Body, Trail, Headwear, Aura, CrashFx, Back
     }
 
     public enum SeasonTrack
@@ -93,6 +91,7 @@ namespace MotionRunner.Commerce
     {
         public string Id { get; }
         public string DisplayName { get; }
+        public bool Legacy => Id=="sunset" || Id=="sky" || Id=="plum" || Id=="chrome";
         public CosmeticSlot Slot { get; }
         public UnlockRule Rule { get; }
 
@@ -133,8 +132,44 @@ namespace MotionRunner.Commerce
                 UnlockRule.Entitlement(Entitlements.SkinEmber), new CosmeticColor(0.80f, 0.16f, 0.04f)),
 
             new CosmeticItem(FrostSkinId, "Frost", CosmeticSlot.Skin,
-                UnlockRule.Entitlement(Entitlements.SkinFrost), new CosmeticColor(0.72f, 0.88f, 1f))
+                UnlockRule.Entitlement(Entitlements.SkinFrost), new CosmeticColor(0.72f, 0.88f, 1f)),
+            Reward("mint", "Mint", CosmeticSlot.Body, SeasonTrack.Free, 1, 0x62CFAB),
+            Reward("white", "White", CosmeticSlot.Trail, SeasonTrack.Free, 2, 0xFFF9E9),
+            Reward("sunset", "Sunset Orange", CosmeticSlot.Body, SeasonTrack.Free, 3, 0xF78353),
+            Reward("sky", "Sky Blue", CosmeticSlot.Body, SeasonTrack.Free, 4, 0x65BBDD),
+            Reward("cap", "Disc Cap", CosmeticSlot.Headwear, SeasonTrack.Free, 5, 0x267B79),
+            Reward("plum", "Plum", CosmeticSlot.Body, SeasonTrack.Free, 6, 0x905A95),
+            Reward("shadow", "Shadow", CosmeticSlot.Trail, SeasonTrack.Free, 7, 0x23545A),
+            Reward("charcoal", "Charcoal", CosmeticSlot.Body, SeasonTrack.Free, 8, 0x33474C),
+            Reward("confetti", "Confetti", CosmeticSlot.CrashFx, SeasonTrack.Free, 9, 0xEF3A8B),
+            Reward("gold", "Matte Gold", CosmeticSlot.Body, SeasonTrack.Free, 10, 0xD8AC43),
+            Reward("neon", "Neon Lime", CosmeticSlot.Body, SeasonTrack.Pass, 1, 0xBEED4C),
+            Reward("cyan", "Cyan Pulse", CosmeticSlot.Trail, SeasonTrack.Pass, 2, 0x5AE2DE),
+            Reward("tophat", "Top Hat", CosmeticSlot.Headwear, SeasonTrack.Pass, 3, 0x215C65),
+            Reward("firefly", "Firefly", CosmeticSlot.Aura, SeasonTrack.Pass, 4, 0xFADE6B),
+            Reward("chrome", "Chrome", CosmeticSlot.Body, SeasonTrack.Pass, 5, 0xD1E8E7),
+            Reward("twin", "Twin", CosmeticSlot.Trail, SeasonTrack.Pass, 6, 0xEA599D),
+            Reward("crown", "Crown", CosmeticSlot.Headwear, SeasonTrack.Pass, 7, 0xE4B83F),
+            Reward("aurora", "Aurora", CosmeticSlot.Trail, SeasonTrack.Pass, 8, 0x68D6B7),
+            Reward("comet", "Comet", CosmeticSlot.Aura, SeasonTrack.Pass, 9, 0xB9B4F5),
+            Reward("prism", "Prism", CosmeticSlot.Skin, SeasonTrack.Pass, 10, 0xBAE4D4),
+            Reward("quiver", "Wayfinder Quiver", CosmeticSlot.Back, SeasonTrack.Free, 3, 0xBC8354),
+            Reward("spellbook", "Moonbound Tome", CosmeticSlot.Back, SeasonTrack.Free, 4, 0x656EA3),
+            Reward("shield", "Sunshield", CosmeticSlot.Back, SeasonTrack.Free, 6, 0xD8AC43),
+            Reward("wings", "Sky Wings", CosmeticSlot.Back, SeasonTrack.Pass, 5, 0xDDEEEB)
         };
+
+        static CosmeticItem Reward(string id, string name, CosmeticSlot slot, SeasonTrack track, int level, int rgb) =>
+            new CosmeticItem(id, name, slot, UnlockRule.SeasonLevel(track, level),
+                new CosmeticColor(((rgb >> 16) & 255)/255f, ((rgb >> 8) & 255)/255f, (rgb & 255)/255f));
+
+        public static CosmeticItem RewardAt(SeasonTrack track, int level)
+        {
+            foreach (var item in Items)
+                if (!item.Legacy && item.Rule.Kind == UnlockKind.SeasonLevel && item.Rule.Track == track && item.Rule.Level == level)
+                    return item;
+            return null;
+        }
 
         public static CosmeticItem Find(string id)
         {

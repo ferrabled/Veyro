@@ -33,6 +33,7 @@ namespace MotionRunner.Gameplay
         bool _airborne;
 
         public bool Airborne => _airborne;
+        public Art.RunnerVisual Visual { get; set; }
 
         /// -1, 0 or +1: the lane the runner is committed to - where it is, or where it is sliding.
         public int Lane => _lanes.Lane;
@@ -53,6 +54,7 @@ namespace MotionRunner.Gameplay
             _airborne = false;
             _lanes.Reset();
             transform.position = new Vector3(_lanes.X, TrackMetrics.RunnerRestY, 0f);
+            Visual?.ResetPose();
         }
 
         public void Step(float deltaTime, IGameInput input)
@@ -83,6 +85,7 @@ namespace MotionRunner.Gameplay
             }
 
             transform.position = new Vector3(x, y, 0f);
+            Visual?.Step(deltaTime, _airborne);
         }
     }
 }

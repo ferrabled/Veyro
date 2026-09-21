@@ -17,6 +17,8 @@ namespace MotionRunner.Core
         public static Material Lit(Color color)
         {
             var m = new Material(BaseLit) { color = color };
+            m.SetFloat("_Smoothness", 0f);
+            m.enableInstancing = true;
             return m;
         }
 

@@ -42,6 +42,9 @@ namespace MotionRunner.Gameplay
         FirstRunGuide _guide;
         MainMenu _menu;
         AttractRun _attract;
+        Camera _gameCamera;
+        int _gameCullingMask;
+        CameraClearFlags _gameClearFlags;
         FaceOverlay _overlay;
 
         public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins,
@@ -54,6 +57,8 @@ namespace MotionRunner.Gameplay
             flow._store = store;
             flow._skins = skins;
             flow._profile = profile;
+            flow._gameCamera = Camera.main;
+            if(flow._gameCamera!=null) { flow._gameCullingMask=flow._gameCamera.cullingMask; flow._gameClearFlags=flow._gameCamera.clearFlags; }
             hud.PauseRequested += flow.RequestPause;
             hud.QuitRequested += flow.QuitToMenu;
 
@@ -75,7 +80,12 @@ namespace MotionRunner.Gameplay
             _menu.Chosen += StartRun;
             _menu.GuideRequested += ShowGuide;
 
-            BeginAttract();
+            // The home screen now showcases the equipped character. Do not also render/simulate
+            // the hidden attract run behind it, especially while a preview camera is active.
+            // URP still needs a screen-output camera after the preview RenderTexture cameras.
+            // Leaving only offscreen cameras misprojects masked overlay UI on Android.
+            if(_gameCamera!=null) { _gameCamera.enabled=true;_gameCamera.cullingMask=0;_gameCamera.clearFlags=CameraClearFlags.SolidColor; }
+            if(_session.Runner!=null) _session.Runner.gameObject.SetActive(false);
 
             // First launch only. It goes up over the menu rather than before it, so the mode
             // choice is made with the controls already explained and the menu is the first
@@ -110,6 +120,9 @@ namespace MotionRunner.Gameplay
             // then lays the real seed over it.
             StopAttract();
 
+            if(_gameCamera!=null) { _gameCamera.enabled=true;_gameCamera.cullingMask=_gameCullingMask;_gameCamera.clearFlags=_gameClearFlags; }
+            if(_session.Runner!=null) _session.Runner.gameObject.SetActive(true);
+            _skins.Apply();
             _menu = null; // it destroys itself on the way out of the pick
             _rig = rig;
             _pause.BeginRun(cameraMode);

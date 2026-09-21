@@ -1,5 +1,417 @@
 # Status journal (newest at top)
 
+## 2026-09-21 — PR #11 review fix: a reroll can no longer be undone by an older profile read
+
+`_profileRequest` ordered `LoadProfile` GETs against each other, but nothing else. A reroll is a
+write that changes the same row those reads return, and it did not touch the counter: the
+post-run XP refresh could have a GET on the wire that read the row before the new handle existed,
+the RPC could return `BRAVO` and repaint the UI, and then the older GET would land, pass the
+generation guard because it was still the newest read, and put `ALPHA` back. The same callback
+clears `_xpRefreshPending`, so nothing re-fetched and the stale name survived until relaunch.
+Deletion and import were already safe (`_userId` / `_dormantAfterDeletion` guards; import
+re-issues `LoadProfile` itself) — reroll was the only unguarded mutation.
+
+`RerollRoutine` now retires the read generation before writing `Current`. The dropped read is not
+lost work: `_xpRefreshPending` stays set, so `RetryXpRefresh` re-reads the row and picks up the XP
+*and* the new handle.
+
+**Verified:** `AProfileReadInFlightDuringARerollCannotRestoreTheOldHandle` interleaves the two
+against the existing fake-HTTP harness — 10/10 `SupabaseAdapterReviewTests` green with the fix,
+and with the one added line removed the test fails `Expected: "BRAVO" But was: "RUNNER"`, i.e. it
+reproduces the rollback rather than passing vacuously. On device (dev APK on the Nord 2, owner
+authorized the live reroll) the reroll path itself works: DAPPER-JAGUAR-62 → BRAVE-EGRET-74.
+Confirming the new handle *survives a later read* could not be done in that session — from
+14:03 on, both the phone and the build machine stopped reaching supabase.co entirely (curl 28,
+15 s timeouts; `supabase.com` itself times out from the PC, general internet fine), so every
+profile GET failed and the header fell back to its offline placeholder. Nothing to do with this
+change, but worth re-checking when the backend answers again. The race itself cannot be hand-
+triggered: it needs a GET already in flight at the instant of the reroll.
+
+## 2026-09-21 — PR #11 review fixes: honest season XP state and resolved equipped slots
+
+Three automated review findings on PR #11, all real:
+
+1. `SeasonService.Read` passed a literal `true` for `SeasonSnapshot.IsLive`, so on a fresh or
+   offline install (no confirmed profile, no recorded XP) the home card drew `0 / n XP` as
+   earned progress. It now reports `HasRecordedXp`, the same gate the season page already used.
+   `SeasonProgress.NotLiveNote` lost its pre-T-025 wording ("arrives with the Season 1 update")
+   and is now the single shared line both surfaces show: "Finish a run to start recording XP."
+2. `SkinService.IsEquipped` compared against `CosmeticLoadout.Item(slot)`, the raw stored value,
+   so a character's built-in accessories (Prism's Crown/Aurora/Comet) rendered on the runner but
+   read as merely OWNED. New `CosmeticLoadout.Resolved(slot)` returns what is actually worn and
+   drops ids that do not belong to the slot — Ember/Frost reuse the *character* id to stand in
+   for their built-in FX, which is not a wearable trail or aura.
+3. `CosmeticsPage.ChooseSlot` had the same raw lookup, so opening Headwear while wearing Prism
+   auto-selected an unrelated first card. It now shares `Resolved`.
+
+Knock-on handled in the same change: an implicit accessory is worn without being *claimed*, so
+"wearing ⇒ button disabled" would have stranded the reward-claim route. The detail button stays
+live as VIEW REWARD / VIEW SHOP whenever the worn item is not unlocked.
+
+**Verified:** `Unity 6000.5.9f1 -batchmode -runTests -testPlatform EditMode` on this tree —
+**484/484 passed, 0 failed**, including three new tests:
+`ResolvedSlotsReportWhatTheCharacterActuallyWears` in `SeasonRewardsTests`, plus
+`EquippedStateFollowsTheCharactersBuiltInAccessories` and
+`SeasonCardStaysNotLiveUntilAProfileRecordsXp` through the real services in
+`SeasonIntegrationTests`.
+
+**Device-verified** on the Nord 2 through `BuildAndroidCosmeticQa` (isolated package — the real
+game's install and save were never touched): with Prism equipped and the Aura slot never set, the
+AURAS row opens on Comet and marks it EQUIPPED, matching the comet on the runner; an explicit Top
+Hat still beats Prism's implicit Crown (Crown reads OWNED) and CLEAR SLOT leaves a bare head with
+nothing marked equipped. For the never-recorded case a throwaway fixture variant (no profile, hook
+reverted afterwards — `GameBootstrap` is unchanged in this commit) showed LEVEL 1 / 10, an empty
+bar and "Finish a run to start recording XP.", the same line the season page renders. The
+Ember/Frost case where the character id stands in for built-in FX could not be reached on that
+phone — both slots were already set explicitly — and is covered by the unit test instead.
+
+## 2026-09-20 — T-025 softer Ember/Frost proportions
+
+Owner feedback identified that the first fitting pass over-slimmed both premium models,
+creating an elongated appearance. Softened model X/Z compression from 64%/70% to 86%/90%
+and restored the uniform head-bone scale from 68% to 80%. The final height normalization
+still matches the original Runner's bare-head height and foot level. This restores fuller
+faces and bodies without changing gameplay size, movement, animation or colliders.
+Regenerated both prefabs, their measured hat/back fitting data and all 27 thumbnails.
+The original Runner's proportions and accepted cap fit are unchanged.
+
+Updated the existing animation regression to compare head width against the fitted idle
+head through run/jump/dodge, instead of requiring the rejected narrow head shape. Kept the
+existing 1.30x Runner body-width limit; the fuller characters still satisfy it. All 481/481
+EditMode cases pass (`builds/proportion-final-tests.xml`, 21:33 UTC). Four-angle geometry
+reviews include all three characters and all hats/back items. Android development build
+succeeded; APK permissions are identical to the previous fitting build. Whitespace check passes.
+
+**Nord 2:** installed `1.0.0-dev.20260920-2334.47e4e3f` over the main game with data intact
+(`builds/MotionRunnerDev.apk`, 89,619,030 bytes). Checked Ember and Frost with the cap in the
+locker and real runs, including Frost's side/cape view. Three captured gameplay windows had
+p50/p95 16.8 ms, CPU 5.82–6.34 ms and GPU 7.87–8.15 ms; one isolated >33 ms frame. No logged
+runtime exception. This does not close the intermittent FPS investigation or long Tilt/Camera soak.
+
+Before/after saved data confirms identity, claims, streak and original Ember + Charcoal +
+Shadow + Cap + Confetti + cleared Back loadout are unchanged. Two runs raised XP 161 → 171.
+Restored that outfit and verified cold relaunch. No uninstall, data clearing, purchases or
+phone-settings changes. Left the game on Home, sent the coordinating agent a release notice,
+and stopped device input. QA app was not changed. Evidence: `builds/cosmetic-fit/proportion-*`;
+private preference backups remain ignored. Owner visual acceptance remains pending.
+
+## 2026-09-20 — T-025 hat seating, proportions and back mounts (fitting follow-up)
+
+Owner screenshots exposed contact/proportion defects that the earlier preview-framing tests
+did not cover. Each character now has separate cap, top-hat and crown fitting data, measured
+from posed upper-head sections and each hat's opening. The original Runner's accepted cap
+fit is preserved. Top-hat fitting excludes its curled brim; the crown clears hair, including
+Frost's squared hair corners. Ember/Frost caps sit lower and fit their reduced head size.
+
+Adapted the two CC0 KayKit characters to slimmer proportions (head bone 68%, model X/Z
+64%/70% before normalization), then matched the original Runner's measured bare-head height
+and foot level. Existing Humanoid animation, the 1.45 presentation scale and gameplay collider
+remain compatible. Frost's cape has reverse-facing geometry/normals (84 additional triangles,
+same shared outfit material), so it remains visible from either side.
+
+Back sockets now use the central torso surface and its slope, excluding projecting sleeves,
+pouches and the cape. Quiver/shield face outward; the book presents its cover. Wings mount
+at their roots. The quiver sits diagonally beside the neck, keeping arrow tips outside the head.
+The locker uses a single-line RUNNER label with bounded font sizing. All 27 thumbnails were
+rebaked. CosmeticFitReview renders 24 character/item combinations from four fixed-scale angles.
+
+**Verification:** 481/481 EditMode tests passed at 20:48 UTC (`builds/fit-final-tests.xml`).
+Six new cases cover actual deformed character height/foot alignment, proportions through
+idle/run/jump/dodge, contact for all nine character/hat combinations, and the cape's inside
+surface/restoration. Existing rotated-framing, inventory, commerce and determinism checks pass.
+Android development and isolated QA builds succeeded. Final whitespace check passes.
+
+**Nord 2:** installed `1.0.0-dev.20260920-2248.47e4e3f`, versionCode 5,
+`builds/MotionRunnerDev.apk` (89,584,726 bytes). Permissions and launcher match the previous
+design build. Checked the Runner's top hat/crown, Ember/Frost cap fit front/side, Frost's cape
+from both sides, and all four back accessories. Ran Runner, Ember and Frost in the real app;
+their lane silhouettes are now comparable. The separate QA build (`2255.47e4e3f`) also checked
+Frost with cap/wings while running and jumping, and Ember with top hat/quiver during a run.
+Premium collection happened only in the QA fixture; the main app's claims are unchanged.
+
+The real profile, claims, streak and original loadout were compared before/after and preserved.
+Three accepted real runs raised XP 158 → 161. Restored Runner + Charcoal + Shadow + Cap +
+Confetti, Back cleared, and verified a cold relaunch. No uninstall, data clear or phone-settings
+change. Main game left on Home; QA stopped. Phone released to the coordinating agent;
+no background device monitor/input remains. OneSignal still belongs to the other branch.
+
+**Performance:** four captured gameplay windows across main/QA had p50 16.8 ms, p95
+16.8–16.9 ms, CPU 5.45–6.00 ms and GPU 7.78–7.92 ms. Two windows had two isolated
+frames over 33 ms; two had none. No sustained 30 FPS state or runtime exception/shader error
+was observed. The intermittent FPS investigation remains open; these are short runs, not a
+long physical Tilt/Camera soak. Owner visual/feel acceptance and production XP-curve approval
+remain the release checks already listed for T-025.
+
+Evidence: `builds/cosmetic-fit/` contains four-angle sheets, phone screenshots, filtered
+`main-performance.txt` / `qa-performance.txt`, permission comparison and private save backups.
+Useful screenshots: `runner-tophat-device.png`, `runner-crown-device.png`,
+`ember-locker-side.png`, `frost-locker-other-side.png`, `frost-quiver-side.png`,
+`runner-run.png`, `ember-run.png`, `frost-run.png`, `qa-frost-wings-jump.png`,
+`qa-ember-quiver-tophat-run.png`, and `home-final.png`.
+
+## 2026-09-20 — T-025 fitted cosmetics, distinct characters and pass-first shop (refinement session)
+
+Replaced Ember/Frost recolours with two different CC0 KayKit Adventurers 2.0 models:
+Barbarian as Ember and Mage as Frost, retargeted to the existing idle/run/jump/lane-dodge
+animations. Character identity now persists independently of dyes and accessories. Pass hats
+hide native headwear; back items hide Frost's cape; Clear Slot restores those native parts.
+Six-field saves migrate to seven fields without losing claims or equipped accessories.
+
+Added a Back category with Wayfinder Quiver (Free Lv3), Moonbound Tome (Free Lv4), Sunshield
+(Free Lv6), and Sky Wings (Pass Lv5, DevMops CC0 Angel Wing). These replace four dye rewards;
+existing dye claims remain usable and recognize the replacement at the same XP/entitlement
+milestone. Source URLs, original license and archive hashes are recorded in the asset folders
+and SEASON_PASS_ASSETS. No paid asset tier, SDK, product ID or entitlement was added.
+
+Cap meshes are centered on their opening and fitted per head. Hat previews frame the bill's
+full rotation, tested at eight angles on all three characters. Back sockets are fitted to posed
+torso geometry, including spine-weighted vertices in the original Runner's combined mesh.
+The old ribbon and opaque ground disc are replaced by a 36-particle foot wake and a feathered
+contact shadow. Both detail pages preview rewards on the currently equipped character.
+The shop presents the season-pass purchase/rewards card first, then two large character cards,
+locker previews and restore. SDK readiness now clears stale unavailable text and fetches prices
+without discarding actionable purchase errors. Generated thumbnails cover all 27 catalog items.
+
+**Verified:** 475/475 EditMode tests pass (`builds/cosmetic-final-tests.xml`, 20:08 UTC).
+Tests cover save migration, legacy claims, entitlement revocation/restoration, character/accessory
+composition, real meshes and Humanoid animation, rotated hat framing, bounded effects, shop
+ordering, purchase cancellation and late store readiness. Nord 2 checks covered cap rotation on
+Runner/Ember/Frost, wing and quiver previews/equipping, native cape/hat restoration, collection,
+clear-slot persistence and cold relaunch. Both new characters ran with wings/cap in the isolated
+QA app; the real app ran Frost with existing accessories and Ember with the earned quiver.
+Real collection remained XP-gated; no purchase or fake entitlement/XP was added to the real app.
+The real profile ends at 158 recorded XP. Profile identity and all previous claims are preserved;
+quiver is additionally collected. Final selection: Frost + Charcoal + Shadow + Cap + Confetti,
+Back cleared. Phone left on Home after cold relaunch. No uninstall, data clear or phone-settings change.
+
+**Installed:** `1.0.0-dev.20260920-2208.47e4e3f`, versionCode 5,
+`builds/MotionRunnerDev.apk`, 89,643,760 bytes (+907,984 versus the prior design APK).
+`adb install -r` succeeded. Permissions and GameActivity match this branch's baseline.
+This is the design branch's RevenueCat Test Store build; OneSignal work remains in the other
+agent's separate branch and is not integrated into this APK. The phone was used only after
+that agent's release and is released again. The separate QA package retains its labelled fixture.
+
+**Performance:** actual running samples were p50/p95 16.8 ms, CPU 5.65–5.99 ms and GPU
+7.70–7.85 ms; menus/locker were also around 16.8 ms. Two isolated >33 ms frames occurred in
+one 300-frame running window; the other had none. No sustained 30 FPS state or new
+NullReference/MissingReference/shader errors was observed. The development probe now uses
+300-frame windows and separates active runs from results/transition screens, preventing static
+results from being reported as gameplay evidence. Evidence: `builds/cosmetic-review/main-performance.txt`
+and `qa-performance.txt`. The intermittent FPS issue remains open. Long physical Tilt/Camera
+feel, real store commerce regression and production XP-curve approval remain human release checks.
+
+Screenshots under `builds/cosmetic-review/`: `shop-final-device.png`, `wings-final-device.png`,
+`runner-cap-device.png`, `cap-final-side.png`, `runner-back-fit-final.png`, `ember-run-final.png`,
+`frost-run-final.png`, `home-final-device.png`. Owner visual acceptance is the next step.
+
+## 2026-09-20 — T-025 horizontal pass and focused wardrobe (horizontal-season session)
+
+Owner requested Rocket Pass-style horizontal rewards and a Pokemon Go-style locker with
+larger, category-focused previews. Implemented a shared tier scroller (premium above free),
+actual item thumbnails, current-XP rail, My Level recentering, explicit selected-reward
+collection and direct navigation to that item in the locker. The locker has a large model
+above a wardrobe sheet, six visual categories, an All/Owned filter and a three-column grid.
+Detail pages use the full menu area; Back restores SHOP/RUN/PROFILE.
+
+A shared preview eases between head, torso, full-body/effects and an angled trail view.
+Dragging rotates the model; Confetti replays in preview. Static 256-pixel thumbnails are
+baked from the existing assets, with no reference-game artwork or additional asset license.
+Only the visible page renders its preview camera. Earned XP, entitlement/collection rules,
+profile-scoped saves and the development/production curve boundary are unchanged.
+
+**Verified:** 467/467 EditMode tests pass (`builds/horizontal-tests-polished.xml`),
+including earned collection through the new action, exact-item locker navigation, locked
+preview isolation, headwear framing and all 23 thumbnail assets. On the Nord 2, checked
+horizontal swipes, My Level, free/premium selection, locked hat preview, smooth category
+framing, drag rotation, vertical grid scrolling, All/Owned and empty-filter states, and Back
+to the unchanged three-tab shell. Phone review led to a higher head/torso crop and a separate
+rotation-hint label. Equipped the free cap through the new locker and verified it in a run;
+that accepted Daily run moved real XP 104→105. Collected earned Matte Gold using the final
+pass action and followed In Locker to its exact category. Restored the current Runner
+selection; the game is left on Home. No purchase or fake XP/ownership was used.
+
+**Installed:** `1.0.0-dev.20260920-1906.71e7c7f`, versionCode 5,
+`builds/MotionRunnerDev.apk`, 88,735,776 bytes (+675,742 versus the previous season APK).
+Installed with `adb install -r`; existing profile/claims preserved. Android permissions and
+GameActivity match the baseline. Final screenshots: `builds/horizontal-review/pass-final.png`,
+`pass-final-hat.png`, `locker-final.png`, `locker-final-body.png`, `home-final.png`.
+
+**Performance:** pass/locker/Home and return-from-background samples remained around
+16.8 ms p50/p95 (occasional 16.9 ms p95); no reproduced sustained 30 FPS state. No new
+NullReference/MissingReference/index/shader errors found in the Unity device log. Filtered
+frame evidence is `builds/horizontal-review/performance.txt`. The earlier intermittent FPS
+issue remains open, and the existing human Tilt/Camera and real commerce release checks
+still apply. Owner visual acceptance of the new portrait layout/camera motion is next.
+
+
+## 2026-09-20 — T-025 season timeline, collection and cosmetic locker (season-pass session)
+
+**Implemented:** server-recorded XP now drives a separate SeasonPassPage with a ten-level
+free/paid timeline, current XP, next-level progress and explicit Collect actions after level 1.
+Collection checks earned XP and the current entitlement; buying a pass never grants XP.
+The existing level-1 starter rule is retained. Development thresholds are cumulative 0–9 XP;
+production has a separate claims/loadout namespace and remains gated pending curve approval
+(OPEN_QUESTIONS 19). No server migration or store product was changed in this session.
+
+The Home character replaces the attract run and opens CosmeticsPage. SHOP/RUN/PROFILE stay
+the three tabs. The locker supports Skin, Body, Trail, Headwear, Aura and Crash FX, with
+preview/equip/clear and ownership revalidation. All 20 ladder items plus Runner/Ember/Frost
+use the same RunnerVisual in preview and gameplay. Imported CC0 cap/top hat/crown meshes
+are fitted to the real head bone; shirt finishes, bounded ribbons, 24-particle auras and
+30-particle confetti are visual only. Physics, steering, scoring and track determinism are
+unchanged. With Confetti, results reveal after a brief burst; score/XP recording is immediate.
+
+**Review fixes:** accepted/duplicate submissions refresh the profile, including queued runs;
+failed XP refreshes retry only the read, with backoff. Stale responses cannot roll XP back.
+Claims and loadout are profile-scoped, survive relaunch and revalidate on entitlement changes.
+Recovered server XP/store ownership permits re-collection; claims/loadout do not cloud-sync.
+Accessories account for FBX bone scale; auras resume after hidden-menu activation. On-device
+UI testing caught incorrect first-display geometry: each page now owns its Canvas batches
+and raycaster, retaining the common shell scale/sorting. Cold locker, category switches,
+timeline and repeated navigation were checked after the fix. Hidden previews stop rendering.
+
+**Verified:** 464/464 EditMode tests pass (`builds/season-tests-final.xml`). The isolated
+`Veyro Cosmetic QA` app uses an explicitly labelled 9-XP/FakeStore fixture, separate package
+and preferences, with no RevenueCat/profile traffic. Collected rewards, equip, composed
+Chrome/Crown/Aurora/Comet/Confetti, cold relaunch persistence and real runner rendering were
+checked there. Crash-window captures show the trail and Confetti before the results card.
+Three real-account Daily Tilt runs scored 153 each, synced, and moved the timeline from
+101 to 104 XP. Cap, Shadow and Confetti were collected from earned free rewards; Mint +
+Cap + Shadow + Confetti equipped and rendered in the final regular build. Paid rewards
+stayed locked without the pass. No purchase, refund or restore was performed.
+Evidence and APKs are ignored under `builds/season-review/` and `builds/`.
+
+**Performance — still open:** added local development CPU/GPU/presentation timings, target,
+refresh, render interval and focus/pause/surface logs. Samples during Home, timeline, locker,
+runs/results and repeated background/resume+screenshot checks held p50/p95 about 16.8 ms.
+The phone briefly reported 90 Hz at resume, then 60 Hz, while the game target stayed 60.
+The earlier intermittent 30 FPS behavior was not reproduced; this is not a proven FPS fix.
+No speculative frame-rate policy or phone setting was changed. Filtered evidence:
+`builds/season-review/performance.txt`.
+
+**Needs human device test / release follow-up:** collect an earned reward, tap the Home
+character, equip it, and judge a ten-minute Tilt & Touch run including rapid lane reversals
+and jumps. Repeat Camera mode with a person in frame, lost tracking, pause/raise-hand resume,
+countdown and return Home. Exercise the existing real Test Store pass purchase/restore/refund
+acceptance. Tune/approve production XP thresholds; confirm the existing backend rollout,
+including migration 0008 for Free-run XP, plus T-009's declaration/privacy flip. Detailed
+review and steps: `docs/SEASON_PASS_IMPLEMENTATION.md`. Website and T-018 icons/avatar are
+unchanged.
+
+**Final installed build:** `1.0.0-dev.20260920-1748.71e7c7f`, versionCode 5,
+`builds/MotionRunnerDev.apk` (88,060,034 bytes; +919,850 bytes versus the previous art APK).
+`aapt2` permissions match the baseline exactly; the Unity GameActivity launcher is retained.
+Installed with `adb install -r`, preserving the real profile. Restored the owner's Frost
+selection and confirmed it on Home after a cold relaunch. The separate cosmetic QA app
+remains installed for paid-item preview/testing. Final screenshots, including 104 XP and
+the free outfit in a run, are under `builds/season-review/main-final-*.png`.
+
+## 2026-09-20 — T-006 runner/camera polish and T-025 asset research (feat-game-design session)
+
+Owner likes the park direction and requested a larger character, lateral animation,
+matching camera guide and free/commercial Season Pass sources.
+
+**Changed:** runner presentation is 1.45× its previous size, scaled about the feet with a
+matching ground shadow. Physics bounds, lane movement, jump timing, seed and scoring are
+unchanged. Two Humanoid dodge takes from KayKit Character Animations 1.1's free CC0 download
+now play on left/right lane changes, with a 0.22-second pose and jump priority. Horizontal
+root travel is extracted and discarded so the animation cannot add a second lane move.
+The source FBX is covered by the existing scoped LFS rule; its license is beside it.
+The explicit editor command updates animation assets without rebuilding authored chunks.
+The camera-position guide uses the shared paper/mint/teal/pink palette and a YOU · CAMERA
+label; it still represents the person in the room. Tracking/thresholds/calibration are unchanged.
+
+**Pass research:** `docs/SEASON_PASS_ASSETS.md` maps the existing ten free + ten paid reward
+slots to downloaded CC0 hats, a crown, Kenney particles and the existing runner's outfit
+materials. Includes creator links, download hashes, licensing evidence and authoring work.
+Only the dodge source ships in this change. Pass hats/particles remain ignored research
+inputs, not live rewards or APK content. No store products, entitlements or pass promises
+changed; implementing XP/unlocks/locker/effects remains T-025.
+
+**Verified:** 442/442 EditMode tests pass (`builds/runner-polish-tests.xml`), including feet/
+scale/collider checks and both retargeted dodge clips moving bones without root travel.
+`BuildAndroidDev` succeeds. Installed with `adb install -r` on the Nord 2, retaining app data.
+Final installed version is `1.0.0-dev.20260920-1350.dc3a24d`; APK is 87,140,184 bytes,
++19,982 bytes over the 19 Sep art build. Android permissions match that build exactly.
+No SDK/package, scene edit, purchase, restore or production deployment. `hob git diff --check`
+passes. Real-device captures under ignored `builds/art-review/` show the larger runner,
+jump, home and themed camera staging guide. Camera gate passed at median 3.7 ms and
+briefly entered a tracked camera run; this is not a physical gesture/feel acceptance test.
+
+**Performance finding — still open:** short fresh-launch samples of the updated build show
+p50/p95 16.8 ms (~60 FPS), allocated Unity memory about 64.6–64.9 MB before camera use.
+An earlier launch and one background/resume + screenshot sequence instead settled at
+p50 33.6 ms (~30 FPS). Reinstalling/relaunching the same APK restored 60 FPS. A later identical
+resume/capture check stayed at 60 FPS, as did the 19 Sep APK comparison. The cause is not
+isolated; do not describe this as a fixed or proven pre-existing issue, or claim an
+unconditional 60 FPS pass. The final updated APK was left installed and foregrounded at
+60 FPS. The bounded investigation made no speculative frame-rate/system-setting changes.
+Filtered evidence is `builds/art-review/runner-polish-performance.txt`. Next profiling step:
+log target frame rate, frame timings and focus/pause transitions while repeating this
+sequence; isolate the presentation changes only if the drop can be reproduced reliably.
+
+**Needs human device test / acceptance:** rapid left/right reversals and lane changes during
+jumps, then a ten-minute Tilt & Touch run; judge the new size/obstacle clearance and dodge
+feel. Repeat Camera mode, verifying guide readability in tracking/lost/too-far states,
+pause, raise-hand resume and countdown. Check resume from Home for smoothness. The
+performance finding and the ten-second stranger-recognition check remain open for T-006.
+T-018 menu icons/avatar and T-037 website figures remain their existing separate tasks.
+
+## 2026-09-19 — T-006 park art pass built and installed (feat-game-design session)
+
+**Working direction:** a sunlit sculpture garden, using the website's teal, pink and paper
+anchors. Seven curated CC0 Kenney Nature Kit props plus one rigged Protagonists character
+with run/jump/idle replace the capsule and greybox scenery. The 13 chunks now have paving,
+foliage, distant rock silhouettes, water/bridges and pergolas, with coral dodge obstacles,
+gold jump hurdles and coins. UI colors match the game; pause/countdown/results contrast was
+checked. Tall obstacles use outward dodge arrows; low hurdles use upward jump arrows.
+The website itself is unchanged; recommendation and source/license provenance are in
+`docs/GAME_ART.md`. T-018's actual menu icons/avatar and T-037's website figures remain separate
+unfinished tasks. Optional splash is deferred.
+
+**Implementation:** ordered chunk ScriptableObjects preserve every original gameplay field.
+Seed/content/world IDs, collision extents, scoring and input tuning remain unchanged. Scenery
+uses an independent seeded PRNG; meshes are combined once per definition, prewarmed and shared
+by pooled views. The humanoid's animation never controls physics/root movement. Owned cosmetics
+color its shirt via the existing SkinService entitlement path. Curated FBX/PNG sources use
+scoped Git LFS rules, configured before import; licenses stay beside them. No new package/SDK,
+permission, scene content or production deployment. The explicit editor rebuild command can
+overwrite authored art/chunk data, so GAME_ART documents that boundary.
+
+**Verified:** 439/439 Unity EditMode tests pass (`builds/art-tests.xml`), including four new
+checks for equivalent chunk fields/order, 10,000 generated selections across all difficulties,
+valid moving Humanoid animation/size/loop settings, and URP-ready readable prop meshes. Android
+development build succeeds and installs with `adb install -r` on the connected Nord 2, retaining
+app data. Real-device captures show the animated runner, coins, garden, bridge, start/run/jump,
+pause and crash/results. The last small contrast/arrow edits were compiled in the final build;
+the full test suite preceded those presentation-only edits. `hob git diff --check` passes.
+
+**Measured on device:** 600-frame attract-loop samples show p50 16.8 ms, p95 16.8–16.9 ms
+(roughly 60 FPS). The first six consecutive samples held allocated Unity memory at 64.7–64.8 MB.
+The final build's two saved samples show p95 16.8 ms, zero/one >33 ms frames and allocated
+memory 64.7/65.1 MB across the start/play/pause/menu smoke check.
+This is a short automatic attract-loop check, not a ten-minute played run or camera-mode
+performance sign-off. Evidence lives under ignored `builds/art-review/`; performance logging
+is local and development/editor-only. Android permission output matches the prior installed
+APK exactly. No store purchase, profile deletion or account migration was performed.
+
+Final installed build: `1.0.0-dev.20260919-2107.94f60e9`, generated by `BuildAndroidDev` at
+21:10 local. APK is 87,120,202 bytes versus the prior installed development APK's 86,762,292
+(+357,910 bytes, about 0.34 MiB). `phone-final-run.png` and `phone-final-jump.png` show the
+final outward-arrow version on the phone; the visible art preview pane displays that run
+capture. The device shell has no `screenrecord` binary, so evidence here is still captures;
+the ten-second footage/recognition check remains a human step.
+
+**Needs human device test / acceptance:** play Tilt & Touch for ten minutes, steering across all
+lanes and jumping hurdles; check runner/obstacle readability, input feel and visible seams or
+hitches as difficulty increases. Repeat in Camera mode, including pause/raise-hand resume and
+the countdown. If Ember/Frost are already owned, equip each and verify only the shirt changes;
+verify restore still updates it in the licensed store build. Show a stranger ten seconds of
+gameplay and ask what game/action they recognize. Owner approval of the park/runner and this
+recognition test are still required for T-006 to become done. No final art-direction decision
+was added to DECISIONS on the owner's behalf. Next: accept/tune this first biome, then use its
+actual character in T-018/T-037 and capture submission footage.
+
 ## 2026-09-19 — Latest PR #10 Copilot review verified and fixed (copilot-latest session)
 
 Checked the nine comments in Copilot review 5256642035 (19 Sep, 17:11 UTC, commit

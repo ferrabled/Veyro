@@ -21,12 +21,12 @@ namespace MotionRunner.Gameplay
     /// once, which is the friendlier way to be wrong.
     public sealed class FirstRunGuide : MonoBehaviour
     {
-        static readonly Color TextColor = new Color(0.94f, 0.96f, 1f);
+        static readonly Color TextColor = Menu.MenuTheme.Text;
         static readonly Color DimColor = new Color(0.04f, 0.05f, 0.09f, 0.88f);
-        static readonly Color PanelColor = new Color(0.11f, 0.13f, 0.20f, 0.98f);
-        static readonly Color AccentColor = new Color(1f, 0.55f, 0.15f);
-        static readonly Color StatusColor = new Color(0.72f, 0.76f, 0.85f);
-        static readonly Color LinkColor = new Color(0.45f, 0.50f, 0.62f);
+        static readonly Color PanelColor = Menu.MenuTheme.Card;
+        static readonly Color AccentColor = Menu.MenuTheme.Accent;
+        static readonly Color StatusColor = Menu.MenuTheme.Dim;
+        static readonly Color LinkColor = Menu.MenuTheme.Faint;
 
         /// The guide is done with. RunFlow owns the screen's lifetime, exactly as it does for the
         /// pause menu, so nothing here destroys itself.
@@ -96,7 +96,7 @@ namespace MotionRunner.Gameplay
 
             _primaryLabel = RuntimeUi.TextButton("Primary", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 112f), new Vector2(560f, 132f),
-                AccentColor, string.Empty, 50, new Color(0.08f, 0.06f, 0.04f),
+                AccentColor, string.Empty, 50, Menu.MenuTheme.OnAccent,
                 Advance).GetComponentInChildren<Text>();
 
             ShowPage();

@@ -38,12 +38,12 @@ namespace MotionRunner.Gameplay
     /// PoseGestureProbe; it is disposed the moment the countdown starts.
     public sealed class PauseMenu : MonoBehaviour
     {
-        static readonly Color TextColor = new Color(0.94f, 0.96f, 1f);
+        static readonly Color TextColor = Menu.MenuTheme.Text;
         static readonly Color DimColor = new Color(0.04f, 0.05f, 0.09f, 0.82f);
-        static readonly Color PanelColor = new Color(0.11f, 0.13f, 0.20f, 0.96f);
-        static readonly Color AccentColor = new Color(1f, 0.55f, 0.15f);
-        static readonly Color SecondaryColor = new Color(0.24f, 0.28f, 0.40f);
-        static readonly Color StatusColor = new Color(0.72f, 0.76f, 0.85f);
+        static readonly Color PanelColor = Menu.MenuTheme.Card;
+        static readonly Color AccentColor = Menu.MenuTheme.Accent;
+        static readonly Color SecondaryColor = Menu.MenuTheme.Slot;
+        static readonly Color StatusColor = Menu.MenuTheme.Dim;
 
         const string IdleHint = "back button resumes";
         const string GesturePrompt = "raise your right hand when ready\n— or tap RESUME";
@@ -216,7 +216,7 @@ namespace MotionRunner.Gameplay
 
             _resumeButton = RuntimeUi.TextButton("Resume", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 430f), new Vector2(520f, 140f),
-                AccentColor, "RESUME", 52, new Color(0.08f, 0.06f, 0.04f),
+                AccentColor, "RESUME", 52, Menu.MenuTheme.OnAccent,
                 () => Begin(Pending.Resume, ResumeOrigin.User));
 
             _restartButton = RuntimeUi.TextButton("Restart", card.transform,
@@ -238,7 +238,10 @@ namespace MotionRunner.Gameplay
             _countdownDigits = RuntimeUi.Label("Countdown", transform,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 new Vector2(-300f, -300f), new Vector2(300f, 300f),
-                400, TextAnchor.MiddleCenter, AccentColor);
+                400, TextAnchor.MiddleCenter, Art.ParkTheme.Paper);
+            var countdownOutline = _countdownDigits.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            countdownOutline.effectColor = Art.ParkTheme.Ink;
+            countdownOutline.effectDistance = new Vector2(4f, -4f);
             _countdownDigits.gameObject.SetActive(false);
         }
 

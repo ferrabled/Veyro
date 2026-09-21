@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e14e0e783b532934eac2749fdabfdd96, type: 3}
+  m_Name: straight_coins
+  m_EditorClassIdentifier: Assembly-CSharp::MotionRunner.Art.TrackChunkAsset
+  ChunkId: straight_coins
+  Biome: 0
+  DifficultyMin: 1
+  DifficultyMax: 3
+  Length: 24
+  EntryType: 0
+  ExitType: 0
+  RequiredSkills: 0
+  Tags: 6
+  Rarity: 1.3
+  Obstacles: []
+  Coins:
+  - Lane: 0
+    Z: 6
+  - Lane: 0
+    Z: 8
+  - Lane: 0
+    Z: 10
+  - Lane: 1
+    Z: 14
+  - Lane: 1
+    Z: 16
+  - Lane: -1
+    Z: 18
+  - Lane: -1
+    Z: 20
+  SceneryVariant: 1
