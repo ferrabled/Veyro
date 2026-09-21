@@ -217,6 +217,26 @@ namespace MotionRunner.Tests
             Assert.AreEqual(8,((IProfileService)_service).Current.Xp);
         }
 
+        [Test]
+        public void AProfileReadInFlightDuringARerollCannotRestoreTheOldHandle()
+        {
+            ReadySession();
+            Set("_xpRefreshPending",true);
+            // A post-run XP read is already on the wire, holding the row as it was before.
+            var read=Routine("LoadProfile");
+            Assert.IsTrue(read.MoveNext());
+            var flags=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
+            var stale=(Action<long,string,float>)read.Current.GetType().GetField("done",flags).GetValue(read.Current);
+
+            _responses.Enqueue(("/rest/v1/rpc/reroll_handle",200,"{\"handle\":\"BRAVO\"}"));
+            Execute(Routine("RerollRoutine",(Action<Profile,SocialError>)((_,error)=>Assert.IsNull(error))));
+            Assert.AreEqual("BRAVO",((IProfileService)_service).Current.Handle);
+
+            stale(200,"{\"handle\":\"RUNNER\",\"xp\":5}",0);
+            Assert.AreEqual("BRAVO",((IProfileService)_service).Current.Handle,"a read older than the reroll rolled the name back");
+            Assert.IsTrue((bool)Get("_xpRefreshPending"),"the dropped read must leave the XP refresh outstanding");
+        }
+
         void LiveSession()
         {
             Set("_userId", "player");

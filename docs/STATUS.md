@@ -1,5 +1,32 @@
 # Status journal (newest at top)
 
+## 2026-09-21 — PR #11 review fix: a reroll can no longer be undone by an older profile read
+
+`_profileRequest` ordered `LoadProfile` GETs against each other, but nothing else. A reroll is a
+write that changes the same row those reads return, and it did not touch the counter: the
+post-run XP refresh could have a GET on the wire that read the row before the new handle existed,
+the RPC could return `BRAVO` and repaint the UI, and then the older GET would land, pass the
+generation guard because it was still the newest read, and put `ALPHA` back. The same callback
+clears `_xpRefreshPending`, so nothing re-fetched and the stale name survived until relaunch.
+Deletion and import were already safe (`_userId` / `_dormantAfterDeletion` guards; import
+re-issues `LoadProfile` itself) — reroll was the only unguarded mutation.
+
+`RerollRoutine` now retires the read generation before writing `Current`. The dropped read is not
+lost work: `_xpRefreshPending` stays set, so `RetryXpRefresh` re-reads the row and picks up the XP
+*and* the new handle.
+
+**Verified:** `AProfileReadInFlightDuringARerollCannotRestoreTheOldHandle` interleaves the two
+against the existing fake-HTTP harness — 10/10 `SupabaseAdapterReviewTests` green with the fix,
+and with the one added line removed the test fails `Expected: "BRAVO" But was: "RUNNER"`, i.e. it
+reproduces the rollback rather than passing vacuously. On device (dev APK on the Nord 2, owner
+authorized the live reroll) the reroll path itself works: DAPPER-JAGUAR-62 → BRAVE-EGRET-74.
+Confirming the new handle *survives a later read* could not be done in that session — from
+14:03 on, both the phone and the build machine stopped reaching supabase.co entirely (curl 28,
+15 s timeouts; `supabase.com` itself times out from the PC, general internet fine), so every
+profile GET failed and the header fell back to its offline placeholder. Nothing to do with this
+change, but worth re-checking when the backend answers again. The race itself cannot be hand-
+triggered: it needs a GET already in flight at the instant of the reroll.
+
 ## 2026-09-21 — PR #11 review fixes: honest season XP state and resolved equipped slots
 
 Three automated review findings on PR #11, all real:

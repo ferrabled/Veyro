@@ -580,6 +580,12 @@ namespace MotionRunner.Social.Supabase
                     done?.Invoke(Current, new SocialError("throttled", "one moment between name changes"));
                     return;
                 }
+                // A GET issued before this reroll read the row while it still held the old
+                // handle; letting it land would roll the new name back. The counter orders
+                // reads against each other, so a write has to retire the generation they
+                // belong to. A dropped XP refresh is not lost: _xpRefreshPending stays set
+                // and RetryXpRefresh re-reads the row, new handle included.
+                _profileRequest++;
                 Current = new Profile(Current.UserId, response.handle, Current.Xp);
                 ProfileChanged?.Invoke();
                 done?.Invoke(Current, null);
