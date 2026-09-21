@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
+using MotionRunner.Progression;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -108,7 +109,7 @@ namespace MotionRunner.Menu
             _xp.text="LEVEL "+state.Level+" / 10     "+season.Inventory.Xp+" XP";
             _next.text=state.IsMaxLevel ? "All levels reached · collect your rewards" :
                 (season.Curve.Threshold(state.Level+1)-season.Inventory.Xp)+" XP to level "+(state.Level+1);
-            if(!season.HasRecordedXp)_next.text="Finish a run to start recording XP.";
+            if(!season.HasRecordedXp)_next.text=SeasonProgress.NotLiveNote;
             if(season.Curve.Id.StartsWith("test"))_next.text+="  ·  TEST: 1 XP / LEVEL";
             RuntimeUi.SetBarFill(_fill,state.Fraction);
             RuntimeUi.SetBarFill(_railFill,Mathf.Clamp01((state.Level-1+(state.IsMaxLevel ? 0:state.Fraction))/9f));

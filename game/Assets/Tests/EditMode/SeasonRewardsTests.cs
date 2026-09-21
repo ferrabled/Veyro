@@ -78,6 +78,22 @@ namespace MotionRunner.Tests
             Assert.AreEqual("frost",restored.Skin);Assert.AreEqual("wings",restored.Back);
         }
         [Test]
+        public void ResolvedSlotsReportWhatTheCharacterActuallyWears()
+        {
+            var prism=new CosmeticLoadout();prism.Equip(CosmeticCatalog.Find("prism"));
+            Assert.AreEqual("crown",prism.Resolved(CosmeticSlot.Headwear));
+            Assert.AreEqual("aurora",prism.Resolved(CosmeticSlot.Trail));
+            Assert.AreEqual("comet",prism.Resolved(CosmeticSlot.Aura));
+            Assert.AreEqual("prism",prism.Resolved(CosmeticSlot.Skin));
+            prism.Equip(CosmeticCatalog.Find("tophat"));
+            Assert.AreEqual("tophat",prism.Resolved(CosmeticSlot.Headwear));
+            prism.Clear(CosmeticSlot.Trail);Assert.IsEmpty(prism.Resolved(CosmeticSlot.Trail));
+            // Ember's built-in FX reuse the character id, which is not a wearable trail or aura.
+            var ember=new CosmeticLoadout();ember.Equip(CosmeticCatalog.Find("ember"));
+            Assert.IsEmpty(ember.Resolved(CosmeticSlot.Trail));Assert.IsEmpty(ember.Resolved(CosmeticSlot.Aura));
+            Assert.IsEmpty(ember.Resolved(CosmeticSlot.Headwear));
+        }
+        [Test]
         public void SixSlotSaveMigratesAndCharacterRevocationKeepsEarnedAccessories()
         {
             var original=CosmeticLoadout.Read("|charcoal|shadow|cap||confetti");

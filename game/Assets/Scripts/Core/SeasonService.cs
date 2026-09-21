@@ -59,7 +59,9 @@ namespace MotionRunner.Core
             int level=Inventory.Level;
             int start=Curve.Threshold(level);
             int required=level==SeasonCurve.Levels ? 0 : Curve.Threshold(level+1)-start;
-            return new SeasonSnapshot(level,Inventory.Xp-start,required,true,passOwned);
+            // Only a confirmed profile has recorded XP; without one the zero is a placeholder,
+            // not progress, and the banner has to say so rather than draw an earned-looking bar.
+            return new SeasonSnapshot(level,Inventory.Xp-start,required,HasRecordedXp,passOwned);
         }
         public void Dispose()
         {

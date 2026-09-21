@@ -8,8 +8,9 @@ namespace MotionRunner.Progression
         public readonly int Xp;
         public readonly int XpForNextLevel;
 
-        /// True once XP is actually earned from runs (T-025). Until then the banner says so
-        /// instead of drawing a zero that looks like a bug or, worse, a bar that looks earned.
+        /// True once there is a confirmed profile whose XP is being recorded. Until then the
+        /// banner says so instead of drawing a zero that looks like a bug or, worse, a bar
+        /// that looks earned.
         public readonly bool IsLive;
 
         /// Whether the `season1` entitlement is held, i.e. whether the paid column is unlocked.
@@ -56,8 +57,9 @@ namespace MotionRunner.Progression
         public const int MaxLevel = 10;
         public const int StartLevel = 1;
 
-        /// The one line the banner shows in place of a fake XP number.
-        public const string NotLiveNote = "XP from runs arrives with the Season 1 update";
+        /// The one line the banner shows in place of an XP number nothing has recorded yet.
+        /// Same wording as the season page, so the two never disagree about what is missing.
+        public const string NotLiveNote = "Finish a run to start recording XP.";
     }
 
     /// The pre-T-025 source: the starting level, no XP, and honest about it. Deliberately does

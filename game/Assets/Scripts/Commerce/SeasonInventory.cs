@@ -112,6 +112,15 @@ namespace MotionRunner.Commerce
             return result;
         }
         string Resolve(CosmeticSlot slot,string fallback) => _slots.TryGetValue(slot,out var value) ? value=="-" ? "" : value : fallback;
+        /// What the runner actually wears in a slot, character defaults included, so "equipped"
+        /// in the menu matches what is rendered. A character id standing in for its own built-in
+        /// FX (ember/frost) is not a wearable item, so only ids belonging to the slot count.
+        public string Resolved(CosmeticSlot slot)
+        {
+            string id=slot==CosmeticSlot.Trail ? Trail : slot==CosmeticSlot.Headwear ? Headwear :
+                slot==CosmeticSlot.Aura ? Aura : Item(slot);
+            return CosmeticCatalog.Find(id)?.Slot==slot ? id : "";
+        }
         public string Body => Item(CosmeticSlot.Body);
         public string Trail => Resolve(CosmeticSlot.Trail,Skin=="prism" ? "aurora" : Skin=="ember" ? "ember" : Skin=="frost" ? "frost" : "");
         public string Headwear => Resolve(CosmeticSlot.Headwear,Skin=="prism" ? "crown" : "");

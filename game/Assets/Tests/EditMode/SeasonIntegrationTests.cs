@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using MotionRunner.Commerce;
+using MotionRunner.Progression;
 using MotionRunner.Social;
 using MotionRunner.Track;
 using NUnit.Framework;
@@ -54,6 +55,30 @@ namespace MotionRunner.Tests
             _store.SetEntitlement(Entitlements.Season1,true);Assert.IsTrue((bool)Skin("IsEquipped","crown"));
             _profile.BecomeReady(new Profile(_user+"other","OTHER",6));
             Assert.IsFalse((bool)Skin("IsEquipped","crown"));Assert.IsFalse((bool)Season("IsOwned","crown"));
+        }
+        [Test] public void EquippedStateFollowsTheCharactersBuiltInAccessories()
+        {
+            _store.SetEntitlement(Entitlements.Season1,true);
+            _profile.BecomeReady(new Profile(_user,"TEST",9));
+            Assert.IsTrue((bool)Season("Collect","prism"));Assert.IsTrue((bool)Season("Collect","tophat"));
+            Assert.IsTrue((bool)Skin("Equip","prism"));
+            Assert.IsTrue((bool)Skin("IsEquipped","crown"),"Prism renders the crown, so the card must say EQUIPPED.");
+            Assert.IsTrue((bool)Skin("IsEquipped","aurora"));Assert.IsTrue((bool)Skin("IsEquipped","comet"));
+            Assert.IsTrue((bool)Skin("Equip","tophat"));Assert.IsFalse((bool)Skin("IsEquipped","crown"));
+        }
+        [Test] public void SeasonCardStaysNotLiveUntilAProfileRecordsXp()
+        {
+            PlayerPrefs.DeleteKey(Last);
+            var offline=new FakeProfileService();
+            var fresh=(IDisposable)Activator.CreateInstance(_seasonType,_store,offline,SeasonCurve.Testing);
+            try
+            {
+                var read=_seasonType.GetMethod("Read");
+                Assert.IsFalse(((SeasonSnapshot)read.Invoke(fresh,new object[]{false})).IsLive);
+                offline.BecomeReady(new Profile(_user,"TEST",3));
+                Assert.IsTrue(((SeasonSnapshot)read.Invoke(fresh,new object[]{false})).IsLive);
+            }
+            finally { fresh.Dispose();PlayerPrefs.SetString(Last,_user); }
         }
         [Test] public void DeletionClearsCachedSeasonIdentity()
         {

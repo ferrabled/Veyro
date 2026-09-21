@@ -1,5 +1,43 @@
 # Status journal (newest at top)
 
+## 2026-09-21 — PR #11 review fixes: honest season XP state and resolved equipped slots
+
+Three automated review findings on PR #11, all real:
+
+1. `SeasonService.Read` passed a literal `true` for `SeasonSnapshot.IsLive`, so on a fresh or
+   offline install (no confirmed profile, no recorded XP) the home card drew `0 / n XP` as
+   earned progress. It now reports `HasRecordedXp`, the same gate the season page already used.
+   `SeasonProgress.NotLiveNote` lost its pre-T-025 wording ("arrives with the Season 1 update")
+   and is now the single shared line both surfaces show: "Finish a run to start recording XP."
+2. `SkinService.IsEquipped` compared against `CosmeticLoadout.Item(slot)`, the raw stored value,
+   so a character's built-in accessories (Prism's Crown/Aurora/Comet) rendered on the runner but
+   read as merely OWNED. New `CosmeticLoadout.Resolved(slot)` returns what is actually worn and
+   drops ids that do not belong to the slot — Ember/Frost reuse the *character* id to stand in
+   for their built-in FX, which is not a wearable trail or aura.
+3. `CosmeticsPage.ChooseSlot` had the same raw lookup, so opening Headwear while wearing Prism
+   auto-selected an unrelated first card. It now shares `Resolved`.
+
+Knock-on handled in the same change: an implicit accessory is worn without being *claimed*, so
+"wearing ⇒ button disabled" would have stranded the reward-claim route. The detail button stays
+live as VIEW REWARD / VIEW SHOP whenever the worn item is not unlocked.
+
+**Verified:** `Unity 6000.5.9f1 -batchmode -runTests -testPlatform EditMode` on this tree —
+**484/484 passed, 0 failed**, including three new tests:
+`ResolvedSlotsReportWhatTheCharacterActuallyWears` in `SeasonRewardsTests`, plus
+`EquippedStateFollowsTheCharactersBuiltInAccessories` and
+`SeasonCardStaysNotLiveUntilAProfileRecordsXp` through the real services in
+`SeasonIntegrationTests`.
+
+**Device-verified** on the Nord 2 through `BuildAndroidCosmeticQa` (isolated package — the real
+game's install and save were never touched): with Prism equipped and the Aura slot never set, the
+AURAS row opens on Comet and marks it EQUIPPED, matching the comet on the runner; an explicit Top
+Hat still beats Prism's implicit Crown (Crown reads OWNED) and CLEAR SLOT leaves a bare head with
+nothing marked equipped. For the never-recorded case a throwaway fixture variant (no profile, hook
+reverted afterwards — `GameBootstrap` is unchanged in this commit) showed LEVEL 1 / 10, an empty
+bar and "Finish a run to start recording XP.", the same line the season page renders. The
+Ember/Frost case where the character id stands in for built-in FX could not be reached on that
+phone — both slots were already set explicitly — and is covered by the unit test instead.
+
 ## 2026-09-20 — T-025 softer Ember/Frost proportions
 
 Owner feedback identified that the first fitting pass over-slimmed both premium models,

@@ -25,7 +25,7 @@ namespace MotionRunner.Core
         public bool IsEquipped(string id)
         {
             var item=CosmeticCatalog.Find(id);
-            return item!=null && Effective.Item(item.Slot)==id;
+            return item!=null && Effective.Resolved(item.Slot)==id;
         }
         public bool Equip(string id)
         {

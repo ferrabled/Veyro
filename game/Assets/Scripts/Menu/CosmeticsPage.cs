@@ -86,7 +86,7 @@ namespace MotionRunner.Menu
         void ChooseSlot(CosmeticSlot slot,bool immediate=false)
         {
             _slot=slot;LayoutCards();
-            string equipped=Menu.Skins.Effective.Item(slot);
+            string equipped=Menu.Skins.Effective.Resolved(slot);
             if(!string.IsNullOrEmpty(equipped))Select(equipped,immediate);
             else
             {
@@ -142,8 +142,11 @@ namespace MotionRunner.Menu
             bool unlocked=Menu.Skins.IsUnlocked(_selected),wearing=Menu.Skins.IsEquipped(_selected);
             _name.text=selected.DisplayName.ToUpperInvariant();
             _description.text=CosmeticUi.SlotName(_slot)+" · "+(wearing ? "YOUR CURRENT LOOK" : unlocked ? "PREVIEW" : "LOCKED PREVIEW");
-            _equip.interactable=!wearing;
-            _equipLabel.text=wearing ? "EQUIPPED" : unlocked ? "EQUIP" : selected.Rule.Kind==UnlockKind.Entitlement ? "VIEW SHOP" : "VIEW REWARD";
+            // A character's built-in accessory is worn without being claimed, so "wearing" alone
+            // must not close the claim route - an unowned item keeps its shop/reward button.
+            _equip.interactable=!wearing || !unlocked;
+            _equipLabel.text=wearing && unlocked ? "EQUIPPED" : unlocked ? "EQUIP" :
+                selected.Rule.Kind==UnlockKind.Entitlement ? "VIEW SHOP" : "VIEW REWARD";
             _equip.image.color=unlocked ? MenuTheme.Accent:MenuTheme.Text;
         }
         public override void OnShown()
