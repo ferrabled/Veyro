@@ -48,7 +48,7 @@ namespace MotionRunner.Social
 
             var queued = _pending.ToArray();
             _pending.Clear();
-            foreach (var run in queued) Submitted.Add(run);
+            foreach (var run in queued) SubmitRun(run,null);
         }
 
         public void SubmitRun(RunSubmission run, Action<SubmitOutcome> done)
@@ -68,7 +68,15 @@ namespace MotionRunner.Social
                 return;
             }
 
+            string id=run.client_run_id;
+            if(!string.IsNullOrEmpty(id) && !_processed.Add(id))
+            { done?.Invoke(new SubmitOutcome(SubmitStatus.Duplicate)); return; }
             Submitted.Add(run);
+            if(Current!=null)
+            {
+                Current=new Profile(Current.UserId,Current.Handle,(int)Math.Min(int.MaxValue,(long)Current.Xp+Math.Min(Math.Max(0,run.score)/100,500)));
+                ProfileChanged?.Invoke();
+            }
             done?.Invoke(new SubmitOutcome(SubmitStatus.Accepted, NextDailyRank, NextAlltimeRank));
         }
 
@@ -83,6 +91,7 @@ namespace MotionRunner.Social
         }
 
         int _rerolls;
+        readonly HashSet<string> _processed=new HashSet<string>();
 
         /// Rerolls are unlimited (owner call, 17 Sep): always a fresh handle, never a budget.
         public void RerollHandle(Action<Profile, SocialError> done)
@@ -138,6 +147,7 @@ namespace MotionRunner.Social
             Current = null;
             IsReady = false;
             _pending.Clear();
+            _processed.Clear();
             ProfileChanged?.Invoke();
             done?.Invoke(null);
         }

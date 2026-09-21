@@ -1,58 +1,55 @@
+using System;
 using MotionRunner.Commerce;
 using UnityEngine;
 
 namespace MotionRunner.Core
 {
-    /// Owns which skin is equipped and paints it onto the runner. Selection persists in
-    /// PlayerPrefs; ownership is re-checked on every apply, so a revoked entitlement (refund)
-    /// falls back to the default runner instead of keeping paid content, and a Restore or an
-    /// out-of-app promo redemption recolors the runner the moment EntitlementsChanged fires.
-    public sealed class SkinService
+    /// The shop's existing skin seam now owns a complete, ownership-checked cosmetic loadout.
+    public sealed class SkinService : IDisposable
     {
-        const string EquippedKey = "veyro.skin";
-
-        /// T-020 ships no XP: level 1 is the starting level (COSMETICS_CATALOG §3) and no
-        /// catalog row uses SeasonLevel yet. T-025 replaces this constant with ladder state.
-        const int SeasonLevel = 1;
-
         readonly IStore _store;
-        readonly System.Action<Color> _applyColor;
-
-        public SkinService(IStore store, Renderer runnerRenderer) : this(store,
-            color => { if (runnerRenderer != null) runnerRenderer.sharedMaterial = RuntimeMaterials.Shared(color); }) { }
-
-        public SkinService(IStore store, System.Action<Color> applyColor)
+        readonly Action<CosmeticLoadout> _apply;
+        public SeasonService Season { get; }
+        public CosmeticLoadout Selected { get; private set; }
+        public CosmeticLoadout Effective => Selected.Validated(IsUnlocked);
+        public string EquippedId => Effective.Skin;
+        public event Action Changed;
+        string Key => Season.StoragePrefix+"loadout";
+        public SkinService(IStore store, SeasonService season, Action<CosmeticLoadout> apply)
         {
-            _store = store;
-            _applyColor = applyColor;
-            _store.EntitlementsChanged += Apply;
+            _store=store; Season=season; _apply=apply;
+            season.Changed+=Apply;
             Apply();
         }
-
-        public string EquippedId => PlayerPrefs.GetString(EquippedKey, CosmeticCatalog.DefaultSkinId);
-
-        public bool IsUnlocked(string itemId) =>
-            CosmeticCatalog.IsUnlocked(itemId, _store.ActiveEntitlements, SeasonLevel);
-
-        /// False when the item is unknown or not owned - equipping never grants.
-        public bool Equip(string itemId)
+        public bool IsUnlocked(string id) => Season.IsOwned(id);
+        public bool IsEquipped(string id)
         {
-            if (!IsUnlocked(itemId)) return false;
-            PlayerPrefs.SetString(EquippedKey, itemId);
-            PlayerPrefs.Save();
-            Apply();
-            return true;
+            var item=CosmeticCatalog.Find(id);
+            return item!=null && Effective.Resolved(item.Slot)==id;
         }
-
-        /// Paints the equipped skin if it is (still) owned, the default otherwise.
+        public bool Equip(string id)
+        {
+            if(!IsUnlocked(id)) return false;
+            Selected.Equip(CosmeticCatalog.Find(id)); Save(); return true;
+        }
+        public void Clear(CosmeticSlot slot) { Selected.Clear(slot); Save(); }
+        void Save()
+        {
+            PlayerPrefs.SetString(Key,Selected.Serialize()); PlayerPrefs.Save(); Apply();
+        }
         public void Apply()
         {
-            var item = CosmeticCatalog.Find(EquippedId);
-            if (item == null || !item.Rule.IsUnlocked(_store.ActiveEntitlements, SeasonLevel))
-                item = CosmeticCatalog.Find(CosmeticCatalog.DefaultSkinId);
-            _applyColor?.Invoke(ToColor(item.BodyColor));
+            string encoded=PlayerPrefs.GetString(Key,"");
+            if(string.IsNullOrEmpty(encoded))
+            {
+                Selected=new CosmeticLoadout();
+                var legacy=CosmeticCatalog.Find(PlayerPrefs.GetString("veyro.skin","runner"));
+                if(legacy!=null && legacy.Slot==CosmeticSlot.Skin && IsUnlocked(legacy.Id)) Selected.Equip(legacy);
+            }
+            else Selected=CosmeticLoadout.Read(encoded);
+            _apply?.Invoke(Effective); Changed?.Invoke();
         }
-
-        public static Color ToColor(CosmeticColor c) => new Color(c.R, c.G, c.B);
+        public static Color ToColor(CosmeticColor c) => new Color(c.R,c.G,c.B);
+        public void Dispose() => Season.Changed-=Apply;
     }
 }

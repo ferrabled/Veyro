@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 323c85fbfc29f314cbb4c31e47dab62c, type: 3}
+  m_Name: Characters
+  m_EditorClassIdentifier: Assembly-CSharp::MotionRunner.Art.CharacterArt
+  Ember: {fileID: 2963081322722826721, guid: 9f5c4bdfb4270014081bfd03cb9492b1, type: 3}
+  Frost: {fileID: 3117886127546023836, guid: f4bc12ae945c886468d492d63e3885ac, type: 3}
+  EmberMaterial: {fileID: 2100000, guid: 834d99b91e3dcc44081a81d43d68a6a1, type: 2}
+  FrostMaterial: {fileID: 2100000, guid: 607d5f92690b38441a7d202798ed8653, type: 2}
+  Wings: {fileID: 7806845443243491508, guid: 19698b0114a170e4ca63600628cf853d, type: 3}
+  Quiver: {fileID: 2035224242374416169, guid: 7685ebb409b882548bd2fdd179a788ef, type: 3}
+  Shield: {fileID: 9212611430964141548, guid: a010f3e9b8fea6a48bb8c7251ea12a90, type: 3}
+  Spellbook: {fileID: 7515482966507496479, guid: 6aa99415cfb30554ca77929e341998f1, type: 3}

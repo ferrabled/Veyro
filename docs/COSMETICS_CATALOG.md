@@ -28,7 +28,7 @@ The confusion this section settles: *"should every pass item be a product?"* **N
 | **Product** | Play Console, mirrored in RevenueCat | The thing money buys. Has a price, an immutable id, and promo codes are generated per-product. | **3** |
 | **Entitlement** | RevenueCat | An unlock flag on a *customer*. Buying any product attached to it grants it. The app reads **only** these. | **3** |
 | **Offering / package** | RevenueCat | Presentation: which products the paywall shows, in what order. Pure display layer. | 1 offering, 3 packages |
-| **Cosmetic item** | Game code (`CosmeticCatalog`, pure C#) | A colour, trail, hat, aura, or skin. Unlocked by a *rule*: default, owns-entitlement, or reached-level-on-track. | ~25 |
+| **Cosmetic item** | Game code (`CosmeticCatalog`, pure C#) | A character, dye, trail, hat, aura, crash effect or back accessory. Unlocked by a *rule*: default, owns-entitlement, or reached-level-on-track. | 27 (20 current rewards, 3 characters, 4 preserved dyes) |
 
 **The rule: money buys products → products grant entitlements → the app checks entitlements →
 items are game data with unlock rules.** Play and RevenueCat never hear about individual pass
@@ -134,49 +134,67 @@ richest premium surface (paid track + instant level-1 unlock, §3).
   Consequences for T-025: the ladder's earn path must not be gated on a date check. If a
   "Season 1 has ended" state is ever added, it must gate the free-track promotion only.
 
-- Progress is stored locally (no backend, D10); **T-009 (post-v1.0) is what makes progress itself
-  durable**, via Play Games Saved Games. Until it lands, the honest statement is: the entitlement
-  always survives reinstall via the store account + Restore; the *level* does not. Buying the pass
-  grants its level-1 reward instantly (below), so a fresh install after Restore is never empty.
-- **Say so at the point of sale.** The pass's paywall/store copy should state that progress is
-  stored on the device until cloud save ships — one line, and it converts a future complaint into a
-  disclosed limitation.
+- **Current T-025 integration (20 Sep):** recorded XP comes from the existing Supabase profile,
+  per D13 and PROFILE_LEADERBOARD_PLAN; the earlier Play Games plan is superseded. Claims and
+  equipped loadouts are local, scoped by profile and curve version. Recovering a profile
+  recovers its XP; store Restore recovers entitlements. Rewards can then be collected again.
+  Buying/restoring the pass exposes level 1 immediately, and never grants higher-level XP.
+- **Recovery copy:** XP follows the recovered online profile. Cosmetic selections and collected
+  markers are on this device; rewards justified by recovered XP can be re-collected. The external
+  paywall copy should be reconciled with that behavior when this build is released.
 
 ### Season 1 reward ladder (proposal ★)
+
+**Asset sourcing, 20 Sep 2026:** `docs/SEASON_PASS_ASSETS.md` maps this ladder to downloaded
+CC0 cap/top-hat/crown models, Kenney particle sprites and our existing runner. Both tracks use
+free commercial-use assets. The season-pass session is implementing this ladder; verification is recorded in STATUS.
+The three products/entitlements are unchanged. Outfit finishes now need the runner's custom shader,
+with the implemented rendering approach recorded in §5.
 
 | Lv | Free track | Pass track (`season1`) |
 |---|---|---|
 | 1 | **Mint** body colour | **Neon Lime** glow body |
 | 2 | **White** trail | **Cyan Pulse** glow trail |
-| 3 | **Sunset Orange** body colour | **Top Hat** (headwear) |
-| 4 | **Sky Blue** body colour | **Firefly** aura |
-| 5 | **Disc Cap** (headwear) | **Chrome** body finish |
-| 6 | **Plum** body colour | **Twin** trail |
+| 3 | **Wayfinder Quiver** back accessory | **Top Hat** (headwear) |
+| 4 | **Moonbound Tome** back accessory | **Firefly** aura |
+| 5 | **Disc Cap** (headwear) | **Sky Wings** back accessory |
+| 6 | **Sunshield** back accessory | **Twin** trail |
 | 7 | **Shadow** trail | **Crown** (headwear) |
 | 8 | **Charcoal** body colour | **Aurora** trail (colour-cycling) |
 | 9 | **Confetti** crash burst | **Comet** aura |
 | 10 | **Matte Gold** body colour | ⭐ **Prism skin** (season exclusive) |
 
-Free track is deliberately generous (colour-heavy, one headwear, one trail, one FX) so the ladder
-is worth engaging with unpaid; the pass column is where glow, metal, layered trails, auras and the
-exclusive skin live. **Prism** = chrome body + colour-cycling emission + Aurora trail + Crown +
-Comet aura; its combination is season-exclusive.
+The free track includes three back accessories, a hat, dyes and effects. The pass adds Sky Wings,
+headwear, glow, auras and the Prism finish/preset. Sunset, Sky, Plum and Chrome remain as legacy
+locker dyes. Existing claims for the replaced milestones recognize the corresponding new reward,
+while retaining the old dye and the same XP/entitlement gates.
 
 ### Item slots
 
-An equipped loadout is one choice per slot, selectable independently in the locker UI:
-**Body** (colour/finish) · **Trail** · **Headwear** · **Aura** · **Crash FX**. A **skin** is a
-preset that fills every slot at once (and is the only way to wear its exclusive parts in v1.0 —
-no per-part unbundling, keeps the locker simple).
+**Character** (persisted as `Skin`) is independent of **Body dye**, **Trail**, **Headwear**,
+**Aura**, **Crash FX** and **Back accessory**. Equipping an accessory keeps Ember/Frost's actual
+model; changing character keeps the collected accessories. A pass hat replaces native headwear;
+a back item replaces a native cape. Clear Slot restores that native part. Explicitly clearing a
+trail/aura suppresses a character's default effect until another one is selected.
+
+The seventh save field appends Back; old six-field loadouts and old empty-character composed
+loadouts migrate without losing their slot selections. Ownership validation checks each choice
+independently: revoking a purchased character falls back to Runner while preserving earned slots.
+Character-exclusive default effects remain attached to that character's ownership.
 
 ---
 
 ## 4. Direct-purchase skins (the two products)
 
-| Skin | Preset |
+| Skin | Character and default effects |
 |---|---|
-| **Ember** | Charcoal body + orange emissive glow + fire-gradient trail + rising-spark aura |
-| **Frost** | Ice-white body + pale-blue emissive glow + crystal-fade trail + drifting-snow aura |
+| **Ember** | KayKit Barbarian: broad explorer with beard, bear headdress and warm accents, short fire foot sparks and rising-spark aura |
+| **Frost** | KayKit Mage: separate robed character, pointed hat and cape with icy fabric, short crystal foot sparks and drifting aura |
+
+Owner requested these distinct meshes on 20 Sep. Both are from the free CC0 Adventurers 2.0
+pack, share the existing humanoid idle/run/jump/dodge controller, and accept every season slot.
+The shop presents a season-pass card first and the two character cards beneath it, using the
+existing localized store prices, direct character purchases and pass paywall.
 
 Names ★ are non-automotive on purpose (the VEYRON caution in OPEN_QUESTIONS "App name"). The ids
 bake the names in (`veyro.skin.ember`) — acceptable because *display* names stay mutable; renaming
@@ -186,21 +204,23 @@ bake the names in (`veyro.skin.ember`) — acceptable because *display* names st
 
 ## 5. Engineering notes (why every item above is cheap)
 
-All items compose from capabilities the project already ships — no new art tech, no new shaders
-(gotchas 1/3: everything derives from the shipped `PrimitiveLit` base material):
+T-025 implementation (20 Sep) uses the real T-006 runner and explicitly referenced shader/
+material assets, so Android shader stripping cannot fall back to a primitive's Standard material:
 
-- **Body colours** — `RuntimeMaterials.Lit(color)`, exists today (`GameBootstrap.cs:44`).
-- **Glow bodies / emissive** — small `RuntimeMaterials` extension: clone base, enable
-  `_EMISSION`, set `_EmissionColor`. URP Lit supports it natively.
-- **Metal finishes (Chrome, Matte Gold)** — set `_Metallic`/`_Smoothness` on the clone.
-- **Trails** — `TrailRenderer` with a `RuntimeMaterials` material (staying in the Lit family
-  avoids shipping a second base material). Twin = two offset emitters; Aurora = colour gradient
-  cycled over time.
-- **Headwear** — primitives parented above the head (`Top Hat` = cylinder + disc, `Crown` = cube
-  ring, `Disc Cap` = flattened cylinder). **Destroy the collider `CreatePrimitive` adds** —
-  cosmetics must never change the player's collision profile.
-- **Auras / crash FX** — `ParticleSystem` (`com.unity.modules.particlesystem` is already in the
-  manifest); keep alive-particle counts small for the 60 FPS budget.
+- **Body colours, glow and metal finishes** — the shipped Runner shader changes only the shirt
+  atlas region. Stylized rim/shine and Prism's animated tint leave skin, hair and shoes intact.
+- **Trails** — short foot-level particles with local backward drift for the scrolling world;
+  maximum 36 per runner, no ribbon mesh, no per-frame managed allocations. The ground contact
+  shadow is a translucent feathered quad with no raised cylinder.
+- **Headwear** — curated CC0 cap, top-hat and crown meshes fitted to the actual Humanoid head
+  bone, accounting for each model’s head dimensions and FBX unit scale. Cap normalization uses its crown/opening rather than its brim bounds. Prefabs contain no colliders.
+- **Back accessories** — CC0 wing, quiver, shield and book meshes on a fitted chest socket; no colliders, one material per item, small transform-only wing flex.
+- **Auras / crash FX** — the existing ParticleSystem module with referenced CosmeticEffect
+  material and CC0 Kenney sprite alpha. Maximum 24 aura / 30 crash particles. With Confetti,
+  the result panel briefly reveals the burst before appearing; scoring remains immediate.
+- **Previews and navigation** — one shared visual implementation for the runner and menu.
+  Only visible preview stages render. Each UGUI page owns its draw batches and raycaster,
+  inheriting the shell's scale/sorting; the three bottom tabs are unchanged.
 - **Determinism (rule 4)** — cosmetics are visual-only. Particle randomness is fine (it is not
   gameplay RNG); nothing here may read or seed track generation.
 - **Unlock rules** — `CosmeticCatalog` rows: `slot`, `id`, `rule` ∈ { Default,
@@ -246,8 +266,37 @@ so these are now committed:
 
 Still tunable, no dashboard or store dependency:
 
-- [ ] Ladder item mix (§3) — freely editable until T-025 lands
+- [x] Ladder item mix (§3) — implemented in T-025 on 20 Sep; human visual acceptance pending
 - [ ] XP curve / level thresholds — frozen before the production release, not before
 
 Still owed on the **Play** side (not a sign-off, a task): create the three products in Play Console
 with the ids above (`PLAY_CONSOLE_SETUP.md` §D1).
+
+
+## T-025 implementation notes — 20 September
+
+`docs/SEASON_PASS_IMPLEMENTATION.md` records the integration review and verification sequence.
+The home character opens the locker; the pass card opens its own timeline component. These are
+detail screens, not new bottom tabs. Level 1 keeps the starting rewards; later rewards require
+both recorded XP and an explicit Collect action. Pass rewards additionally require `season1`.
+Claims are repeat-safe and revalidated before equip; a refund removes access without granting XP.
+
+Development thresholds are cumulative 0–9 XP. They have a distinct claims/loadout storage
+version from production; the raw XP cache is unchanged. The provisional production curve is
+not approved, and non-development builds are guarded until it is tuned and approved.
+No local XP import is needed: the previous season implementation stored no XP at all.
+
+All 20 rewards use the existing runner material, the selected CC0 meshes, short scrolling-world
+ribbons, or bounded particle systems. Ember/Frost become full presets. Customizing a slot exits
+a preset and does not unbundle its exclusive effects. Asset provenance lives beside the source
+files in `Assets/Art/Season/SOURCES.md`; the implementation changes presentation, not gameplay or store contracts.
+
+
+### 20 September presentation follow-up
+
+The pass uses a horizontally draggable tier timeline, premium above free, with actual item
+thumbnails and a large selected-item preview. The locker uses a three-column wardrobe grid
+with All/Owned filters. Shared preview cameras ease to the head, torso or full effect area
+according to the selected category; dragging rotates the model. Detail views temporarily
+use the full screen, with Back returning to the existing three tabs. These presentation
+changes do not change the catalog, XP curve or entitlement/collection rules above.

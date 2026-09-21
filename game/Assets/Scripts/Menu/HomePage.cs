@@ -6,15 +6,8 @@ using UnityEngine;
 
 namespace MotionRunner.Menu
 {
-    /// The middle tab, and the one the app opens on: season pass at the top, the daily stamp card
-    /// under it, the live run showing through the middle, and the two ways to start a run at the
-    /// bottom.
-    ///
-    /// The window in the middle is not a component - it is a gap the stack leaves and nothing
-    /// draws in. Everything the player sees through it is the real game: TrackDirector generating
-    /// a real seeded track and RunnerController being steered by AutoPilot, run by AttractRun
-    /// behind this canvas. That is why the cards are translucent and why the page has no backdrop
-    /// of its own.
+    /// The middle tab: recorded season progress, daily stamps, the equipped runner opening
+    /// the locker, and the two ways to start a run. Hidden pages stop their preview cameras.
     public sealed class HomePage : MenuPage
     {
         /// Top margin above the first card.
@@ -23,6 +16,7 @@ namespace MotionRunner.Menu
         SeasonPassCard _seasonPass;
         DailyStampsCard _stamps;
         ModePickerCard _modes;
+        RunnerPreview _preview;
 
         /// Forwarded from the card, so MainMenu never reaches through a page into a card.
         public event Action<bool, FaceTrackingRig> Chosen;
@@ -35,15 +29,22 @@ namespace MotionRunner.Menu
         {
             var stack = new MenuStack(Root, TopOffset);
 
-            _seasonPass = new SeasonPassCard(new PlaceholderSeasonProgress(), Menu.IsPassOwned);
-            _seasonPass.Build(stack.Add("SeasonPass", SeasonPassCard.Height), () => Menu.Show(MenuTab.Shop));
+            _seasonPass = new SeasonPassCard(Menu.Season, Menu.IsPassOwned);
+            _seasonPass.Build(stack.Add("SeasonPass", SeasonPassCard.Height), Menu.ShowSeason);
 
             _stamps = new DailyStampsCard(() => DateTime.UtcNow);
             _stamps.Build(stack.Add("Stamps", DailyStampsCard.Height));
 
-            // The window onto the live run. Whatever height is left after the cards above and the
-            // picker below, which is how the layout stays honest on a taller or shorter phone:
-            // the furniture keeps its size and the game gets the rest.
+            // The character fills the space between the fixed cards and the mode picker.
+            RuntimeUi.Element("CharacterLocker",Root,out var character);
+            RuntimeUi.Stretch(character,Vector2.zero,Vector2.one,
+                new Vector2(MenuTheme.SidePadding,ModePickerCard.Height+14),new Vector2(-MenuTheme.SidePadding,stack.Y-14));
+            _preview=RunnerPreview.Create(character);
+            var target=RuntimeUi.Panel("OpenLocker",character,new Color(0,0,0,0));
+            var open=target.gameObject.AddComponent<UnityEngine.UI.Button>();open.targetGraphic=target;
+            open.onClick.AddListener(Menu.ShowCosmetics);
+            RuntimeUi.Label("LockerHint",character,Vector2.zero,new Vector2(1,0),new Vector2(12,8),new Vector2(-12,62),
+                32,TextAnchor.MiddleCenter,MenuTheme.Text).text="YOUR LOOK  ·  TAP TO CUSTOMIZE";
             var picker = BuildPickerSlot();
             _modes = new ModePickerCard();
             _modes.Chosen += OnChosen;
@@ -74,6 +75,7 @@ namespace MotionRunner.Menu
         {
             _seasonPass?.Refresh();
             _stamps?.Refresh();
+            _preview?.Show(Menu.Skins.Effective);
         }
 
         /// Switching tabs abandons a camera setup in progress AND a pick that has not committed

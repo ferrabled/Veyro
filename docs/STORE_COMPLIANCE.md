@@ -243,3 +243,14 @@ AD_ID, ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION are absent. ARM64 native
 Layers and APK ZIP alignment are 16 KiB compatible. This verifies the current SDK
 increment only; repeat on the final combined/signed Play artifact. Code 5 was not
 incremented and this local keyless-shop APK must not be uploaded as a new release.
+
+
+### T-025 — Season timeline and cosmetic locker (20 Sep implementation)
+
+Uses the existing `season1` entitlement, existing score-derived server XP and existing profile
+requests; no new SDK, permission, product, login or telemetry. This build still carries every
+T-009 deployment/declaration prerequisite above. Local collected markers and loadouts are
+profile-scoped; recovered XP allows re-collection on a new install. Keep the UI and point-of-sale
+copy clear about that distinction. Test-speed thresholds are development-only and cannot ship
+through the release build guard until the production curve is approved. A separate Cosmetic QA
+package uses a labelled fake profile/store and never generates RevenueCat revenue or server runs.

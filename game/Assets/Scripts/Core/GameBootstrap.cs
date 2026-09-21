@@ -41,6 +41,7 @@ namespace MotionRunner.Core
             camGo.AddComponent<AudioListener>();
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.09f, 0.10f, 0.16f);
+            cam.cullingMask &= ~(1 << MotionRunner.Menu.RunnerPreview.Layer);
             cam.fieldOfView = 65f;
             cam.farClipPlane = 220f;
             camGo.transform.position = new Vector3(0f, 4.2f, -6.2f);
@@ -68,7 +69,7 @@ namespace MotionRunner.Core
             // The store UI itself lives on the main menu's shop tab now, so what is built here is
             // only the seam; RunFlow hands both to the menu.
             var store = CreateStore();
-            var skins = new SkinService(store, visual.SetOutfit);
+
 
             // Profile/leaderboard backend (T-009): same fail-open shape as the store. Once the
             // profile loads, its user id becomes the RevenueCat app user id too (D13), so one
@@ -83,6 +84,9 @@ namespace MotionRunner.Core
                 else store.ResetIdentity();
             };
             if (profile.Current != null) store.Identify(profile.Current.UserId);
+            var season = new SeasonService(store, profile,
+                Debug.isDebugBuild ? SeasonCurve.Testing : SeasonCurve.Production);
+            var skins = new SkinService(store, season, visual.ApplyLoadout);
 
             // Session last: it drives everything above in a fixed order. Disabled until the
             // player has picked a control scheme.
@@ -106,7 +110,11 @@ namespace MotionRunner.Core
         /// RevenueCat public keys.
         static IProfileService CreateProfileService()
         {
-#if UNITY_EDITOR
+#if VEYRO_COSMETIC_QA && DEVELOPMENT_BUILD
+            var qa=new FakeProfileService();
+            qa.BecomeReady(new Profile("cosmetic-qa", "QA-RUNNER", 9));
+            return qa;
+#elif UNITY_EDITOR
             return FakeProfileService.Ready();
 #else
             if (!SupabaseKeys.IsConfigured)
@@ -125,7 +133,11 @@ namespace MotionRunner.Core
         /// RevenueCatKeys (test key in APKs, Play key in .aab store builds, enforced at build).
         static IStore CreateStore()
         {
-#if UNITY_EDITOR
+#if VEYRO_COSMETIC_QA && DEVELOPMENT_BUILD
+            var fixture=FakeStore.WithDefaultCatalog();fixture.IsReady=true;
+            foreach(var entitlement in Entitlements.All)fixture.SetEntitlement(entitlement,true);
+            return fixture;
+#elif UNITY_EDITOR
             var fake = FakeStore.WithDefaultCatalog();
             fake.IsReady = true;
             return fake;

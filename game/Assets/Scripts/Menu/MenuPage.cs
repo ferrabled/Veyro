@@ -1,5 +1,6 @@
 using MotionRunner.Core;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MotionRunner.Menu
 {
@@ -36,6 +37,10 @@ namespace MotionRunner.Menu
 
             Root = gameObject.AddComponent<RectTransform>();
             RuntimeUi.Stretch(Root, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // A page owns its draw batches. Keep its changing masks/preview geometry out of
+            // the shell's header/tab batches, while inheriting the shell's scale and sorting.
+            gameObject.AddComponent<Canvas>().overrideSorting=false;
+            gameObject.AddComponent<GraphicRaycaster>();
 
             Build();
         }

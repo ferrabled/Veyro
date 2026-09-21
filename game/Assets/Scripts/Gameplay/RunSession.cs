@@ -267,6 +267,8 @@ namespace MotionRunner.Gameplay
 
         void Crash()
         {
+            if (!IsRunning) return;
+            Runner.Visual?.Crash();
             IsRunning = false;
             _restart.LockOut();
 
@@ -307,7 +309,7 @@ namespace MotionRunner.Gameplay
 
             if (Hud != null)
                 Hud.ShowResult(new RunSummary(Mode, Scheme, score, Score.Coins, Score.BestCombo,
-                    (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel));
+                    (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel), Runner.Visual!=null && Runner.Visual.HasCrashEffect);
         }
 
         /// Hands the finished run to the shared boards (T-009). Fire-and-forget from Crash:
@@ -317,8 +319,9 @@ namespace MotionRunner.Gameplay
         /// restart is not a result.
         void SubmitToBoards(int score)
         {
-            if (Profile == null) return;
-
+            if (Profile == null) { Hud?.SetXpStatus("XP waits for your online profile"); return; }
+            int submittedRun=_runIndex;
+            Hud?.SetXpStatus("Recording season XP…");
             Profile.SubmitRun(new RunSubmission
             {
                 client_run_id = _runId,
@@ -340,7 +343,14 @@ namespace MotionRunner.Gameplay
 #else
                 platform = SubmissionPlatform.AndroidGooglePlay
 #endif
-            }, null);
+            }, outcome =>
+            {
+                if(this==null || submittedRun!=_runIndex || IsRunning || !enabled)return;
+                string note=outcome.Status==SubmitStatus.Accepted ? "Run synced · check your season rewards" :
+                    outcome.Status==SubmitStatus.Duplicate ? "Run already synced · no duplicate XP" :
+                    outcome.Status==SubmitStatus.Queued ? "XP pending sync · reconnect to record it" : "This run earned no season XP";
+                Hud?.SetXpStatus(note);
+            });
         }
 
         /// The RUN AGAIN button. QUEUED, not started: this runs inside the EventSystem's dispatch,

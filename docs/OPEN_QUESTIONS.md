@@ -215,8 +215,18 @@ the question. Keep this file short; it is read every session.
     App ID `app_4cf32e54fc359326` received; SDK consent and real-run instrumentation implemented.
     Confirm no advertising/CAPI destinations are enabled. The upstream v3.3.2 archive contains
     no LICENSE or package license field; ask Layers for terms allowing the documented local
-    consent/privacy patch to be distributed, or an upstream equivalent fix. Patch details are
-    in `game/Packages/com.layers.analytics/VEYRO_PATCH.md`. *Recommended default: SDK analytics
+    consent/privacy patch to be distributed, or an upstream equivalent fix. Owner now requests
+    a stock SDK migration assessment before changing it; `LAYERS_STOCK_SDK_REVIEW.md` records
+    the public-API gaps. Confirm supported advertising-attribution controls and pending-data
+    deletion, or obtain an explicit owner decision on changed privacy promises before migration.
+    Patch details are in `game/Packages/com.layers.analytics/VEYRO_PATCH.md`. *Recommended default: SDK analytics
     only, advertising off, explicit opt-in, verified provider-deletion process; resolve vendor
     terms before distributing the modified SDK.* Production feature baseline and unused Play
     versionCode are still owner decisions in Q19; no signed Play release was assumed.
+
+23. **Production Season 1 XP curve (T-025, before release).** Owner requested a tiny temporary
+    cap for testing. Development builds now use cumulative thresholds 0–9; actual server XP
+    is unchanged. Choose production pacing after device acceptance. Suggested tuning starting
+    point: 0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP, not yet approved. Production builds
+    of the game are gated until this is resolved; development/device verification can proceed.
+    Level-1 Mint and owned-pass Neon Lime retain their immediate catalog unlock.

@@ -7,24 +7,9 @@ using UnityEngine.UI;
 
 namespace MotionRunner.Menu
 {
-    /// The cosmetics catalog, as a view that builds into whatever rect it is handed (T-020). It
-    /// used to be the whole StorePanel - a modal over the result screen - and everything that made
-    /// that panel correct is still here; only the frame around it changed. The store is now a tab
-    /// on the main menu, so the result screen's SHOP button leaves the run and lands here instead
-    /// of stacking an overlay on top of a finished run.
-    ///
-    /// Two purchase paths, split by product (owner call, 29 Aug):
-    ///   * the two skins buy DIRECTLY - one tap raises the native Google Play sheet, because
-    ///     a €2.99 colour swap the player just tapped needs no sales page in front of it;
-    ///   * the Season 1 pass opens the dashboard-configured RevenueCat paywall, which is the
-    ///     offering that paywall was built for and stays revisable without a store release
-    ///     (REVENUECAT_PLAN §5).
-    /// Both are gated the same way: a row is only ever purchasable when the player does not
-    /// already own it - the paywall itself takes no entitlement argument (§3.3), and entitlements
-    /// stay the single source of truth for "owned".
-    ///
-    /// Fail-open: with the store unavailable everything shows locked, every tap completes with a
-    /// message, and the tab bar always works - the player is never stuck (CLAUDE.md rule 3).
+    /// Pass-first storefront, followed by two distinct character cards. Live prices and ownership
+    /// come from IStore. Characters purchase directly; the pass uses the configured paywall.
+    /// Preview navigation never buys/equips, and leaving the shop stays possible during commerce.
     public sealed class StoreCatalogView
     {
         readonly IStore _store;
@@ -33,10 +18,13 @@ namespace MotionRunner.Menu
         readonly List<(string itemId, string packageId, Text state, Image row)> _rows =
             new List<(string, string, Text, Image)>();
 
+        public Action ViewSeason;
+        public Action<string> PreviewCharacter;
         Text _status;
         Text _passState;
         Image _passRow;
-        bool _busy;
+        bool _busy,_readyPricesRequested;
+        const string Unavailable="store unavailable right now - you can keep playing";
 
         /// Raised whenever entitlements may have changed, so the cards on other tabs (the season
         /// pass banner) can catch up without polling the store themselves.
@@ -50,48 +38,29 @@ namespace MotionRunner.Menu
 
         public void Build(RectTransform slot)
         {
-            float pad = MenuTheme.SidePadding;
-
-            RuntimeUi.Label("Title", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -84f), new Vector2(-pad, -12f),
-                52, TextAnchor.MiddleLeft, MenuTheme.Text).text = "COSMETICS";
-
-            // Skin rows. Each is one tap: equip when owned, straight to the Google Play sheet when
-            // not - the paywall is the pass's path, not theirs.
-            float y = -104f;
-            foreach (var item in CosmeticCatalog.Items)
-            {
-                string packageId = PackageForItem(item);
-                var (state, row) = BuildRow(slot, ref y, item.DisplayName.ToUpperInvariant(),
-                    SkinService.ToColor(item.BodyColor), () => OnSkinTapped(item.Id, packageId));
-                _rows.Add((item.Id, packageId, state, row));
-            }
-
-            // The pass is not a skin: it has no equip action, only owned/locked state. Its reward
-            // ladder ships with T-025; selling it before the ladder exists is fine for Test Store
-            // verification but the row says what it is today.
-            var pass = BuildRow(slot, ref y, "SEASON 1 PASS", MenuTheme.Accent, OnPassTapped);
-            _passState = pass.state;
-            _passRow = pass.row;
-
-            RuntimeUi.Label("PassNote", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad + 20f, y - 52f), new Vector2(-pad - 20f, y),
-                28, TextAnchor.UpperLeft, MenuTheme.Faint).text =
-                "reward ladder arrives with the Season 1 update";
-            y -= 72f;
-
-            BuildButton(slot, ref y, "RESTORE PURCHASES", OnRestore);
-
-            _status = RuntimeUi.Label("Status", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, y - 140f), new Vector2(-pad, y - 12f),
-                30, TextAnchor.UpperCenter, MenuTheme.Dim);
+            CosmeticUi.Text("Title",CosmeticUi.Rect("ShopHeading",slot,0.025f,0.975f,10,70),"MAKE IT YOUR RUN",43,MenuTheme.Text);
+            var content=CosmeticUi.Scroll(slot,94,out var scroll);scroll.viewport.GetComponent<Image>().color=Color.clear;
+            content.sizeDelta=new Vector2(0,1608);
+            var pass=CosmeticUi.Rect("SeasonPassCard",content,0.025f,0.975f,0,420);
+            var passBackground=CosmeticUi.Surface(pass,MenuTheme.Text,32);
+            passBackground.Gradient=true;passBackground.Bottom=MenuTheme.PassGradient;
+            CosmeticUi.Text("SeasonTag",CosmeticUi.Rect("SeasonTagSlot",pass,0.035f,0.75f,20,38),"SEASON 1  /  WORLD RUNNER",24,MenuTheme.Owned);
+            CosmeticUi.Text("SeasonTitle",CosmeticUi.Rect("SeasonTitleSlot",pass,0.035f,0.75f,60,62),"A WHOLE NEW LOOK",40,MenuTheme.OnAccent);
+            CosmeticUi.Text("SeasonDetails",CosmeticUi.Rect("SeasonDetailsSlot",pass,0.035f,0.66f,128,76),"Earn XP. Collect 10 premium rewards.\nWings, headwear, effects & more.",26,MenuTheme.OnAccent);
+            CosmeticUi.Thumbnail(CosmeticUi.Rect("PassWings",pass,0.63f,0.995f,32,252),"wings");
+            CosmeticUi.Text("FreeTrack",CosmeticUi.Rect("FreeTrackSlot",pass,0.035f,0.975f,216,42),"10 free rewards for everyone · no gameplay advantage",22,MenuTheme.Owned);
+            var buy=CosmeticUi.Pill(CosmeticUi.Rect("BuyPass",pass,0.035f,0.58f,294,85),"",OnPassTapped,MenuTheme.Accent,30);
+            _passState=buy.GetComponentInChildren<Text>();_passRow=buy.image;
+            CosmeticUi.Pill(CosmeticUi.Rect("ViewRewards",pass,0.60f,0.965f,294,85),"VIEW REWARDS",()=>ViewSeason?.Invoke(),MenuTheme.Card,24);
+            CosmeticUi.Text("CharacterHeading",CosmeticUi.Rect("CharacterHeadingSlot",content,0.025f,0.975f,444,58),"MEET YOUR NEXT RUNNER",33,MenuTheme.Text);
+            BuildCharacter(content,"ember",0.025f,0.50f);
+            BuildCharacter(content,"frost",0.50f,0.975f);
+            CosmeticUi.Text("Compatibility",CosmeticUi.Rect("CompatibilitySlot",content,0.025f,0.975f,1304,70),"Both characters wear your collected pass items.\nOne-time purchases. Yours to keep.",25,MenuTheme.Dim,TextAnchor.MiddleCenter);
+            CosmeticUi.Pill(CosmeticUi.Rect("RestorePurchases",content,0.12f,0.88f,1394,76),"RESTORE PURCHASES",OnRestore,MenuTheme.Slot,27);
+            _status=CosmeticUi.Text("Status",CosmeticUi.Rect("StatusSlot",content,0.025f,0.975f,1490,96),"",25,MenuTheme.Dim,TextAnchor.UpperCenter);
 
             _store.EntitlementsChanged += Refresh;
             Refresh();
-            FetchPrices();
         }
 
         /// The store SDK outlives this view whenever the player leaves the tab with a purchase or
@@ -106,59 +75,18 @@ namespace MotionRunner.Menu
             _status = null;
         }
 
-        /// A row: colour swatch + name on the left, live state on the right, whole row tappable.
-        (Text state, Image row) BuildRow(RectTransform slot, ref float y, string label,
-            Color swatch, Action onTap)
+        void BuildCharacter(Transform content,string id,float left,float right)
         {
-            var go = RuntimeUi.Element(label, slot, out var rect);
-            RuntimeUi.Stretch(rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(MenuTheme.SidePadding, y - 130f),
-                new Vector2(-MenuTheme.SidePadding, y));
-
-            var image = go.AddComponent<Image>();
-            image.color = MenuTheme.Slot;
-            var button = go.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(() => onTap());
-
-            var swatchGo = RuntimeUi.Element("Swatch", go.transform, out var swatchRect);
-            swatchRect.anchorMin = new Vector2(0f, 0.5f);
-            swatchRect.anchorMax = new Vector2(0f, 0.5f);
-            swatchRect.anchoredPosition = new Vector2(70f, 0f);
-            swatchRect.sizeDelta = new Vector2(70f, 70f);
-            swatchGo.AddComponent<Image>().color = swatch;
-
-            RuntimeUi.Label("Name", go.transform,
-                new Vector2(0f, 0f), new Vector2(0.55f, 1f),
-                new Vector2(130f, 0f), new Vector2(0f, 0f),
-                42, TextAnchor.MiddleLeft, MenuTheme.Text).text = label;
-
-            var state = RuntimeUi.Label("State", go.transform,
-                new Vector2(0.45f, 0f), new Vector2(1f, 1f),
-                new Vector2(0f, 0f), new Vector2(-28f, 0f),
-                34, TextAnchor.MiddleRight, MenuTheme.Dim);
-
-            y -= 150f;
-            return (state, image);
-        }
-
-        void BuildButton(RectTransform slot, ref float y, string label, Action onTap)
-        {
-            var go = RuntimeUi.Element(label, slot, out var rect);
-            RuntimeUi.Stretch(rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(MenuTheme.SidePadding, y - 110f),
-                new Vector2(-MenuTheme.SidePadding, y));
-
-            var image = go.AddComponent<Image>();
-            image.color = MenuTheme.Slot;
-            var button = go.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(() => onTap());
-
-            RuntimeUi.Label("Label", go.transform, Vector2.zero, Vector2.one,
-                Vector2.zero, Vector2.zero, 40, TextAnchor.MiddleCenter, MenuTheme.Text).text = label;
-
-            y -= 130f;
+            var item=CosmeticCatalog.Find(id);var package=PackageForItem(item);
+            var card=CosmeticUi.Rect(id+"Card",content,left,right,514,764);
+            var background=CosmeticUi.Surface(card,id=="ember" ? MenuTheme.EmberCard : MenuTheme.FrostCard,28);
+            background.Gradient=true;background.Bottom=MenuTheme.Card;
+            CosmeticUi.Text("Name",CosmeticUi.Rect("NameSlot",card,0.02f,0.98f,14,56),item.DisplayName.ToUpperInvariant(),38,MenuTheme.Text,TextAnchor.MiddleCenter);
+            CosmeticUi.Text("CharacterType",CosmeticUi.Rect("TypeSlot",card,0.02f,0.98f,69,34),id=="ember" ? "FIREBOUND EXPLORER":"ICEBOUND MAGE",20,MenuTheme.Dim,TextAnchor.MiddleCenter);
+            CosmeticUi.Thumbnail(CosmeticUi.Rect("CharacterPortrait",card,0.02f,0.98f,101,495),id);
+            var buy=CosmeticUi.Pill(CosmeticUi.Rect("Buy"+id,card,0.035f,0.965f,610,70),"",()=>OnSkinTapped(id,package),MenuTheme.Text,28);
+            _rows.Add((id,package,buy.GetComponentInChildren<Text>(),buy.image));
+            CosmeticUi.Pill(CosmeticUi.Rect("Preview"+id,card,0.035f,0.965f,696,50),"TRY IN LOCKER",()=>PreviewCharacter?.Invoke(id),MenuTheme.ItemCard,23);
         }
 
         /// Which package of offering `default` sells this item, or null for one nothing sells on
@@ -184,7 +112,7 @@ namespace MotionRunner.Menu
         void OnPassTapped()
         {
             if (_busy) return;
-            if (Entitlements.Has(_store.ActiveEntitlements, Entitlements.Season1)) return;
+            if (Entitlements.Has(_store.ActiveEntitlements, Entitlements.Season1)){ViewSeason?.Invoke();return;}
             OpenPaywall();
         }
 
@@ -292,28 +220,37 @@ namespace MotionRunner.Menu
                 if (_skins.EquippedId == itemId && _skins.IsUnlocked(itemId))
                 {
                     state.text = "EQUIPPED";
-                    state.color = MenuTheme.Accent;
+                    state.color = MenuTheme.OnAccent;
                 }
                 else if (_skins.IsUnlocked(itemId))
                 {
                     state.text = "TAP TO EQUIP";
-                    state.color = MenuTheme.Text;
+                    state.color = MenuTheme.OnAccent;
                 }
                 else
                 {
                     state.text = Price(packageId);
-                    state.color = MenuTheme.Dim;
+                    state.color = MenuTheme.OnAccent;
                 }
-                row.color = _skins.IsUnlocked(itemId) ? MenuTheme.Owned : MenuTheme.Slot;
+                row.color = _skins.IsUnlocked(itemId) ? MenuTheme.Accent : MenuTheme.Text;
             }
 
             bool passOwned = Entitlements.Has(_store.ActiveEntitlements, Entitlements.Season1);
-            _passState.text = passOwned ? "OWNED" : Price("season1_pass");
-            _passState.color = passOwned ? MenuTheme.Accent : MenuTheme.Dim;
-            _passRow.color = passOwned ? MenuTheme.Owned : MenuTheme.Slot;
+            _passState.text = passOwned ? "PASS OWNED  >" : "GET PASS · "+Price("season1_pass");
+            _passState.color = MenuTheme.OnAccent;
+            _passRow.color = passOwned ? MenuTheme.Text : MenuTheme.Accent;
 
             if (!_store.IsReady)
-                _status.text = "store unavailable right now - you can keep playing";
+            {
+                _status.text=Unavailable;_readyPricesRequested=false;
+            }
+            else
+            {
+                if(_status.text==Unavailable)_status.text=string.Empty;
+                // A shop built before SDK readiness gets fresh prices when readiness arrives.
+                // Set before the callback: FakeStore and cached offers can complete synchronously.
+                if(!_readyPricesRequested){_readyPricesRequested=true;FetchPrices();}
+            }
 
             Changed?.Invoke();
         }

@@ -60,8 +60,12 @@ namespace MotionRunner.EditorTools
         public static void BuildAndroidCamDev() =>
             Build("com.ferrabled.veyro.camdev", "Veyro Cam Dev", "VeyroCamDev.apk", bundle: false);
 
+        /// Isolated fixture app: no RevenueCat/Supabase traffic or writes to the real player's save.
+        public static void BuildAndroidCosmeticQa() =>
+            Build("com.ferrabled.veyro.cosmeticqa", "Veyro Cosmetic QA", "VeyroCosmeticQA.apk", false, true, true);
+
         static void Build(string packageName, string productName, string outputName, bool bundle,
-            bool development = false)
+            bool development = false, bool cosmeticQa = false)
         {
             EnsureScene();
 
@@ -70,6 +74,7 @@ namespace MotionRunner.EditorTools
             bool previousBundle = EditorUserBuildSettings.buildAppBundle;
             int previousVersionCode = PlayerSettings.Android.bundleVersionCode;
             string previousVersion = PlayerSettings.bundleVersion;
+            bool previousTimings = PlayerSettings.enableFrameTimingStats;
             string previousDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
 
             // Everything that mutates the project goes inside the try, not before it: the
@@ -96,8 +101,11 @@ namespace MotionRunner.EditorTools
                 PlayerSettings.SplashScreen.showUnityLogo = false;
 
                 EditorUserBuildSettings.buildAppBundle = bundle;
+                PlayerSettings.enableFrameTimingStats = development;
                 if (development) PlayerSettings.bundleVersion = DevVersion(previousVersion);
                 ApplyStoreKeyPairing(bundle, development, previousDefines);
+                if(cosmeticQa) PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android,
+                    PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android)+";VEYRO_COSMETIC_QA");
                 if (bundle)
                 {
                     ApplyUploadKeystoreFromEnv();
@@ -136,6 +144,7 @@ namespace MotionRunner.EditorTools
                 // serializes into the committed ProjectSettings.asset, and a build timestamp left
                 // there would ride into the next .aab as the version name Play shows.
                 PlayerSettings.bundleVersion = previousVersion;
+                PlayerSettings.enableFrameTimingStats = previousTimings;
                 PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, previousDefines);
                 if (bundle)
                 {

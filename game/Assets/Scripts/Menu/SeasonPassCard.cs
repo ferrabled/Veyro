@@ -78,14 +78,14 @@ namespace MotionRunner.Menu
             bool owned = _passOwned != null && _passOwned();
             var snapshot = _progress.Read(owned);
 
-            _state.text = owned ? "OWNED" : "TAP TO UNLOCK";
+            _state.text = owned ? "PASS OWNED · VIEW" : "VIEW REWARDS";
             _state.color = owned ? MenuTheme.Accent : MenuTheme.Dim;
 
             _level.text = "LEVEL " + snapshot.Level + " / " + SeasonProgress.MaxLevel;
 
             RuntimeUi.SetBarFill(_fill, snapshot.Fraction);
 
-            _note.text = snapshot.IsLive
+            _note.text = snapshot.IsMaxLevel ? "All levels reached · collect your rewards" : snapshot.IsLive
                 ? snapshot.Xp + " / " + snapshot.XpForNextLevel + " XP to level " + (snapshot.Level + 1)
                 : SeasonProgress.NotLiveNote;
         }

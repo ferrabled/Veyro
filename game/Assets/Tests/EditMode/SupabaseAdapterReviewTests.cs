@@ -76,6 +76,7 @@ namespace MotionRunner.Tests
                 "{\"access_token\":\"test\",\"expires_in\":3600,\"user\":{\"id\":\"player\"}}"));
             ProfileAndKeyResponses();
             _responses.Enqueue(("/functions/v1/submit-run", 200, "{\"accepted\":true}"));
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp", 200, "{\"handle\":\"RUNNER\",\"xp\":43}"));
             Execute(Routine("DrainPending"));
             Assert.AreEqual(0, PendingRuns.Decode(PlayerPrefs.GetString(Pending, "")).Count);
             Assert.AreEqual(0, _responses.Count);
@@ -93,6 +94,7 @@ namespace MotionRunner.Tests
             _responses.Enqueue(("/rest/v1/profiles?select=handle,xp", 200,
                 "{\"handle\":\"RECOVERED\",\"xp\":42}"));
             _responses.Enqueue(("/functions/v1/submit-run", 200, "{\"accepted\":true}"));
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp", 200, "{\"handle\":\"RUNNER\",\"xp\":43}"));
             Execute(Routine("DrainPending"));
             Assert.AreEqual(0, _responses.Count, "drain stopped at the old recovery guard");
             Assert.AreEqual(0, PendingRuns.Decode(PlayerPrefs.GetString(Pending, "")).Count);
@@ -104,11 +106,13 @@ namespace MotionRunner.Tests
             ReadySession();
             _responses.Enqueue(("/functions/v1/submit-run", 200,
                 "{\"accepted\":true,\"duplicate\":true,\"daily_rank\":3,\"alltime_rank\":7}"));
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp", 200, "{\"handle\":\"RUNNER\",\"xp\":5}"));
             SubmitOutcome outcome = default;
             Execute(Routine("SubmitRoutine", Run(), (Action<SubmitOutcome>)(o => outcome = o), true));
             Assert.AreEqual(SubmitStatus.Duplicate, outcome.Status);
             Assert.AreEqual(3, outcome.DailyRank);
             Assert.AreEqual(7, outcome.AlltimeRank);
+            Assert.AreEqual(5, ((IProfileService)_service).Current.Xp);
         }
 
         [TestCase(true)]
@@ -185,6 +189,54 @@ namespace MotionRunner.Tests
             Assert.IsFalse(File.Exists(_supportPath), "deletion must clear preserved codes too");
         }
 
+        [Test]
+        public void FailedPostRunXpRefreshRetriesOnlyTheProfileRead()
+        {
+            ReadySession();Set("_xpRefreshPending",true);
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp",503,"{}"));
+            Execute(Routine("LoadProfile"));
+            Assert.IsTrue((bool)Get("_xpRefreshPending"));
+            Assert.AreEqual(0,((IProfileService)_service).Current.Xp);
+            _responses.Enqueue(("/rest/v1/profiles?select=handle,xp",200,"{\"handle\":\"RUNNER\",\"xp\":12}"));
+            Execute(Routine("RetryXpRefresh","player"));
+            Assert.AreEqual(12,((IProfileService)_service).Current.Xp);
+            Assert.IsFalse((bool)Get("_xpRefreshPending"));
+        }
+
+        [Test]
+        public void OutOfOrderProfileReadsCannotRollBackRecordedXp()
+        {
+            ReadySession();
+            var first=Routine("LoadProfile");var second=Routine("LoadProfile");
+            Assert.IsTrue(first.MoveNext());Assert.IsTrue(second.MoveNext());
+            var flags=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
+            var newer=(Action<long,string,float>)second.Current.GetType().GetField("done",flags).GetValue(second.Current);
+            var older=(Action<long,string,float>)first.Current.GetType().GetField("done",flags).GetValue(first.Current);
+            newer(200,"{\"handle\":\"RUNNER\",\"xp\":8}",0);
+            older(200,"{\"handle\":\"RUNNER\",\"xp\":3}",0);
+            Assert.AreEqual(8,((IProfileService)_service).Current.Xp);
+        }
+
+        [Test]
+        public void AProfileReadInFlightDuringARerollCannotRestoreTheOldHandle()
+        {
+            ReadySession();
+            Set("_xpRefreshPending",true);
+            // A post-run XP read is already on the wire, holding the row as it was before.
+            var read=Routine("LoadProfile");
+            Assert.IsTrue(read.MoveNext());
+            var flags=BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic;
+            var stale=(Action<long,string,float>)read.Current.GetType().GetField("done",flags).GetValue(read.Current);
+
+            _responses.Enqueue(("/rest/v1/rpc/reroll_handle",200,"{\"handle\":\"BRAVO\"}"));
+            Execute(Routine("RerollRoutine",(Action<Profile,SocialError>)((_,error)=>Assert.IsNull(error))));
+            Assert.AreEqual("BRAVO",((IProfileService)_service).Current.Handle);
+
+            stale(200,"{\"handle\":\"RUNNER\",\"xp\":5}",0);
+            Assert.AreEqual("BRAVO",((IProfileService)_service).Current.Handle,"a read older than the reroll rolled the name back");
+            Assert.IsTrue((bool)Get("_xpRefreshPending"),"the dropped read must leave the XP refresh outstanding");
+        }
+
         void LiveSession()
         {
             Set("_userId", "player");
@@ -241,7 +293,8 @@ namespace MotionRunner.Tests
             while (routine.MoveNext())
             {
                 Assert.Less(++steps, 100, "coroutine stalled");
-                if (routine.Current is IEnumerator nested) Execute(nested);
+                // Time waits are scheduler leaves, not nested network/session routines.
+                if (routine.Current is IEnumerator nested && !(nested is CustomYieldInstruction)) Execute(nested);
             }
         }
     }

@@ -92,6 +92,61 @@ namespace MotionRunner.Tests
         }
 
         [Test]
+        public void EnlargedPresentationKeepsFeetGroundedAndDoesNotChangeRunnerBounds()
+        {
+            var root=new GameObject("Runner presentation test");
+            root.transform.position=new Vector3(0,TrackMetrics.RunnerRestY,0);
+            try
+            {
+                var type=Type.GetType("MotionRunner.Art.RunnerVisual, Assembly-CSharp",true);
+                type.GetMethod("Create").Invoke(null,new object[]{root.transform});
+                var animator=root.GetComponentInChildren<Animator>();
+                animator.Play("idle",0,0);
+                animator.Update(0);
+                var mesh=root.GetComponentInChildren<SkinnedMeshRenderer>();
+                Assert.That(mesh.bounds.size.y,Is.InRange(1.35f,1.55f));
+                Assert.That(mesh.bounds.min.y,Is.InRange(-0.07f,0.07f),"Feet must remain on the path.");
+                Assert.AreEqual(new Vector3(0,TrackMetrics.RunnerRestY,0),root.transform.position);
+                Assert.IsEmpty(root.GetComponentsInChildren<Collider>());
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        [TestCase("DodgeLeft","dodgeLeft")]
+        [TestCase("DodgeRight","dodgeRight")]
+        public void LateralDodgeRetargetsWithoutMovingTheRunnerRoot(string field,string state)
+        {
+            var clip=(AnimationClip)Field(Manifest,field);
+            Assert.IsTrue(clip.humanMotion);
+            Assert.IsFalse(clip.isLooping);
+            var instance=UnityEngine.Object.Instantiate((GameObject)Field(Manifest,"Runner"));
+            try
+            {
+                var animator=instance.GetComponentInChildren<Animator>();
+                Assert.IsFalse(animator.applyRootMotion);
+                var initialPosition=animator.transform.localPosition;
+                animator.Play(state,0,0);
+                animator.Update(0);
+                var hip=animator.GetBoneTransform(HumanBodyBones.Hips);
+                var leg=animator.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
+                var initialHip=hip.position;
+                var initialLeg=leg.localRotation;
+                float largestLegChange=0;
+                for(int frame=0;frame<14;frame++)
+                {
+                    animator.Update(1f/60f);
+                    Assert.Less(Mathf.Abs(hip.position.x-initialHip.x),0.25f,
+                        "The pose must not add a second lateral lane move.");
+                    largestLegChange=Mathf.Max(largestLegChange,Quaternion.Angle(initialLeg,leg.localRotation));
+                }
+                Assert.Greater(largestLegChange,5f,"A dodge must visibly animate the leg.");
+                Assert.That(Vector3.Distance(initialPosition,animator.transform.localPosition),Is.LessThan(0.001f));
+                Assert.AreEqual(Vector3.zero,instance.transform.position);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(instance); }
+        }
+
+        [Test]
         public void CuratedPropsHaveReadableMeshesAndUrpMaterialsWithoutColliders()
         {
             var props=(GameObject[])Field(Manifest,"Props");
