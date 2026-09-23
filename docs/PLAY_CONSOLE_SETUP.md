@@ -128,7 +128,10 @@ BILLING permission §D1 waits for, and ships as a track update.
 4. **Attach the Play products in RevenueCat** (they're already created there): each product into
    its entitlement (`skin_ember`, `skin_frost`, `season1`) and into the empty Play row of its
    package in offering `default`.
-5. *(Post-release)* Promo codes for judges: `REVENUECAT_PLAN.md` §6 — 10 for the pass, 5 per skin.
+5. *(Post-release)* **Google Play promo codes are the primary judge-access route**:
+   `REVENUECAT_PLAN.md` §6 — 10 for `season1.pass`, 5 each for `skin.ember` and `skin.frost`,
+   plus separate test codes. Supply all three product groups and keep promotions active through
+   judging. No custom judge login is planned.
 
 ## E. After the 14 days — production access
 

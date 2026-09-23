@@ -17,19 +17,47 @@ Events screen to check delivery after the game test.
 
 ## What this increment implements
 
-- OneSignal Unity 5.1.15 Stable; Layers Unity 3.3.2, pinned to upstream commit
-  `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b`, embedded with a documented privacy patch.
-  Native binaries are unchanged. RevenueCat stays 9.8.1.
+- OneSignal Unity 5.1.15 Stable; Layers Unity 3.3.2 as the **official unmodified**
+  package, referenced by Git URL at upstream commit
+  `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (tag v3.3.2). No SDK source is patched or
+  redistributed. Native binaries are unchanged. RevenueCat stays 9.8.1.
 - PROFILE → GAMEPLAY ANALYTICS is a separate explicit choice, off by default.
   Layers is not initialized before acceptance. An accepted choice survives restart.
-  Turning it off revokes consent, stops transports and removes the isolated pending
-  analytics queue, retaining the copyable support ID for deletion requests.
-- Advertising consent, advertising-ID/install-referrer collection, automatic application error
-  and gameplay performance collection, and automatic deep-link/clipboard attribution are off.
-  Consented app lifecycle and native SDK delivery-health reporting remain on. SDK
-  first-open and `$sdk_health` events are expected. Delivery diagnostics are included
-  in the policy and Data Safety form; disabling the app-performance module does not
-  disable native SDK health counters.
+  On enable the adapter initializes the SDK and sets consent analytics=true,
+  advertising=false before any event can be transmitted, then identifies with the
+  separate random analytics support ID. Turning it off revokes both consents and shuts
+  the SDK down; unsent events stay on the device, can never be sent while analytics is
+  off, and are deleted the next time analytics is enabled — the adapter denies consent,
+  calls the SDK's Reset (which discards the queue and rotates the SDK device ID), then
+  grants analytics consent again — or when the player clears app data. The copyable
+  support ID is retained for deletion requests.
+- SDK persistence is Unity's `persistentDataPath`, which on this project is the
+  app-specific *external* folder `Android/data/com.ferrabled.veyro.run/files/`; the stock
+  core writes its own `layers_sdk/` subfolder there (`identity_state`,
+  `events_shutdown_<epoch>`, `super_properties` observed on device 22 Sep). Other apps
+  cannot read it, but the device owner can via USB or a file manager. No page claims
+  isolation beyond that. The old `veyro-layers`
+  directory from the patched build is deleted once on first launch of the new build.
+- Advertising-ID and install-referrer collection is prevented at the project level: a
+  `configurations.all { exclude ... }` block in `mainTemplate.gradle` and
+  `launcherTemplate.gradle` drops `com.google.android.gms:play-services-ads-identifier`
+  and `com.android.installreferrer:installreferrer` from every configuration, so EDM4U's
+  resolution of the stock `Editor/LayersDependencies.xml` cannot add AD_ID and the SDK's
+  JNI lookups fail and return null (the behaviour upstream's README describes for the
+  no-EDM4U case). This exclusion is required rather than cosmetic: RevenueCat's Android
+  SDK already depends on ads-identifier 17.0.1, so `AdvertisingIdClient` is present in
+  today's release APK and the stock SDK's automatic lookup would read a real GAID on
+  Android 8–12 (minSdk 26); Android 13+ returns zeros without the permission.
+  **Verified 21 Sep** on a scratch development build (`builds/layers-stock-verification.json`):
+  permission set identical to the release baseline, AD_ID absent, no ads-identifier
+  implementation or installreferrer classes in any dex, native library hash unchanged.
+- Advertising consent, automatic application error and gameplay performance collection,
+  and automatic deep-link/clipboard attribution are off.
+  Consented app lifecycle and native SDK delivery-health reporting remain on. The stock
+  SDK always emits an initialization-timing event (`layers_init_timing`) plus
+  `$sdk_health` delivery diagnostics; both fall under the declared delivery-diagnostics
+  disclosure. Delivery diagnostics are included in the policy and Data Safety form;
+  disabling the app-performance module does not disable native SDK health counters.
 - Real runs emit `daily_run_started`, `daily_run_completed`, `free_run_started` and
   `free_run_completed`. Attract/demo runs do not. Abandoning a run is not completion;
   enabling analytics midway through a run does not backfill that run.
@@ -70,9 +98,11 @@ separate SDK records. Their support/deletion routes are disclosed in the app/sit
    Verify the same campaign values on `notification_opened`, `daily_run_started`
    and `daily_run_completed`. Repeat cold launch; a foreground push must not cover
    gameplay. Verify the V icon in Android's notification display.
-7. Turn analytics off. Verify no further Layers traffic, unsent events discarded,
-   and no replay after re-enabling/relaunch. Previously uploaded events remain until
-   a provider deletion request. Leave the owner's preferred analytics choice intact.
+7. Turn analytics off. Verify no further Layers traffic, including across a relaunch
+   while off. Then re-enable and verify that nothing from the disabled period is
+   delivered: the adapter discards the previously queued events before granting consent
+   again, so no backlog replays. Previously uploaded events remain until a provider
+   deletion request. Leave the owner's preferred analytics choice intact.
 
 Compare the same analytics-consenting cohort across providers. Do not divide Layers
 completions by all OneSignal recipients while silently treating nonconsenting players
@@ -95,11 +125,12 @@ Owner/account checks:
    account's retention/deletion arrangements and applicable processor/transfer terms.
    Do not invent a fixed retention period or assume SDK advertising consent proves
    every server-side integration is disabled.
-2. Upstream's downloaded SDK tag has no LICENSE or package license field. The local
-   patch is fully described in `game/Packages/com.layers.analytics/VEYRO_PATCH.md`.
-   Obtain Layers confirmation that this modified SDK may be distributed in the app
-   and repository, or obtain an upstream equivalent fix. This is an actual missing
-   license finding, not a claim that Layers forbids application integration.
+2. Upstream's SDK tag still has no LICENSE or package license field, and upstream
+   publishes no releases or changelog. Since the migration to the stock package, no
+   modified SDK source is distributed in the app or the repository, so this is a
+   courtesy request — ask Layers to add a LICENSE or confirm terms — and **not a
+   release gate**. It remains a real upstream gap, not a claim that Layers forbids
+   application integration.
 3. Enable a verified deletion procedure: end users contact ferrabled+veyro@gmail.com
    with the separate analytics/notification support ID. Layers currently directs
    project owners to request user-event deletion through security@layers.com with
@@ -144,6 +175,16 @@ References checked 21 September 2026:
 [Google Play definitions](https://support.google.com/googleplay/android-developer/answer/10787469).
 
 ## Verified checkpoint — 21 Sep
+
+The evidence below was produced against the **patched** SDK build, before the same-day
+migration to the stock package. Re-run on the stock build the same evening
+(`builds/layers-stock-verification.json`): 515/515 EditMode tests; development APK
+`builds/MotionRunner-StockLayersDev.apk` (91,913,480 bytes) with a permission set
+identical to the release baseline, no AD_ID, no ads-identifier/installreferrer classes,
+`liblayers_core.so` sha256 unchanged; packages-lock records source `git` at hash
+`7d28dcda…`. The release flavour could not be built because the Season 1 XP-curve guard
+(OPEN_QUESTIONS 23) blocks non-development builds; repeat the permission/dex diff on the
+final signed artifact.
 
 - 468/468 tests pass in the isolated Unity scratch project, including real managed
   Layers SDK consent tests with its native/network-free mock. These tests enter

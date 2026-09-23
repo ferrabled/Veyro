@@ -1,5 +1,143 @@
 # Status journal (newest at top)
 
+## 2026-09-23 — Judge access standardized on Google Play promo codes
+
+`judge-premium-access` / T-035 documentation follow-up. Owner requested retiring the old
+judge-login proposal and making Google Play promo codes the primary route. OPEN_QUESTIONS 10
+is resolved in place; its number remains stable and DECISIONS.md remains owner-maintained.
+
+Updated the RevenueCat runbook, catalog, Play setup guide and submission instructions/checklist
+to use the three real product IDs (`season1.pass`, `skin.ember`, `skin.frost`), grouped unused
+codes and the current Shop/Google payment-sheet redemption flow. The pass does not grant the
+separate characters or higher-level XP. Access must cover judging, 1–13 October; the planned
+promotion end date is 31 October, with issued-code availability checked at the quarter change.
+The profile-enabled build can use its existing Player ID for manual RevenueCat support if
+needed; no identity-switching feature is planned. Historical proposals below are marked retired.
+
+Verification: documentation-wide search for old judge-login instructions and example identifiers,
+cross-check against existing restore/resume/profile behavior, and whitespace/diff checks. No game
+code or store configuration changed. Next: owner generates the product-specific codes; verify
+both redemption routes, resume/relaunch and restore on a second Google account using the signed,
+Play-installed build. Codes have not been generated or tested by this documentation task.
+
+## 2026-09-21 — Stock Layers SDK migration (supersedes the patched integration below)
+
+**Device test — 22 Sep (OnePlus Nord 2, Android 13, 00:09–00:18 WEST).** The pending
+physical test of the consent lifecycle was run on `builds/MotionRunner-StockLayersDev.apk`
+(installed with `adb install -r` over the existing profile — no uninstall, no data clear;
+prior build `1.0.0-dev.20260922-0003.nogit` → `1.0.0-dev.20260921-2227.nogit`, firstInstallTime
+unchanged, streak/season/hat intact). **All seven steps passed**; full evidence in the
+`device_test` object of `builds/layers-stock-verification.json`. Baseline OFF: launched and
+idled 25 s — no `[Analytics]`/`[LayersSDK]` line and `liblayers_core.so` never loaded, so the
+SDK really is inert until the player opts in. Enable: `[Analytics] Optional analytics
+initialized; advertising disabled.` preceded by **both** `[LayersSDK] Install referrer fetch
+failed: java.lang.ClassNotFoundException: com.android.installreferrer.api.InstallReferrerClient`
+and `[LayersSDK] GAID fetch failed: Object reference not set to an instance of an object.` —
+the Gradle exclusion is confirmed to work at runtime, not just in the dex. Two real Daily tilt
+runs were played to a crash; turning analytics off 12 s after the second one left
+`events_shutdown_1790028883260` on disk holding `daily_run_completed` + `$sdk_health`, both
+unsent, with `$health_consent_analytics: "denied"`, `$health_flush_allowed: false`, and
+`$ad_personalization`/`$ad_user_data` = false on every event; `grep -ril 'idfa|advertis|gaid'`
+over the whole SDK directory matched **nothing** at any point. Force-stop + relaunch while off
+left both files byte-identical (md5 unchanged) and produced no SDK activity. Re-enabling
+deleted the queue file, cleared `veyro.analytics.purge_pending`, and **rotated the device id
+891407e2-5cca-4bb4-acc7-ba435ce0852b → 664aeacd-43f2-434f-8413-c6f9af6ce349** (anonymous id
+rotated too); the SDK's own health record proves discard rather than delivery —
+`hydrated_events: 2`, `dropped: {"reset_discarded": 3}` at 22:16:20Z while `delivered` stayed
+at 6 and `batches_attempted` at 3. Analytics was left OFF and the phone on the Home screen with
+the teal top hat and 5-day streak showing.
+
+Two corrections to the entry below. (1) Storage: stock persists to
+`/storage/emulated/0/Android/data/com.ferrabled.veyro.run/files/layers_sdk` — this project's
+`Application.persistentDataPath` is **external app-scoped storage, not `/data/data/<pkg>/files`**,
+so "the app's private storage" is imprecise (the folder is visible to the device owner via a
+file manager or MTP); nothing Layers-related was written to the internal `files/` dir. Stock
+also does create its own `layers_sdk` subfolder, so files are not literally mixed in with game
+saves. Observed filenames were `identity_state`, `events_shutdown_<epoch_ms>` and
+`super_properties` — no `events_snapshot` or `remote_config` appeared. (2) The one-shot
+`veyro-layers` cleanup was **not exercised**: the previously installed build came from a
+non-Layers branch, so no legacy directory existed.
+
+Could not be verified here, and remains owner work: **Layers Events-screen receipt** (needs the
+owner's dashboard) — what was observed is transport-level only, `batches_by_status {"2xx": 3}`
+with `delivered: 6` while consent was granted, i.e. six events were accepted by the endpoint;
+**no on-wire payload was captured** (no TLS interception), so the first-batch `idfa`/ad-consent
+check was done against the persisted queue file instead; `layers_init_timing` was never seen in
+a persisted queue (if emitted, it was inside those six delivered events); the OneSignal→Daily
+measurement loop was not touched (no pushes sent); and the release flavour is still blocked by
+OPEN_QUESTIONS 23. Screenshots and the pulled queue/identity files are under `builds/device/`;
+device-side screenshots were deleted. No commit was made by this pass.
+
+`feat-implement-tracks` / T-022. The owner approved replacing the locally patched
+Layers SDK after reading the assessment, and the migration was implemented the same
+day across three parallel tracks: the package swap plus Gradle changes, the adapter
+and test rewrite, and this documentation/copy pass.
+
+What changed. The embedded `com.layers.analytics` 3.3.2 package with `VEYRO_PATCH.md`
+is gone; the project now references the official unmodified SDK by Git URL at upstream
+commit `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (tag v3.3.2, still the latest
+upstream release — upstream has no LICENSE file and no releases/changelog). No modified
+SDK source is redistributed any more. Advertising-ID and install-referrer collection is
+now prevented at the project level: a `configurations.all { exclude ... }` block in
+`mainTemplate.gradle` and `launcherTemplate.gradle` drops
+`com.google.android.gms:play-services-ads-identifier` and
+`com.android.installreferrer:installreferrer` from every configuration.
+
+Key findings behind that choice. EDM4U is installed with auto-resolve on build, so the
+stock SDK's `Editor/LayersDependencies.xml` would otherwise pull ads-identifier 18.1.0
+and its AD_ID manifest entry. More importantly, RevenueCat's Android SDK already depends
+on ads-identifier 17.0.1, so `AdvertisingIdClient` is present in today's release APK —
+without the exclusion the stock SDK's automatic lookup would read a **real GAID on
+Android 8–12** (minSdk 26); Android 13+ returns zeros without the permission. With the
+exclusion the JNI lookups fail and return null, which is the behaviour upstream's own
+README describes for the no-EDM4U case. Also found: the Rust core exposes
+`consent_required`, `respect_dnt`, `cookieless_mode` and `requires_explicit_consent`,
+none of which the Unity wrapper surfaces — recorded as an upstream feature request
+(it would give "no events before consent" natively), not as something we use.
+
+Behaviour changes that had to reach the copy. Analytics stays off until PROFILE →
+GAMEPLAY ANALYTICS; on enable the adapter initializes the SDK and sets consent
+analytics=true / advertising=false before any event can be transmitted, then identifies
+with the separate random support ID. On turn-off it revokes consent and shuts the SDK
+down, so unsent events can never be sent while analytics is off — but, unlike the patch,
+they are not discarded at that moment: they are deleted on the next enable (deny consent
+→ the SDK's `Reset`, which discards the queue and rotates the SDK device ID → grant
+analytics consent) or when app data is cleared. The stock SDK always emits an
+initialization-timing event (`layers_init_timing`) alongside `$sdk_health`; both are
+covered by the existing delivery-diagnostics disclosure. Isolated SDK storage is no
+longer claimed anywhere: stock persists in the app's private storage next to game data,
+and the old `veyro-layers` folder is deleted once on first launch.
+
+Documentation/copy updated in this pass: `PRIVACY_POLICY.md` and the byte-synced
+`site/public/privacy/index.html` (Turning-it-off bullet, diagnostics sentence, header
+note, Changes paragraph), `site/public/support/index.html`, the two
+`AnalyticsPanel.cs` string literals, `STORE_COMPLIANCE.md`, `SDK_PRIVACY_RELEASE.md`,
+`LAYERS_STOCK_SDK_REVIEW.md` (dated Outcome section), `OPEN_QUESTIONS.md` 22 and the
+T-022 backlog line.
+
+Verification (same evening, fresh scratch copy `C:\scratch\veyro-layers-stock`, evidence in
+`builds/layers-stock-verification.json`). Unity resolved `com.layers.analytics` from the Git
+URL at hash `7d28dcda…` (packages-lock source `git`, copied back to the worktree); the
+resolved source has none of the three patch APIs. **515/515 EditMode tests pass**, including
+the four rewritten `LayersConsentTests`. `BuildAndroidDev` succeeded (the release flavour is
+blocked by the Season 1 XP-curve guard, OPEN_QUESTIONS 23, so the dev APK is the artifact;
+manifest merge and dependency resolution are identical). EDM4U did add the stock SDK's
+ads-identifier 18.1.0 + installreferrer 2.2 lines to the generated `unityLibrary/build.gradle`,
+and the `configurations.all` exclusion (present in both generated Gradle files) removed them:
+permission set **identical** to the release baseline, **no AD_ID**, **no ads-identifier
+implementation and no installreferrer classes in any dex** (only RevenueCat's own type
+reference remains, as before), `liblayers_core.so` sha256 unchanged. Artifacts:
+`builds/MotionRunner-StockLayersDev.apk`, `builds/layers-stock-permissions.txt`,
+`builds/layers-stock-editmode.xml`. Scratch drift after the build was Unity/EDM4U write-back
+only (resolver lines in the template, an `APP_UI_EDITOR_ONLY` define, URP assets) and was not
+copied back. The site was **not** deployed and no commit was made by this pass.
+
+Next. Owner: confirm no advertising/CAPI destinations are connected in the Layers
+dashboard; send the courtesy LICENSE/terms request to Layers (no longer a release gate,
+since no modified source ships); run the combined-build device test of enable / off /
+relaunch / re-enable with Events-screen receipt; then the Play Console flips per
+`STORE_COMPLIANCE.md`. Nothing is released.
+
 ## 2026-09-21 - Main merge and stock Layers SDK assessment
 
 Owner requested preserving both SDK commits, bringing this branch up to main, and
@@ -1700,11 +1838,10 @@ which is exactly why these mattered: the T-020 Unity session reads these docs as
 - **`PurchaseOutcome` is a struct, not an enum.** It was sketched as
   `enum { … Failed(reason) }`, which does not compile — a C# enum cannot carry a payload, and the
   reason is needed for §6 diagnostics. Now `PurchaseStatus` enum + optional `StoreError`.
-- **Judge codes are random and absent from the APK.** The proposed `LogIn("shipaton-judge-<n>")`
-  (OPEN_QUESTIONS 10) was a guessable shared identifier — `strings` on the APK confirms the pattern
-  and the next person to try `-2` inherits the granted entitlement. Now one high-entropy code per
-  judge (`openssl rand -hex 6`), generated out-of-band, validated by nothing, revocable per-ID.
-  Blast radius was only a cosmetic, but the fix is free at design time and impossible afterwards.
+- **Historical judge-login proposal — retired 23 Sep 2026.** This review had proposed random
+  identifiers in place of predictable shared identifiers. The owner subsequently chose Google
+  Play promo codes as the primary route; no custom judge login is planned. Current instructions:
+  REVENUECAT_PLAN §6 and resolved OPEN_QUESTIONS 10.
 - **Season 1 earning never closes for pass owners.** The catalog claimed paid items "stay owned"
   after 31 Oct because the entitlement is non-consumable. Not true: pass-track items unlock on
   *level*, level derives from local XP (D10), so reinstall → Restore returns `season1` but resets the
@@ -1800,7 +1937,8 @@ P10 merchant profile ✅ (payout bank still unwired — non-blocking, sales accr
    held-back cosmetics paragraph (LISTING.md §3) + privacy-policy purchases section on
    docs + site (redeploy = owner wrangler run).
 3. Owner-only, still open: **§D2 15% fee tier**, payout bank, address-publication decision
-   (register), OPEN_QUESTIONS 10/12 → DECISIONS.md.
+   (register), OPEN_QUESTIONS 12 → DECISIONS.md. Historical question 10 was subsequently resolved
+   on 23 Sep: Google Play promo codes are primary; the judge-login proposal is retired.
 
 ## 2026-08-25 — First Play upload done; site live + compliance register created (compliance session)
 
@@ -1845,7 +1983,7 @@ docs of this branch assumed; reconciled in this merge, not just spliced:
   listing description must mention camera mode (T-030).
 - **The privacy policy is drafted** (`docs/PRIVACY_POLICY.md`, linked in-app via `GameLinks`) —
   remaining is hosting + contact email, merged into OPEN_QUESTIONS **9** (was 12 on this branch;
-  judge mode keeps 10).
+  judge-access question retains 10, resolved 23 Sep in favor of Google Play promo codes).
 - **T-031 sequencing improved:** an AAB exists *now*, so the 12×14 clock starts with the current
   build; the RevenueCat build follows as a track update — which is also what unlocks Play in-app
   product creation. Backlog T-030/T-031 rewritten as the union of both branches.
@@ -1996,8 +2134,8 @@ assembly, so `-runTests` keeps working with or without the package (and the SDK 
 Editor at all, so this is a requirement, not a nicety).
 
 **Owner must review/decide:** OPEN_QUESTIONS **9** (SKU ids, entitlement name, prices — product ids
-are immutable once created) and **10** (ship a hidden judge-mode login as a promo-code fallback;
-recommended yes).
+are immutable once created). Historical question **10** is now resolved (23 Sep): the judge-login
+proposal is retired and Google Play promo codes are the primary route; see REVENUECAT_PLAN §6.
 
 **Two things found while reading the repo, both cheap, both embarrassing if missed:** Player Settings
 still say `productName: Motion Runner` / `companyName: DefaultCompany` (that string is the launcher

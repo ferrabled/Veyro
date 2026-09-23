@@ -68,3 +68,65 @@ verification. No SDK files were changed during this assessment.
 Sources: [official installation](https://layers.com/docs/sdk/installation),
 [SDK at the reviewed tag](https://github.com/layers/layers-sdk-unity/tree/v3.3.2).
 Detailed comparisons are retained locally under `builds/layers-stock-audit/`.
+
+## Outcome — 21 September 2026
+
+The owner approved the migration the same day and it was implemented.
+
+**Decision.** Ship the official unmodified package, referenced by Git URL at commit
+`7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (tag v3.3.2, still the latest upstream
+release). The embedded patched package and its two LFS rules are gone; the art LFS
+rules stay. The three patch-only behaviours are replaced as follows:
+
+- *No advertising ID / install referrer* → a project-level Gradle exclusion rather than
+  SDK source. `configurations.all { exclude ... }` in `mainTemplate.gradle` and
+  `launcherTemplate.gradle` drops `com.google.android.gms:play-services-ads-identifier`
+  and `com.android.installreferrer:installreferrer` from every configuration, so EDM4U
+  (installed, auto-resolve on build) cannot honour the stock
+  `Editor/LayersDependencies.xml`, and the SDK's JNI lookups fail and return null —
+  the behaviour upstream's own README describes for the no-EDM4U case.
+- *Isolated persistence* → dropped as a promise. The stock SDK stores its files under
+  Unity's `persistentDataPath`, which here is the app-specific external folder
+  `Android/data/<pkg>/files/`; on device (22 Sep) the core created its own `layers_sdk/`
+  subfolder there. Other apps cannot read it; the device owner can. No document claims
+  more isolation than that. The old `veyro-layers` directory is deleted
+  once on first launch of the new build, preserving the saved choice and support ID.
+- *Revoke-and-shutdown purge* → purge-on-re-enable. Turning analytics off revokes both
+  consents and shuts the SDK down, so queued events can never leave the device; they are
+  deleted the next time analytics is enabled (deny consent → the SDK's `Reset`, which
+  discards the queue and rotates the SDK device ID → grant analytics consent), or when
+  the player clears app data. On enable, consent analytics=true / advertising=false is
+  set before any event can be transmitted, then identity is set to the separate random
+  analytics support ID.
+
+**Why the exclusion is load-bearing, not belt-and-braces.** RevenueCat's Android SDK
+already depends on `play-services-ads-identifier` 17.0.1, so `AdvertisingIdClient` is
+present in today's release APK independently of Layers. Without the exclusion the stock
+SDK's automatic lookup would read a **real GAID on Android 8–12** (the game's minSdk is
+26); only on Android 13+ does it return zeros without the AD_ID permission. EDM4U would
+additionally have pulled ads-identifier 18.1.0 and its AD_ID manifest entry. "Call
+advertising consent false after initialization" was never sufficient on its own.
+
+**Upstream feature request to Layers.** The Rust core already exposes `consent_required`,
+`respect_dnt` and `cookieless_mode` config keys and a `requires_explicit_consent` method
+that the Unity wrapper does not surface. Surfacing them would give "no events before
+consent" natively, instead of depending on the adapter never initializing the SDK. We do
+not use these keys today; this is an ask, not a dependency. The missing LICENSE is a
+separate courtesy request and, with no modified source redistributed, no longer a gate.
+
+**Verified 21 Sep (scratch build, `builds/layers-stock-verification.json`).** The
+resolved package is upstream 3.3.2 at the pinned hash with none of the patch APIs;
+515/515 EditMode tests pass including the four rewritten consent tests. EDM4U did resolve
+the stock `LayersDependencies.xml` into the generated `unityLibrary/build.gradle`
+(ads-identifier 18.1.0 + installreferrer 2.2), and the `configurations.all` exclusion in
+both generated Gradle files neutralised it: the built APK's permission set is identical
+to the previous release baseline, AD_ID is absent, no ads-identifier implementation
+class and no installreferrer class is in any dex (the only remaining mention is
+RevenueCat's own type reference to `AdvertisingIdClient` in its never-called fetcher,
+which was also present before), and `liblayers_core.so` hashes identically to the
+previous build. The artifact is the development flavour because the release flavour is
+blocked by the Season 1 XP-curve guard (OPEN_QUESTIONS 23); manifest merge and
+dependency resolution are the same. Still owed by the owner: the combined-build device
+test of enable / off / relaunch / re-enable with Events-screen receipt (include a
+first-batch payload check for `idfa` and the ad-consent fields), and confirmation that
+no advertising or CAPI destinations are connected in the Layers dashboard.

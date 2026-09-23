@@ -36,7 +36,7 @@ Legend: ☐ not started · ⏳ blocked · ✅ done. Update in place.
 | B4 | Live store URL | app publicly listed | owner | ⏳ | **Production review since 16 Sep** — auto-publishes on approval (managed publishing off). Live ~23 Sep if review runs normally |
 | B5 | App icon | **1024 × 1024** [S1] | designer | ☐ | brief ✅ `store-kit/ART_DIRECTION.md` |
 | B6 | Screenshot | **≥ 1 at exactly 1179 × 2556, no device frame** [S1] | device owner | ☐ | recipe ✅ `store-kit/SCREENSHOTS.md` §3 |
-| B7 | Judge access — free trial **or** promo code | promo codes for the cosmetic SKU | owner, in Play Console | ⏳ | **T-020 + product live**; text ✅ `DEVPOST_ANSWERS.md` §4 |
+| B7 | Judge access — Google Play promo codes (primary route) | unused codes for `season1.pass`, `skin.ember`, `skin.frost` | owner, in Play Console | ⏳ | **T-020 + products active**; text ✅ `DEVPOST_ANSWERS.md` §4; no custom judge login |
 | B8 | Categories selected | only genuinely targeted ones [S3] | owner | ☐ | the ⚠️ audit in `DEVPOST_ANSWERS.md` §1 |
 
 **Verify B6 with a command, not with an eyeball:**
@@ -61,10 +61,13 @@ python3 -c "from PIL import Image; print(Image.open('shot.png').size)"   # must 
 
 - ☐ **YouTube video set to Public or Unlisted, and embeddable.** A private video is a filtered
   submission. Check it from a logged-out browser.
-- ☐ **Promo codes generated and written down somewhere that is not this repository.** They are
-  bearer tokens; do not commit them.
-- ☐ **Promo code tested end-to-end on a second Google account** before it goes in the form
-  (`REVENUECAT_PLAN.md` §6.2, Route A). An untested code in a submission is a coin flip.
+- ☐ **Product-specific Google Play promo codes generated for all three products**, stored outside
+  this repository/public marketing copy, and unused codes grouped by product in judge instructions.
+- ☐ **Promotions active throughout 1–13 October judging** (planned end 31 October); recheck
+  issued-code availability at the 1 October quarter change.
+- ☐ **Each product's promo redemption tested on a second Google account**, using separate test
+  codes and the signed, Play-installed build. Cover both redemption routes, resume, relaunch and
+  restore (`REVENUECAT_PLAN.md` §6). Pass ownership does not grant XP.
 - ☐ **Store listing screenshots not stale** — recapture if the visible Daily Run date is more than
   ~2 weeks old (`SCREENSHOTS.md`, Shot 3).
 - ☐ **Privacy policy URL live** — required by Play regardless of how little data is collected

@@ -110,8 +110,11 @@ the same change that ships a feature listed below.
   before enabling the alias. No site deploy or Console change has been performed by this task.
 
 ### Layers analytics
-21 Sep 2026 implementation: consent-gated Layers 3.3.2 with the local privacy patch;
-App ID `app_4cf32e54fc359326`. No Console changes or uploaded release are implied.
+21 Sep 2026 implementation: consent-gated Layers 3.3.2 — the **official unmodified**
+package, pinned by Git URL to upstream commit `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b`
+(tag v3.3.2); App ID `app_4cf32e54fc359326`. Advertising-ID and install-referrer
+libraries are excluded project-wide in the Gradle templates, not by patching the SDK.
+No Console changes or uploaded release are implied.
 Use this table together with existing RevenueCat/OneSignal/Supabase declarations:
 
 | Play category | Collection / requirement | Purposes and handling |
@@ -127,21 +130,35 @@ Use this table together with existing RevenueCat/OneSignal/Supabase declarations
   processing may qualify for Google's service-provider sharing exception when done
   solely on our instructions. Confirm Layers advertising/CAPI destinations are off
   before relying on that exception; SDK consent alone is not account verification.
-- Advertising ID: expected **No**, subject to final artifact verification. The Layers
-  attribution modules and GAID/install-referrer dependencies are disabled/removed.
+- Advertising ID: expected **No**, subject to final artifact verification. With the
+  stock SDK, `mainTemplate.gradle` and `launcherTemplate.gradle` carry a
+  `configurations.all { exclude ... }` block dropping
+  `com.google.android.gms:play-services-ads-identifier` and
+  `com.android.installreferrer:installreferrer` from every configuration, so EDM4U's
+  resolution of the SDK's `Editor/LayersDependencies.xml` cannot reintroduce AD_ID and
+  the SDK's JNI lookups return null. This matters because RevenueCat's Android SDK
+  already pulls ads-identifier 17.0.1, so the class would otherwise be present and a
+  real GAID readable on Android 8–12 (minSdk 26). **Verified 21 Sep** on the stock
+  scratch build (`builds/layers-stock-verification.json`): permission set identical to
+  the release baseline, AD_ID absent, no ads-identifier implementation or installreferrer
+  classes in any dex. That artifact is the development flavour (release builds are
+  guarded until the XP curve is approved); repeat the permission dump on the final
+  signed AAB before answering the Console question.
   Inspect the merged release manifest for AD_ID, location and foreground-service
   changes; preserve the prior OneSignal permission baseline. No ads are added.
 - Network transports use HTTPS. No camera frames, raw motion readings, recovery
   secrets, email or phone data are sent to Layers. Camera control labels are events,
   not image collection. Account creation/access answers remain those of profiles.
-- Privacy policy effective **21 September 2026**, with separate opt-in, opt-out,
-  queued-event deletion, US processing and support-ID deletion explanations. Public
+- Privacy policy effective **21 September 2026**, with separate opt-in, opt-out
+  (unsent events are held on the device, never sent, and deleted on the next enable or
+  when app data is cleared), US processing and support-ID deletion explanations. Public
   deletion URL remains `https://veyro.ferrabled.com/support/#delete`. DELETE ONLINE
   PROFILE does not delete the independent OneSignal/Layers records in this release.
 - Full ordered release procedure, owner/vendor checks and evidence gaps:
-  `SDK_PRIVACY_RELEASE.md`. Do not publish a modified SDK until its missing upstream
-  license/redistribution terms have been clarified. No fixed analytics retention
-  period or one-click provider deletion is promised without an implemented process.
+  `SDK_PRIVACY_RELEASE.md`. The app now ships the stock SDK and redistributes no
+  modified SDK source, so the courtesy request asking Layers to add a LICENSE or
+  confirm terms is **not a release gate**. No fixed analytics retention period or
+  one-click provider deletion is promised without an implemented process.
 
 ### T-009 — Supabase profiles + leaderboard (post-v1.0, Update 1)
 > Redefined 3 Sep 2026: anonymous-first Supabase identity, **no Play Games sign-in in this
@@ -243,6 +260,35 @@ AD_ID, ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION are absent. ARM64 native
 Layers and APK ZIP alignment are 16 KiB compatible. This verifies the current SDK
 increment only; repeat on the final combined/signed Play artifact. Code 5 was not
 incremented and this local keyless-shop APK must not be uploaded as a new release.
+
+### 21 Sep 2026 — stock Layers SDK migration (supersedes the patched-SDK entry above)
+
+The embedded, locally patched `com.layers.analytics` package was removed and replaced
+by the official unmodified package pinned by Git URL to upstream commit
+`7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (tag v3.3.2, still the latest upstream
+release). Advertising-ID and install-referrer collection is now prevented at the
+project level by a `configurations.all { exclude ... }` block in `mainTemplate.gradle`
+and `launcherTemplate.gradle` rather than by editing SDK source, because EDM4U would
+otherwise resolve the stock SDK's `Editor/LayersDependencies.xml` and add AD_ID via
+ads-identifier 18.1.0, and RevenueCat already ships ads-identifier 17.0.1 in today's
+APK. Declarations in the table above are unchanged in substance; the Advertising ID
+answer stays **No**, evidenced by the rebuilt stock artifact the same evening
+(`builds/layers-stock-verification.json`: no AD_ID, permission set identical to the
+previous release, no ads-identifier/installreferrer classes). Re-check on the final
+signed artifact.
+
+Opt-out semantics changed with the stock SDK and are already reflected in the policy
+and in-game copy: turning analytics off revokes consent and shuts the SDK down, unsent
+events are held on the device and can never be sent while analytics is off, and they
+are deleted on the next enable (deny consent → SDK Reset → grant analytics consent) or
+when the player clears app data. The stock SDK also always emits an initialization-
+timing event, covered by the existing Diagnostics declaration. No isolated-storage
+claim remains anywhere: SDK files sit in the app-specific external folder
+`Android/data/<pkg>/files/layers_sdk/` (device-verified 22 Sep), unreadable by other apps.
+
+Owner items that remain: confirm no advertising/CAPI destinations are connected in the
+Layers dashboard; send the courtesy license request (not a gate); run the combined-build
+device test; then the Console flips in the table above. No Console change was made here.
 
 
 ### T-025 — Season timeline and cosmetic locker (20 Sep implementation)
