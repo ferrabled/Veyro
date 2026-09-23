@@ -12,6 +12,7 @@
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "MotionRunner.Growth",
+        "MotionRunner.Growth.Layers",
         "Layers.Unity"
     ],
     "includePlatforms": [

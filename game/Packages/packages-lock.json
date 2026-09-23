@@ -8,10 +8,11 @@
       "url": "https://package.openupm.com"
     },
     "com.layers.analytics": {
-      "version": "file:com.layers.analytics",
+      "version": "https://github.com/layers/layers-sdk-unity.git#7d28dcda555ab3ab3f0901c6c6e77f8710613f4b",
       "depth": 0,
-      "source": "embedded",
-      "dependencies": {}
+      "source": "git",
+      "dependencies": {},
+      "hash": "7d28dcda555ab3ab3f0901c6c6e77f8710613f4b"
     },
     "com.onesignal.unity.android": {
       "version": "5.1.15",

@@ -61,6 +61,6 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0",
-    "com.layers.analytics": "file:com.layers.analytics"
+    "com.layers.analytics": "https://github.com/layers/layers-sdk-unity.git#7d28dcda555ab3ab3f0901c6c6e77f8710613f4b"
   }
 }

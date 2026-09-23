@@ -12,11 +12,13 @@ namespace MotionRunner.Growth.Layers
         public const string ChoiceKey = "veyro.analytics.choice.v1";
         const string SupportKey = "veyro.analytics.support_id";
         const string PurgeKey = "veyro.analytics.purge_pending";
+        // The embedded fork kept the SDK's files here via its patch-only
+        // PersistenceDirectory. Stock always uses persistentDataPath itself.
+        const string LegacyDirectory = "veyro-layers";
         public bool Enabled => PlayerPrefs.GetInt(ChoiceKey, 0) == 1;
         public bool IsReady => Enabled && LayersSDK.IsInitialized;
         public string SupportId => PlayerPrefs.GetString(SupportKey, string.Empty);
         public event Action Changed;
-        static string DataDirectory => Path.Combine(Application.persistentDataPath, "veyro-layers");
 
         public static IAnalyticsService Create()
         {
@@ -24,7 +26,7 @@ namespace MotionRunner.Growth.Layers
             var host = new GameObject("Optional analytics");
             DontDestroyOnLoad(host);
             var service = host.AddComponent<LayersAnalyticsService>();
-            if (PlayerPrefs.GetInt(PurgeKey, 0) == 1) service.ClearQueueFiles();
+            DeleteLegacyDirectory();
             if (service.Enabled) service.StartSdk();
             return service;
 #else
@@ -40,11 +42,8 @@ namespace MotionRunner.Growth.Layers
             try
             {
                 if (enabled) StartSdk();
-                else
-                {
-                    LayersSDK.RevokeConsentAndShutdown();
-                    ClearQueueFiles();
-                }
+                else if (LayersConsentFlow.Disable())
+                    Debug.Log("[Analytics] Optional analytics disabled; unsent events held until the next enable."); // device-test signature
             }
             catch (Exception error) { Unavailable(error); }
             Changed?.Invoke();
@@ -53,7 +52,6 @@ namespace MotionRunner.Growth.Layers
         void StartSdk()
         {
             if (!Enabled || LayersSDK.IsInitialized) return;
-            if (PlayerPrefs.GetInt(PurgeKey, 0) == 1 && !ClearQueueFiles()) return;
             try
             {
                 if (string.IsNullOrEmpty(SupportId))
@@ -62,29 +60,18 @@ namespace MotionRunner.Growth.Layers
                     PlayerPrefs.SetString(SupportKey, "veyro-" + Guid.NewGuid().ToString("N"));
                     PlayerPrefs.Save();
                 }
-                Directory.CreateDirectory(DataDirectory);
-                LayersSDK.Initialize(new LayersConfig
+                // Everything the previous session queued while analytics were
+                // off is discarded before consent is granted again.
+                bool purgePending = PlayerPrefs.GetInt(PurgeKey, 0) == 1;
+                var config = LayersConsentFlow.BuildConfig(AppId, Debug.isDebugBuild);
+                if (!LayersConsentFlow.Enable(config, purgePending, SupportId)) return;
+                if (purgePending)
                 {
-                    AppId = AppId,
-                    Environment = Debug.isDebugBuild ? LayersEnvironment.Development : LayersEnvironment.Production,
-                    PersistenceDirectory = DataDirectory,
-                    EnableAndroidAttribution = false,
-                    EnableDebug = false,
-                    Debug = false,
-                    AutoTrackAppOpen = false,
-                    AutoCaptureLifecycle = true,
-                    AutoTrackDeepLinks = false,
-                    AutoTrackExceptions = false,
-                    CaptureLogErrors = false,
-                    AutoTrackPerformance = false,
-                    FlushIntervalMs = 15000,
-                    FlushThreshold = 10,
-                    MaxQueueSize = 200,
-                    MaxBatchSize = 20
-                });
-                if (!LayersSDK.IsInitialized) return;
-                LayersSDK.Identify(SupportId);
-                LayersSDK.SetConsent(analytics: true, advertising: false);
+                    // Only cleared once the purge has actually run; a failed
+                    // initialize leaves it pending for the next attempt.
+                    PlayerPrefs.DeleteKey(PurgeKey);
+                    PlayerPrefs.Save();
+                }
                 Debug.Log("[Analytics] Optional analytics initialized; advertising disabled.");
             }
             catch (Exception error) { Unavailable(error); }
@@ -97,21 +84,24 @@ namespace MotionRunner.Growth.Layers
             catch (Exception error) { Unavailable(error); }
         }
 
-        bool ClearQueueFiles()
+        /// <summary>
+        /// One-shot cleanup of the forked SDK's private folder. It held only
+        /// that build's event queue and identity record — the consent choice
+        /// and the support ID live in PlayerPrefs and are untouched.
+        /// </summary>
+        static void DeleteLegacyDirectory()
         {
             try
             {
                 // Only this SDK's dedicated child directory; never delete game/profile data.
                 string parent = Path.GetFullPath(Application.persistentDataPath);
-                string target = Path.GetFullPath(DataDirectory);
-                if (Path.GetDirectoryName(target) != parent || Path.GetFileName(target) != "veyro-layers")
-                    return false;
+                string target = Path.GetFullPath(
+                    Path.Combine(Application.persistentDataPath, LegacyDirectory));
+                if (Path.GetDirectoryName(target) != parent || Path.GetFileName(target) != LegacyDirectory)
+                    return;
                 if (Directory.Exists(target)) Directory.Delete(target, true);
-                PlayerPrefs.DeleteKey(PurgeKey);
-                PlayerPrefs.Save();
-                return true;
             }
-            catch (Exception error) { Unavailable(error); return false; }
+            catch (Exception error) { Unavailable(error); }
         }
 
         static void Unavailable(Exception error) =>

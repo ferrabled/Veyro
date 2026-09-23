@@ -35,7 +35,8 @@ namespace MotionRunner.Menu
             {
                 GUIUtility.systemCopyBuffer = _analytics.SupportId;
                 _body.text = "Analytics support ID copied. Email it to ferrabled+veyro@gmail.com for access or deletion. " +
-                    "We verify control before acting. Turning analytics off stops future collection; it does not delete past provider records.";
+                    "We verify control before acting. Turning analytics off stops future collection and holds unsent events on this device; " +
+                    "it does not delete past provider records.";
             });
             Button(card, "Policy", -470f, "READ PRIVACY POLICY", () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
             Button(card, "Close", -580f, "CLOSE", Close);
@@ -59,7 +60,8 @@ namespace MotionRunner.Menu
                 "\n\nIf enabled, Layers receives app visits, notification opens and run results, plus an installation ID, " +
                 "device/app details and approximate region from your connection. This helps us improve Daily Run reminders." +
                 "\n\nNo camera images, motion readings or advertising ID. This choice is separate from reminders. " +
-                "The full game works with analytics off. Turning it off stops uploads and clears unsent events; past records need a deletion request.";
+                "The full game works with analytics off. Turning it off stops uploads; unsent events stay on your device, never sent, " +
+                "and are deleted when you re-enable. Past records need a deletion request.";
             _enable.interactable = !_analytics.Enabled || !_analytics.IsReady;
             _disable.GetComponentInChildren<Text>().text = _analytics.Enabled ? "TURN ANALYTICS OFF" : "KEEP ANALYTICS OFF";
             _copy.interactable = !string.IsNullOrEmpty(_analytics.SupportId);
