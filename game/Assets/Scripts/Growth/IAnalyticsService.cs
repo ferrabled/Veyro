@@ -7,6 +7,7 @@ namespace MotionRunner.Growth
     {
         bool Enabled { get; }
         bool IsReady { get; }
+        bool DisablePending { get; }
         string SupportId { get; }
         event Action Changed;
         void SetEnabled(bool enabled);
@@ -17,6 +18,7 @@ namespace MotionRunner.Growth
     {
         public bool Enabled { get; private set; }
         public bool IsReady => Enabled;
+        public bool DisablePending => false;
         public string SupportId => string.Empty;
         public event Action Changed;
         public readonly List<KeyValuePair<string, Dictionary<string, object>>> Events =

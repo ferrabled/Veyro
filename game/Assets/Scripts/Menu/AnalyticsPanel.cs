@@ -56,6 +56,16 @@ namespace MotionRunner.Menu
         }
         void Refresh()
         {
+            if (_analytics.DisablePending)
+            {
+                _body.text = "Turning analytics off has not finished. We are retrying. " +
+                    "Your OFF choice is saved, but collection may continue until shutdown succeeds. " +
+                    "Restart the app if this message persists; analytics will stay off on launch.";
+                _enable.interactable = false;
+                _disable.GetComponentInChildren<Text>().text = "RETRY TURNING OFF";
+                _copy.interactable = false; // copying must not replace the pending warning
+                return;
+            }
             _body.text = (_analytics.Enabled ? "Analytics is " + (_analytics.IsReady ? "ON." : "enabled but unavailable right now.") : "Analytics is OFF by default.") +
                 "\n\nIf enabled, Layers receives app visits, notification opens and run results, plus an installation ID, " +
                 "device/app details and approximate region from your connection. This helps us improve Daily Run reminders." +

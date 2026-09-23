@@ -12,7 +12,7 @@ namespace MotionRunner.Notifications
         public bool TryOffer(PushStatus status, bool safeMenu, bool completedDaily, bool development)
         {
             if (Seen || !safeMenu || !status.Initialized || !status.Registered ||
-                (!development && !completedDaily)) return false;
+                (!development && (!completedDaily || status.ReadyForPush))) return false;
             Seen = true;
             return true;
         }

@@ -86,8 +86,10 @@ namespace MotionRunner.Growth.Layers
         public static bool Enable(ILayersSdkOps sdk, LayersConfig config, bool purgePending, string supportId)
         {
             sdk.Initialize(config);
-            // Initialize is synchronous and no HTTP transport runs before the
-            // next frame, so every call below still precedes the first send.
+            // The caller gates Initialize on the player's analytics choice.
+            // Stock Initialize starts a /config request; it is not network-free.
+            // Set SDK consent synchronously before the configured periodic event
+            // flush. First-batch payload fields still need device/provider checks.
             if (!sdk.IsInitialized) return false;
 
             if (purgePending)
@@ -116,10 +118,12 @@ namespace MotionRunner.Growth.Layers
         public static bool Disable(ILayersSdkOps sdk)
         {
             if (!sdk.IsInitialized) return false;
-            // Consent first again: Shutdown persists the queue to disk, and
-            // the gate decides whether anything may leave on the way out.
-            sdk.SetConsent(analytics: false, advertising: false);
-            sdk.Shutdown();
+            // Always attempt shutdown, even if consent revocation throws. In
+            // the pinned Android SDK Shutdown aborts the uploader, persists to
+            // disk (FlushBlocking, not HTTP Flush) and releases the core.
+            // The caller retries if a shutdown failure leaves it initialized.
+            try { sdk.SetConsent(analytics: false, advertising: false); }
+            finally { sdk.Shutdown(); }
             return true;
         }
     }

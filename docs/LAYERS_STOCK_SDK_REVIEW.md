@@ -96,8 +96,11 @@ rules stay. The three patch-only behaviours are replaced as follows:
   deleted the next time analytics is enabled (deny consent → the SDK's `Reset`, which
   discards the queue and rotates the SDK device ID → grant analytics consent), or when
   the player clears app data. On enable, consent analytics=true / advertising=false is
-  set before any event can be transmitted, then identity is set to the separate random
-  analytics support ID.
+  set synchronously after initialization, then identity is set to the separate random
+  analytics support ID. Initialization follows the player's accepted analytics choice;
+  it starts a configuration request and can queue startup events before SDK consent is
+  applied. First-uploaded-batch fields still require verification (see the 23 Sep review
+  in `SDK_PRIVACY_RELEASE.md`).
 
 **Why the exclusion is load-bearing, not belt-and-braces.** RevenueCat's Android SDK
 already depends on `play-services-ads-identifier` 17.0.1, so `AdvertisingIdClient` is
@@ -126,7 +129,17 @@ RevenueCat's own type reference to `AdvertisingIdClient` in its never-called fet
 which was also present before), and `liblayers_core.so` hashes identically to the
 previous build. The artifact is the development flavour because the release flavour is
 blocked by the Season 1 XP-curve guard (OPEN_QUESTIONS 23); manifest merge and
-dependency resolution are the same. Still owed by the owner: the combined-build device
-test of enable / off / relaunch / re-enable with Events-screen receipt (include a
-first-batch payload check for `idfa` and the ad-consent fields), and confirmation that
-no advertising or CAPI destinations are connected in the Layers dashboard.
+dependency resolution are the same.
+
+**Device follow-up — 22 Sep; review reconciled 23 Sep.** The stock development APK's
+enable / off / relaunch / re-enable sequence passed on the Nord 2. A held queue stayed
+unchanged while off, then was discarded on re-enable with SDK identity rotation and no
+increase in delivered counters during purge. Six events had been accepted in three 2xx
+batches while enabled. This is transport and persistence evidence, not Events-screen
+receipt. The held shutdown queue had no advertising ID and had false ad-consent fields;
+the first uploaded batch was not inspected. Remaining: dashboard receipt and first-batch
+fields, failed-initialization recovery with an old queue, legacy-directory cleanup,
+the combined OneSignal-to-Daily loop, final release-artifact checks, and owner confirmation
+that no advertising or CAPI destinations are connected in Layers. See
+`SDK_PRIVACY_RELEASE.md` for the current matrix rather than repeating the completed
+22 Sep phone lifecycle test as wholly untested.

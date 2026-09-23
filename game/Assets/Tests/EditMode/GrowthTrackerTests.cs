@@ -12,11 +12,13 @@ namespace MotionRunner.Tests
         FakeAnalyticsService _analytics;
         GrowthTracker _tracker;
         DateTime _now;
+        int _visitVersion;
         [SetUp] public void SetUp()
         {
             _now = new DateTime(2026, 9, 21, 12, 0, 0, DateTimeKind.Utc);
             _analytics = new FakeAnalyticsService();
-            _tracker = new GrowthTracker(_analytics, "test", true, () => _now);
+            _visitVersion = 0;
+            _tracker = new GrowthTracker(_analytics, "test", true, () => _now, () => _visitVersion);
         }
         [TearDown] public void TearDown() => _tracker.Dispose();
         static NotificationOpen Push(string id = "push1", string destination = "daily", string version = "1") =>
@@ -49,6 +51,39 @@ namespace MotionRunner.Tests
         {
             _analytics.SetEnabled(true); Start(); _tracker.AbandonRun(); Finish();
             Assert.That(_analytics.Events.Count, Is.EqualTo(1));
+        }
+        [Test] public void CampaignIsConsumedByFirstDailyStartAndRetainedForItsCompletion()
+        {
+            _analytics.SetEnabled(true); _tracker.NotificationOpened(Push());
+            Start(); Finish(); Start("r2"); Finish("r2");
+            var runs = _analytics.Events.Where(e => e.Key != "notification_opened").ToArray();
+            Assert.That(runs.Select(e => e.Value.ContainsKey("campaign_id")),
+                Is.EqualTo(new[] { true, true, false, false }));
+        }
+        [Test] public void AbandonedAttributedRunCannotPassCampaignToRestart()
+        {
+            _analytics.SetEnabled(true); _tracker.NotificationOpened(Push());
+            Start(); _tracker.AbandonRun(); Start("r2");
+            Assert.That(_analytics.Events.Last().Value.ContainsKey("campaign_id"), Is.False);
+        }
+        [Test] public void PermissionPauseWithoutActivityStopRetainsCampaign()
+        {
+            _analytics.SetEnabled(true); _tracker.NotificationOpened(Push());
+            _now = _now.AddMinutes(2); // long dialog: elapsed time is not a new visit
+            Start();
+            Assert.That(_analytics.Events.Last().Value["campaign_id"], Is.EqualTo("daily-20260921"));
+        }
+        [Test] public void ActivityStopDuringPermissionPromptEndsAttribution()
+        {
+            _analytics.SetEnabled(true); _tracker.NotificationOpened(Push());
+            ++_visitVersion; Start();
+            Assert.That(_analytics.Events.Last().Value.ContainsKey("campaign_id"), Is.False);
+        }
+        [Test] public void NotificationAfterActivityStopBelongsToTheNewVisit()
+        {
+            _analytics.SetEnabled(true); _tracker.NotificationOpened(Push());
+            ++_visitVersion; _tracker.NotificationOpened(Push("push2")); Start();
+            Assert.That(_analytics.Events.Last().Value["campaign_id"], Is.EqualTo("daily-20260921"));
         }
         [Test] public void OldRunResultCannotCompleteNewRun()
         {
@@ -93,6 +128,8 @@ namespace MotionRunner.Tests
             _analytics.SetEnabled(true); _tracker.NotificationOpened(Push()); Start(mode: "free"); Finish();
             Assert.That(_analytics.Events.Last().Key, Is.EqualTo("free_run_completed"));
             Assert.That(_analytics.Events.Last().Value.ContainsKey("campaign_id"), Is.False);
+            Start("daily-after-free");
+            Assert.That(_analytics.Events.Last().Value["campaign_id"], Is.EqualTo("daily-20260921"));
         }
         [Test] public void NotificationDuringRunDoesNotAttributeTheAlreadyRunningRun()
         {
