@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Veyro uses gameplay events, not acquisition attribution. GAID and install-referrer
-     collection are disabled before initialization; neither dependency is needed. -->
-<dependencies><androidPackages /></dependencies>
