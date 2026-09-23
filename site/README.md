@@ -15,6 +15,7 @@ site/
     index.html            homepage — built from independent <section> blocks
     styles.css            design tokens + one CSS block per section
     site.js               daily-ticket generator (page works without JS)
+    challenge/            landing page for a shared run (T-024) — index.html + challenge.js
     privacy/index.html    REQUIRED by Google Play; path /privacy/ is load-bearing
     terms/index.html      terms of use (cosmetic IAPs, safety notice)
     support/index.html    contact, FAQ, data-deletion statement
@@ -90,6 +91,16 @@ long as the two-ink rule holds and each pose still reads at a glance.
    the RevenueCat build reaches testers.*
 4. **Contact email** `ferrabled+veyro@gmail.com` is a temporary alias — when the real one
    exists, grep the whole `site/` + `docs/PRIVACY_POLICY.md` for it.
+5. **`/challenge/` (T-024, added 21 Sep 2026 — undeployed).** Where a shared run lands. It must be
+   live *before* any build with a SHARE button reaches a tester, or every shared link 404s. The
+   page only reads its own query string (`?s=&v=&w=&p=&m=&d=`) and re-emits it verbatim as
+   `veyro://challenge?…`; the app parses both shapes with the same code
+   (`MotionRunner.Track.ChallengeMessage`), so **the key names are a contract — do not rename
+   them**, links already in somebody's chat history have to keep working. Script is a separate
+   file because `_headers` sets `script-src 'self'` (no inline JS anywhere on this site).
+   Optional upgrade, owner-only: publish `public/.well-known/assetlinks.json` with the Play app
+   signing SHA-256 and the https link opens the game directly, skipping this page
+   (`docs/PLAY_CONSOLE_SETUP.md` §F, OPEN_QUESTIONS 24).
 
 ## Copy rules (binding — docs/store-kit/ART_DIRECTION.md)
 

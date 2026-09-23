@@ -235,3 +235,20 @@ the question. Keep this file short; it is read every session.
     point: 0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP, not yet approved. Production builds
     of the game are gated until this is resolved; development/device verification can proceed.
     Level-1 Mint and owned-pass Neon Lime retain their immediate catalog unlock.
+
+24. **Android App Links verification for challenge links (T-024) — needs the release signing
+    certificate's SHA-256, which only the owner can produce.** The game now registers
+    `https://veyro.ferrabled.com/challenge…` with `android:autoVerify="true"`
+    (`Assets/Editor/AndroidChallengeLinks.cs`). Android only honours that filter if
+    `https://veyro.ferrabled.com/.well-known/assetlinks.json` serves the fingerprint of the cert
+    the app is *actually signed with* — and because Play App Signing re-signs uploads, the right
+    fingerprint is the one in **Play Console → Test and release → Setup → App signing → "App
+    signing key certificate" SHA-256**, not the upload key's. (Play Console → *App Links* can also
+    generate the file's contents; the same screen reports verification state per release.)
+    **Recommended default, already implemented: ship without it.** The custom scheme
+    `veyro://challenge?…` needs no verification and is what the landing page taps, so an
+    unverified https link simply opens the web page, which then opens the app — the round trip
+    works today. Adding assetlinks later is a *website* change, needs no rebuild, and only
+    upgrades the experience (the link stops bouncing through the browser). Owner action when
+    ready: paste the fingerprint into `site/public/.well-known/assetlinks.json` (see
+    `docs/PLAY_CONSOLE_SETUP.md` §F) and `npx wrangler deploy`.

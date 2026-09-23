@@ -154,6 +154,37 @@ The old "apply ~7–8 Sep" line here was arithmetically impossible (14 days from
 is gone. Spend the new slack on T-020 and the listing assets, not on delaying the application:
 production access is the gate everything else queues behind.
 
+## F. Challenge links — App Links verification (T-024, optional, do it any time)
+
+**Not a release blocker.** Skipping this costs one extra tap: an unverified link opens
+veyro.ferrabled.com/challenge/ in the browser, and that page's "Open in Veyro" button launches
+the game through the `veyro://` custom scheme, which nothing verifies. Doing it makes the https
+link open the game directly from the chat app. It is a **website** change — no rebuild, no new
+upload, no Console declaration.
+
+1. **Get the right fingerprint.** Play Console → Test and release → **Setup → App signing** →
+   copy the **SHA-256** of the *App signing key certificate*. ⚠️ Not the upload key: Play App
+   Signing re-signs every upload, so the upload key's fingerprint verifies nothing on a device.
+   (Play Console → Grow → **App Links** offers a generated `assetlinks.json` and shows the live
+   verification state per release — use it to check the work afterwards.)
+2. **Publish the file** at `https://veyro.ferrabled.com/.well-known/assetlinks.json` — create
+   `site/public/.well-known/assetlinks.json` and `npx wrangler deploy` from `site/`. It must be
+   served over https, as `application/json`, with no redirect:
+   ```json
+   [{
+     "relation": ["delegate_permission/common.handle_all_urls"],
+     "target": { "namespace": "android_app",
+                 "package_name": "com.ferrabled.veyro.run",
+                 "sha256_cert_fingerprints": ["<SHA-256 from step 1>"] }
+   }]
+   ```
+3. **Verify on the phone** (a fresh install re-runs verification; an existing one may not):
+   `adb shell pm verify-app-links --re-verify com.ferrabled.veyro.run` then
+   `adb shell pm get-app-links com.ferrabled.veyro.run` → the domain should read `verified`.
+4. Tapping a `https://veyro.ferrabled.com/challenge/?…` link in a chat app should now open the
+   game straight into the challenged run. The web page stays exactly as useful for everyone
+   without the app — that is the path that sends them to the Play listing.
+
 ---
 
 ## Sources (checked 24 Aug 2026)

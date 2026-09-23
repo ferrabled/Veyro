@@ -236,6 +236,273 @@ permission dumps, public SDK-config response and `builds/site-layers-deployment.
 Private API keys/keystore secrets were not read or requested. Public SDK config HTTP
 200 / success is configuration evidence only, not proof of SDK ingestion.
 
+## 2026-09-21 — review fixes + first device pass for the card / crash poses / share (feat-share-run)
+
+A review pass over the three tracks above found two regressions and three deep-link gaps; all fixed
+before the device pass:
+
+- **A tap during the crash pose skipped the card.** The card now waits 1.0 s + 0.25 s fade, but
+  `RestartGate.LockoutSeconds` was still 0.5 s, so the tap-anywhere restart fired before the card
+  had been drawn. `RestartGate.LockOut(float)` takes a duration (never below the constant);
+  `RunSession.Crash` passes `RunHud.RevealSeconds`. Test: `ALongerLockoutCoversTheWholeCardReveal`.
+- **The CHALLENGE banner leaked into every later run**, and the pause menu's RESTART swapped the
+  friend's track for a random one under the same banner. The banner is now set by
+  `RunSession.StartRun` from the seed the run actually uses (`BeginChallenge(seed, target)`), and
+  `RunSession.RestartSameRun()` re-arms the challenge for the pause-menu restart.
+- **Deep link hardening** — `RunFlow.TryStartPendingChallenge` refuses a link whose content
+  version / world id this build cannot generate (a lookalike track is not the sender's), never
+  starts on the frame the menu appeared (QuitToMenu + auto-start used to land in one frame), and
+  stands aside while a mode pick is pending (`MainMenu.HasPendingPick`). `ChallengeMessage.TryParse`
+  accepts only `veyro://challenge` and `https://veyro.ferrabled.com/challenge[/]` and caps `v`/`w`
+  at 32 chars. Tests added in `ChallengeMessageTests`.
+- The card's character block no longer disables itself forever after one failure, and the defeat
+  pose gets a side-on, floor-level framing (`RunnerPreview.FrameFallen`) — the first device shot
+  showed a head looming at the bottom of a standing-height frame.
+
+**Device pass (Nord 2, `adb install -r`, profile kept; permissions byte-identical to the previous
+build, manifest gained the two challenge intent-filters):** wall crash → runner stopped dead and
+down in front of the planter; hurdle crash → mid-air tumble over the hurdle with the confetti
+cosmetic; card fades in after the pose with score, `best today …`, three tiles, XP caption;
+SHARE opens the system chooser with `I scored 69 in Veyro Run on today's Daily Run (39 m) — can you
+beat me? https://veyro.ferrabled.com/challenge/?s=20260921&v=greybox-1&w=greybox&p=69&m=daily&d=2026-09-21`;
+Back from the chooser leaves the card up; RUN AGAIN afterwards starts a clean run; a
+`veyro://challenge?...` intent fired mid-run parks until the menu and then starts a
+`FREE RUN · TILT` with `CHALLENGE · beat 4 210` on the HUD. Not reachable by automation: a
+**new-record** run (all-time best on this profile is 7 787) — the NEW BEST pill and the dance are
+covered by the EditMode badge test and the `builds/crash-review/` render sheets only; a human
+should beat a best once and look.
+
+**In-depth QA pass (second agent, same device, build `…-2322`), 9/9 PASS:** planter and hurdle
+poses; every card element; tap 0.3 s into the pose does NOT restart, tap on the visible card does
+(no first-frame jump); SHARE chooser text, BACK keeps the card, double-tap SHARE safe, RUN AGAIN
+after; deep link parked on the card and taken after QUIT TO MENU, taken within 34 ms at Home,
+cold start into the challenge, RUN AGAIN after a challenge has no banner, `v=nope` refused with the
+menu intact, a link fired during a live Daily run parks across two further runs and never touches
+the Daily; pause → RESTART RUN replays the same challenge seed (`987654` twice in the log) with the
+banner; SKINS & SHOP / QUIT / back exits; no new logcat errors; card animation at 60 fps
+(`p50=p95=16.8 ms`). The game auto-paused correctly when another app took the foreground mid-test
+and the parked link survived it. Evidence: `C:\scratch\qa\*.png` (not committed).
+
+Found and fixed after that pass: **the fallen character was clipped at the stage's left edge** with
+the hat mostly out of frame — `Death01` carries the hips a body length from the root, and skinned
+renderer bounds stay at the bind pose, so a root-targeted camera missed it. `RunnerPreview.FrameFallen`
+now fits the humanoid bones (+ cosmetic meshes) every frame while active, so the camera follows the
+fall and settles on the body — verified on device: `1.0.0-dev.20260922-0003.nogit` (509/509 EditMode,
+permissions unchanged, `adb install -r`, profile kept) shows the whole lying body with the hat in
+frame. Phone left on Home and handed to the Layers consent-test agent. Follow-ups (T-044), not done: the chase camera hides much of the wall
+slam behind the runner's own back (a short camera lift on `WallSlam` would show it); a challenge
+run's card does not say whether the target was beaten and re-shares as a plain free run (UX, T-024
+polish); the celebrate dance is a subtle groove — a livelier CC0 clip would sell the record better.
+
+## 2026-09-21 — crash poses and result-card poses (feat-share-run, animation track)
+
+**Why.** On a crash the runner used to freeze mid-stride with the `run` loop still cycling in
+place; only the confetti cosmetic marked the moment. The owner asked for a death animation that
+depends on what was hit (a wall → stamped against it, a hurdle → trips), and for the card's
+character to dance on a new record or fall in defeat otherwise.
+
+**What changed.**
+- `RunSession.ResolveCollisions` now reports the `ObstacleKind` it hit; `Crash(CrashKind)` maps
+  it through the engine-free `CrashKinds.For` (`RunSummary.cs`): `FullBlock` → `WallSlam`,
+  `LowBarrier` → `Trip`. The two `BestBoard.Record*` booleans are captured instead of dropped and
+  travel in `RunSummary` (`NewAllTimeBest`, `NewDailyBest`, `IsNewRecord`, `Crash`, `Seed`) — the
+  card's badge and the share payload read them from there.
+- `RunnerVisual.Crash(kind)` fires the cosmetic and plays `crashWall` / `crashTrip`; a `_crashed`
+  latch ignores `Step` until `ResetPose`, and `Play` checks `Animator.HasState` so a controller
+  without the new states keeps its pose instead of logging every frame. `PlayResultPose(bool)`
+  plays `celebrate` / `defeat` for the card's preview; `PlayCrashEffect()` is the locker's
+  FX-only replay (was `Crash()`).
+- Clips: **Quaternius Universal Animation Library (Standard, CC0)**, one FBX under
+  `Assets/Art/Quaternius/` (LFS), provenance + SHA-256 in its `SOURCES.md` and `docs/GAME_ART.md`.
+  `Death01` ×1.7 = wall slam (stagger, fall onto the back, on the floor by 0.7 s), `Roll` ×1.15 =
+  trip (forward tumble), `Dance_Loop` = celebrate, `Death01` ×1 = defeat. Imported and wired by the
+  new `Assets/Editor/RunnerCrashBuild.cs` (menu `Veyro → Art → Update crash and result
+  animations`), which `ParkArtBuild.BuildRunner` also calls so a full rebuild keeps the states.
+  New `ParkAssets` fields `CrashWall/CrashTrip/Celebrate/Defeat`; `Runner.controller` gained the
+  four states (Ember/Frost share the controller, so all three skins have them).
+- Two things the review renders caught before any device saw them: with `keepOriginalOrientation`
+  the Quaternius rest pose faces the other way, so the runner spun 180° at impact — root rotation
+  is now baked to the body orientation; and the 0.33 s `Hit_Chest` flinch was far too subtle for a
+  wall, hence `Death01` at 1.7×. The KayKit legacy 1.2 emotes (Cheer/Dance/Defeat) were tried and
+  dropped: that rig has no foot bones, so no Humanoid avatar. `RunnerCrashBuild.RenderReview`
+  writes the contact sheets to `builds/crash-review/`.
+
+**Verified.** `RunnerCrashBuild.BuildAndReview` and the EditMode suite in the scratch copy
+(`C:\scratch\veyro-share`, 6000.5.9f1): **506/506 passed** (3 new `CrashKindTests`). Copied back
+only `Runner.controller`, `Park.asset` and the generated `.meta` files; `diff -rq` clean.
+
+**Needs a human device test.** Crash into a planter (full block): the runner should stop dead,
+stagger and fall backwards, no sliding or spin, visible ~1 s before the card fades in. Clip a
+hurdle: forward tumble. On the card, a record run dances (subtle groove — consider a livelier CC0
+clip later), any other run falls to the ground. Check all three skins.
+
+## 2026-09-21 — run-over screen redesigned as a shareable result card (feat-share-run, hud track)
+
+**Why.** Owner feedback on the old screen: too much information, badly presented. It was "RUN
+OVER", a 140px score, one wrapped string carrying both bests + distance + coins + combo, an XP
+line and three stacked slabs. Nothing about it was worth screenshotting.
+
+**What the card is now** (880 × 1420 in the 1080×1920 design space, centred; rounded
+`CosmeticPanel` surface with a warm paper gradient, on an ink scrim):
+
+| band | contents |
+| --- | --- |
+| 26–68 | `DAILY · 2026-09-21` left, `TILT` right — 26px, dim. Metadata, not a headline |
+| 78–112 | `SCORE`, 26px |
+| 112–268 | the score, 132px bold, grouped `4 210` by `ChallengeMessage.FormatScore` — the same format the share text uses |
+| 284–356 | **NEW BEST** / **NEW DAILY BEST** gold pill (460×72, ease-out-back pop on reveal, unscaled) *or*, when it was not a record, a quiet `best today 4 210` line. Never both |
+| 372–908 | the player's own runner, live, on the locker's teal→cream wash. `RunnerPreview` (RenderTexture → RawImage, layer 30) with the equipped loadout; draggable to spin before sharing; `veyro` wordmark signed bottom-right of the stage |
+| 926–1076 | three tiles: DISTANCE / COINS / BEST COMBO |
+| 1092–1134 | the season-XP caption (`SetXpStatus`, still filled asynchronously by RunSession) |
+| bottom 140–260 | `RUN AGAIN` (pink, 516×120) + `SHARE` (slot, 268×120) |
+| bottom 42–114 | `SKINS & SHOP` and `QUIT TO MENU` as text links |
+
+All four existing events (`RestartRequested`, `StoreRequested`, `QuitRequested`,
+`PauseRequested`) and their RunFlow subscribers are unchanged. The multiline bests string is gone.
+
+**Reveal.** The card now always waits `RunnerVisual.CrashPoseSeconds` (1.0s) before fading in over
+0.25s, where it used to wait 0.35s only when a crash cosmetic was firing — the crash pose always
+exists now. `CanvasGroup.interactable` and the "tap anywhere" hint both wait for the fade.
+
+**The one new risk, and its guard.** SHARE is the first button that stays *on* the result screen.
+The release that opens the Android chooser is the same `TouchPhase.Ended` `TouchTapInput` reports
+as a jump, so `RestartGate` would have queued a restart and started it the moment the player came
+back from the share sheet. RunHud now holds the run for 0.5s on a share tap (re-armed on regaining
+focus) through a new `HoldRun` seam wired in `GameBootstrap` to `RunSession.Frozen` — the same
+mechanism the pause menu uses: the session ticks input while frozen and returns before the restart
+check, so the tap is consumed and dropped. Every exit (`HideResult`, `Clear`, the timer) releases
+it, because a leaked hold would soft-lock the card.
+
+**Seams added.** `RunHud.Loadout` (`Func<CosmeticLoadout>`, wired to `SkinService.Effective`) and
+`RunHud.HoldRun` (`Action<bool>`), both set in `GameBootstrap`; `RunnerPreview.Visual`. The card's
+preview is built on the first result, parked by `HideResult` (the panel deactivates, so
+`RunnerPreview.OnDisable` stops its stage and camera — no GPU cost during a run) and destroyed by
+`Clear()`, which releases the RenderTexture rather than leaking one per run.
+
+**Verified.** `Unity -batchmode -projectPath C:\scratch\veyro-hud -runTests -testPlatform EditMode`
+(6000.5.9f1, scratch copy per CLAUDE.md gotcha 4, hashes diffed against the worktree before and
+after): **503/503 passed, 0 failed**. `SeasonIntegrationTests.CrashReveal…` was extended: both
+reveal paths now start hidden, and a `NewAllTimeBest` summary must show the badge reading
+`NEW BEST` where an ordinary one hides it. Note `-runTests` must NOT be combined with `-quit` —
+Unity exits before the tests run and writes no results file.
+
+**Needs a human device test** (OnePlus Nord 2 or any 20:9 phone) — exact steps:
+1. Crash a Free run. The world crash pose must hold for a beat before the card fades in; the "tap
+   anywhere" hint must appear only once the card is fully up.
+2. Check the card's margins top and bottom on the phone's aspect — the card is 880×1420 and should
+   clear the notch and the gesture bar with room to spare.
+3. Confirm the character on the card is wearing **exactly** what the run wore: change skin, hat and
+   back item in the locker, run, crash, compare. Drag the character — it should spin.
+4. Beat the all-time best: the gold **NEW BEST** pill must pop in after the fade, and the
+   `best today …` line must be absent. Beat only the daily best: **NEW DAILY BEST**.
+5. Tap **SHARE**. The chooser opens; cancel it with back. **The result card must still be on
+   screen** — if a new run has started, the hold regressed. Repeat while tapping SHARE twice
+   quickly.
+6. Tap **RUN AGAIN** immediately after returning from the share sheet: it must start a run and the
+   runner must not jump on its first frame.
+7. `SKINS & SHOP` and `QUIT TO MENU` must land on the menu without a run starting behind them.
+8. Own a crash-FX cosmetic (e.g. `confetti`) and crash: the burst should replay on the card's
+   character, not only in the world.
+
+## 2026-09-21 — T-024: challenge a friend — share sheet, deep links, landing page (feat-share-run)
+
+**What it does.** The result card's SHARE button now produces one line of text plus a link, hands
+it to the Android share sheet, and a phone that opens that link starts the *same track* as a Free
+run with the sender's score on the HUD.
+
+Exact text (free run, new personal best):
+
+```
+🏆 new personal best! I scored 4 210 in Veyro Run (1 240 m) — can you beat me? https://veyro.ferrabled.com/challenge/?s=987654&v=1&w=greybox&p=4210&m=free
+```
+
+Daily run, no record: `I scored 4 210 in Veyro Run on today's Daily Run (1 240 m) — can you beat
+me? …&m=daily&d=2026-09-21`. URL shape:
+`https://veyro.ferrabled.com/challenge/?s=<seed>&v=<contentVersion>&w=<worldId>&p=<score>&m=<daily|free>&d=<dayLabel>`
+— single-letter keys because chat apps truncate, values percent-encoded, `d` omitted for free runs.
+
+**The round trip, end to end.**
+
+1. `RunHud` (other session) calls `RunShare.Share(summary)` → `ChallengeMessage.Build` (engine-free,
+   Track assembly) → `ShareSheet.Send` → `Intent.ACTION_SEND` + `EXTRA_TEXT`/`EXTRA_SUBJECT` wrapped
+   in `Intent.createChooser`, started from `UnityPlayer.currentActivity` (still the accessor under
+   Unity 6 GameActivity). Plain `AndroidJavaObject` JNI — no package added. Editor/desktop: the text
+   goes to `GUIUtility.systemCopyBuffer` and the log. Nothing throws into the UI: every path is
+   caught, and a failed intent falls back to the clipboard.
+2. Someone taps the link. `Assets/Editor/AndroidChallengeLinks.cs` (an
+   `IPostGenerateGradleAndroidProject`, modelled on `AndroidLaunchModeFix`) has added two
+   intent-filters to `com.unity3d.player.UnityPlayerGameActivity`: `veyro://challenge` and
+   `https://veyro.ferrabled.com/challenge…` with `autoVerify="true"`. No committed manifest, no new
+   permission.
+3. `DeepLinks.Begin()` (from `GameBootstrap`) reads `Application.absoluteURL` for the cold start and
+   subscribes to `Application.deepLinkActivated` for the warm one, parses with
+   `ChallengeMessage.TryParse` and parks the result in `PendingChallenge`.
+4. `RunFlow.TryStartPendingChallenge` takes it **only at the menu** (never mid-run, never while the
+   camera picker is staging) and starts a tilt run: `_session.Mode = RunMode.Free` +
+   `RunSession.BeginChallenge(seed)` — the only RunSession change, a one-run seed override that
+   `StartRun` consumes and that is ignored outright in `RunMode.Daily`, so **a link can never
+   rewrite today's Daily Run**. `RunHud.SetChallenge(target)` (one new additive method, building its
+   own label) shows `CHALLENGE · beat 4 210`; `QuitToMenu` clears it.
+5. Everyone without the app lands on the new `site/public/challenge/` page: it reads the query
+   client-side, says "Beat 4 210", offers **Open in Veyro** (`veyro://challenge?` + the same query
+   verbatim, falling back to the Play listing after 1.5 s if the page is still visible) and a Play
+   button. Riso styling reused from the existing pages; script is external because the site's CSP is
+   `script-src 'self'`; `noindex`, no cookies, no analytics.
+
+**Verified:** EditMode, headless, in a scratch copy (`C:\scratch\veyro-share`, robocopy `/E`, Unity
+6000.5.9f1) — **503/503 pass, 0 failures**, of which **18/18** are the new
+`ChallengeMessageTests`: score/link in the text, daily vs free wording, the record flag, URL escaping
+of an awkward worldId (`park & ride/v2?x=1` → `w=park%20%26%20ride%2Fv2%3Fx%3D1` and back),
+seed→URL→`RngState()` round trips for both modes, the scheme and https forms parsing identically,
+refusal of non-challenge links (`veyro://shop?s=1`, no-seed, non-numeric seed), and the
+PendingChallenge take-once rule. One compile error was found and fixed on the way
+(`Application.deepLinkActivated` needs a void handler; `DeepLinks.Handle` returns bool). No APK was
+built — the owner builds.
+
+**Needs a human device test (two phones, or one phone twice).** Both phones need a build with this
+change; the website page must be deployed first (see below) for step 3.
+
+1. Play a run, crash, tap **SHARE** → the system chooser opens and the result card is still there
+   underneath (the `HoldRun` freeze). Check the text: score, `(… m)`, "Daily Run" only for daily
+   runs, the 🏆 line only on a new best.
+2. Send it to yourself. The link must be the whole `https://veyro.ferrabled.com/challenge/?s=…`.
+3. Open the link on the second phone → the landing page shows **Beat &lt;score&gt;** → tap **Open in
+   Veyro** → the game launches, the menu appears for a frame and a **FREE RUN** starts with
+   `CHALLENGE · beat <score>` under the mode line. Compare the first few obstacles with the sender's
+   run — same track, or the round trip is broken.
+4. Without the site (tests the app half alone), from Git Bash — note the inner single quotes, which
+   keep the device shell from eating `&`:
+   ```
+   MSYS_NO_PATHCONV=1 adb shell "am start -a android.intent.action.VIEW -d 'veyro://challenge?s=987654&v=1&w=greybox&p=4210&m=free'"
+   ```
+   Run it three ways: **cold** (`adb shell am force-stop com.ferrabled.veyro.run` first →
+   `absoluteURL` path), **warm at the menu** (`deepLinkActivated` → the run should start within a
+   frame), and **warm during a run** (nothing should happen until you quit to the menu, then the
+   challenge starts).
+5. `MSYS_NO_PATHCONV=1 adb logcat -d -s Unity` should show `[DeepLink] challenge <seed>/… score=…`
+   then `Run over. mode=Free … seed=<the same seed>`.
+6. **The Daily Run must be untouched:** after the challenge run, QUIT TO MENU and start a normal run
+   — the mode line must read `DAILY · <today>` and the seed in logcat must be the daily one.
+7. Per standing compliance rule 3 (the manifest changed): build the release APK and diff
+   `aapt2 dump permissions` + file size against the previous release. Expected: **identical
+   permissions** (INTERNET + CAMERA), size unchanged but for code.
+
+**Owner actions, neither blocking the code review:**
+
+- **Deploy the site** — `npx wrangler deploy` from `site/` — *before* any build with a SHARE button
+  reaches a tester, or shared links 404. Not deployed by this session, deliberately.
+- **`assetlinks.json`** with the Play *app signing* certificate SHA-256, so the https link opens the
+  app directly instead of the browser: **OPEN_QUESTIONS 20**, steps in `PLAY_CONSOLE_SETUP.md` §F.
+  Shipping without it is safe — the link goes through the web page, which then opens the app via the
+  custom scheme.
+- Privacy policy: add the sharing section (`SHARE_COMPLIANCE.md` §8), bump both copies, redeploy.
+  Listing may mention "challenge a friend" only in/after the release that ships it.
+
+**Known, deliberate:** RUN AGAIN after a challenge is an ordinary free run with a fresh seed (the
+override is one-shot) while the `CHALLENGE · beat …` line stays up as the goal; the challenge run is
+always tilt+touch (a link must not open with a camera-permission dialog); a challenge scores on the
+free/all-time board and stamps no day, exactly like any other free run.
+
 ## 2026-09-21 — PR #11 review fix: a reroll can no longer be undone by an older profile read
 
 `_profileRequest` ordered `LoadProfile` GETs against each other, but nothing else. A reroll is a

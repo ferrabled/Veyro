@@ -1,54 +1,149 @@
 using System;
+using MotionRunner.Art;
+using MotionRunner.Commerce;
 using MotionRunner.Core;
+using MotionRunner.Menu;
 using MotionRunner.Track;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace MotionRunner.Gameplay
 {
-    /// Live readout plus the crash/result screen (T-005), built entirely from code so there is
+    /// Live readout plus the crash/result card (T-005), built entirely from code so there is
     /// no authored scene or prefab content to merge (CLAUDE.md rule 1). The UGUI plumbing itself
     /// lives in RuntimeUi, shared with every other screen.
+    ///
+    /// ---- the result card -----------------------------------------------------------------
+    ///
+    /// The card is the thing a player screenshots, so it is laid out as a result card and not as
+    /// a readout: mode and scheme as small metadata, the score, one badge OR one "what to beat"
+    /// line, the player's actual runner on a stage, three stat tiles, and the four ways on.
+    ///
+    /// It borrows the menu's own furniture deliberately - rounded CosmeticPanel surfaces,
+    /// MenuTheme's palette and type sizes, the locker's teal-to-cream preview wash behind the
+    /// character - because a share card that looks like a different app than the locker it
+    /// advertises is worth less than one that does not.
+    ///
+    /// What it deliberately does NOT show: the multiline bests block the old screen carried. The
+    /// bests are one quiet line, and only while they are still something to chase.
     public sealed class RunHud : MonoBehaviour
     {
-        static readonly Color TextColor = Menu.MenuTheme.Text;
-        static readonly Color DimColor = new Color(0.04f, 0.05f, 0.09f, 0.82f);
-        static readonly Color PanelColor = Menu.MenuTheme.Card;
-        static readonly Color ButtonColor = Menu.MenuTheme.Accent;
-        static readonly Color SecondaryColor = Menu.MenuTheme.Slot;
-        static readonly Color ComboColor = Menu.MenuTheme.Gold;
-        static readonly Color ModeColor = Menu.MenuTheme.Dim;
+        static readonly Color TextColor = MenuTheme.Text;
+
+        /// The scrim behind the card. The park's own ink rather than the old blue-black: the card
+        /// is paper laid on the game's dark, not on a debug overlay.
+        static readonly Color DimColor =
+            new Color(ParkTheme.Ink.r, ParkTheme.Ink.g, ParkTheme.Ink.b, 0.86f);
+
+        static readonly Color ComboColor = MenuTheme.Gold;
+        static readonly Color ModeColor = MenuTheme.Dim;
+
+        // ---- card geometry, in the 1080x1920 design space (RuntimeUi.ReferenceResolution) ----
+        //
+        // 880 is the widest the card may be. RuntimeUi.PortraitCanvas scales at match 0.5, so a
+        // 20:9 phone leaves about 966 design units of WIDTH and a 21:9 one about 943 - the card
+        // therefore keeps ~30px of air each side on the tallest phone we target and 100 on a
+        // 16:9 one. 1420 tall centres inside 1920 with 250 clear above and below, which is where
+        // the tap hint and any notch live.
+        const float CardWidth = 880f;
+        const float CardHeight = 1420f;
+        const float CardPad = 40f;
+        const float CardRadius = 44f;
+
+        /// The card fades in over this, once the world's crash pose has had its turn.
+        const float FadeSeconds = 0.25f;
+
+        /// Crash to fully-visible card. RunSession locks the tap-anywhere restart out for this
+        /// long, so a tap during the crash pose cannot skip a card nobody has seen yet.
+        public const float RevealSeconds = RunnerVisual.CrashPoseSeconds + FadeSeconds;
+
+        /// The NEW BEST pill's pop, on unscaled time - the result screen can be up while the
+        /// world is still at timeScale 0.
+        const float BadgePopSeconds = 0.34f;
+        const float BadgeStartScale = 0.55f;
+
+        /// How long the run stays held after a SHARE tap. See HoldRun.
+        const float ShareHoldSeconds = 0.5f;
 
         /// Raised by the restart button. RunSession also accepts a tap anywhere, because a
         /// button is a nicety and being able to start the next run is not.
         public event Action RestartRequested;
 
-        /// Raised by the SHOP button on the result screen - the store entry point (T-020).
+        /// Raised by the SKINS & SHOP link on the result card - the store entry point (T-020).
         /// RunFlow owns what opens; the HUD only announces the tap. It leaves the run for the
         /// menu's shop tab, so this behaves exactly like QuitRequested with a different landing
         /// place - which is what makes it safe against the tap that fired it also restarting the
-        /// run behind it (see the note on the Quit button below).
+        /// run behind it (see the note on the Quit link below).
         public event Action StoreRequested;
 
         /// Raised by the pause button. RunFlow owns what pausing means; the HUD only announces
         /// the tap, exactly like the store button.
         public event Action PauseRequested;
 
-        /// Raised by the QUIT TO MENU button on the result screen. Same shape again: RunFlow
-        /// owns what leaving costs, the HUD only announces the tap.
+        /// Raised by the QUIT TO MENU link on the result card. Same shape again: RunFlow owns
+        /// what leaving costs, the HUD only announces the tap.
         public event Action QuitRequested;
+
+        /// What the card's character wears. Set by GameBootstrap to the live SkinService, so the
+        /// runner on the card is the runner the player just ran with, hat and back item and all.
+        /// Null in a test, or in any host with no commerce layer: the card then shows the default
+        /// runner rather than no runner.
+        public Func<CosmeticLoadout> Loadout;
+
+        /// Holds / releases the run loop. Set by GameBootstrap to RunSession.Frozen.
+        ///
+        /// It exists for exactly one caller: SHARE. Every other way off this card is already safe
+        /// against its own tap - RUN AGAIN wants a restart, and SKINS & SHOP and QUIT TO MENU go
+        /// through RunFlow.QuitToMenu -> RunSession.Stop(), which clears the pending restart and
+        /// disables the session in the same frame the button fires (the 27 Aug store-tap bug).
+        ///
+        /// SHARE is the first button that STAYS on the result screen, and that is what makes it
+        /// different. The release that opens the share sheet is the same TouchPhase.Ended that
+        /// TouchTapInput reports as a jump, so RunSession's "tap anywhere" path (RestartGate, fed
+        /// by Input.IsJumpPressed) would queue a restart on that very frame and start it on the
+        /// next one the game gets - i.e. the moment the player comes back from the share sheet,
+        /// the card they were sharing is gone and a run they never asked for is under way.
+        /// ShareSheet.Send hands the app to an Android chooser activity, so "the next frame" is
+        /// after the round trip, which is precisely the worst moment for it.
+        ///
+        /// Freezing is the fix, and it is the mechanism the pause menu already uses: RunSession
+        /// ticks input while Frozen and returns BEFORE the restart check, so the tap is consumed
+        /// and dropped. RunSession's DefaultExecutionOrder(100) runs it after the EventSystem, so
+        /// a freeze set inside this click handler lands on the frame of the tap that caused it.
+        /// The hold releases on a short unscaled timer, re-armed whenever the app regains focus
+        /// (the sheet takes focus away), and unconditionally from HideResult/Clear - a leaked
+        /// hold would soft-lock the card, so every exit releases it.
+        public Action<bool> HoldRun;
 
         Text _score;
         Text _coins;
         Text _combo;
         Text _mode;
+
         Text _resultScore;
+        Text _resultMode;
+        Text _resultScheme;
         Text _resultBest;
         Text _resultXp;
+        Text _resultDistance;
+        Text _resultCoins;
+        Text _resultCombo;
+        Text _badgeText;
+        GameObject _badge;
+        RectTransform _badgeRect;
+        GameObject _hint;
+        RectTransform _stage;
+        RunnerPreview _preview;
+
         GameObject _resultPanel;
         CanvasGroup _resultCanvas;
         float _resultRevealAt;
         GameObject _pauseButton;
+
+        /// The run the card is showing - SHARE's whole payload (T-024).
+        RunSummary _summary;
+
+        float _shareHoldUntil;
 
         int _shownScore = -1;
         int _shownCoins = -1;
@@ -94,41 +189,180 @@ namespace MotionRunner.Gameplay
                          + " · " + SchemeName(scheme);
         }
 
+        /// The season-XP line, filled in asynchronously by RunSession once the submission lands.
+        /// A caption on the card rather than a headline: it is news about a background job.
         public void SetXpStatus(string status) { if(_resultXp!=null) _resultXp.text=status; }
+
+        /// Built lazily by SetChallenge, and only for challenge runs - see there.
+        Text _challenge;
+
+        /// The one line a challenge run adds to the HUD (T-024): the score the link asked the
+        /// player to beat, under the mode line. `target` of 0 or less clears it.
+        ///
+        /// Self-contained on purpose - it builds its own label the first time it is asked for
+        /// one, so no other HUD method has to know it exists and the ordinary run's canvas is
+        /// byte-for-byte what it always was.
+        public void SetChallenge(int target)
+        {
+            if (target <= 0)
+            {
+                if (_challenge != null) _challenge.text = string.Empty;
+                return;
+            }
+
+            if (_challenge == null)
+                _challenge = RuntimeUi.Label("Challenge", transform,
+                    new Vector2(0f, 1f), new Vector2(0.75f, 1f),
+                    new Vector2(36f, -238f), new Vector2(0f, -192f),
+                    32, TextAnchor.UpperLeft, ComboColor);
+
+            _challenge.text = "CHALLENGE · beat " + ChallengeMessage.FormatScore(target);
+        }
 
         public void ShowResult(in RunSummary summary, bool showCrashEffect=false)
         {
-            _resultScore.text = summary.Score.ToString();
+            _summary = summary;
 
-            // The bests are the active scheme's board and say so: a camera personal best is not
-            // a claim about tilt runs (owner call - the two are separate games).
-            string scheme = SchemeName(summary.Scheme);
-            string bestLine = summary.IsDaily
-                ? "DAILY · " + summary.DailyLabel + " · " + scheme +
-                  "\nbest today " + summary.DailyBest + "   all-time " + summary.AllTimeBest
-                : "all-time best " + summary.AllTimeBest + " · " + scheme;
+            // Grouped the way the share text groups it (ChallengeMessage.FormatScore): "4 210",
+            // never "4,210" - one number format across the card and the message it produces.
+            _resultScore.text = ChallengeMessage.FormatScore(summary.Score);
+            _resultMode.text = summary.IsDaily
+                ? "DAILY · " + (string.IsNullOrEmpty(summary.DailyLabel) ? "TODAY" : summary.DailyLabel)
+                : "FREE RUN";
+            _resultScheme.text = SchemeName(summary.Scheme);
 
-            _resultBest.text = bestLine + "\n" + summary.Distance + "m   coins " + summary.Coins +
-                               "   best combo " + summary.BestCombo;
-            _resultRevealAt=Time.unscaledTime+(showCrashEffect ? 0.35f:0);
-            _resultCanvas.alpha=showCrashEffect ? 0:1;
-            _resultCanvas.interactable=!showCrashEffect;
+            // One of the two, never both: a run that set a record does not need telling what the
+            // record was, and a run that did not needs to know what to beat. The best quoted is
+            // the ACTIVE SCHEME's board - a camera personal best is not a claim about tilt runs
+            // (owner call: the two are separate games) - which the scheme tag above says.
+            bool record = summary.IsNewRecord;
+            _badge.SetActive(record);
+            _resultBest.gameObject.SetActive(!record);
+            if (record)
+                _badgeText.text = summary.NewAllTimeBest ? "NEW BEST" : "NEW DAILY BEST";
+            else
+                _resultBest.text = summary.IsDaily
+                    ? "best today " + ChallengeMessage.FormatScore(summary.DailyBest)
+                    : "all-time best " + ChallengeMessage.FormatScore(summary.AllTimeBest);
+
+            _resultDistance.text = ChallengeMessage.FormatScore(summary.Distance) + "m";
+            _resultCoins.text = summary.Coins.ToString();
+            _resultCombo.text = summary.BestCombo.ToString();
+
+            // The world's crash pose always plays now, so the card always waits it out - the old
+            // 0.35s applied only when a crash cosmetic was firing. showCrashEffect no longer
+            // gates the delay; it says the player OWNS a crash burst, which the card replays on
+            // its own character so the cosmetic they paid for is in the screenshot.
+            _badgeRect.localScale = Vector3.one * BadgeStartScale;
+            _resultRevealAt = Time.unscaledTime + RunnerVisual.CrashPoseSeconds;
+            _resultCanvas.alpha = 0f;
+            _resultCanvas.interactable = false;
             _resultPanel.SetActive(true);
+            _hint.SetActive(false);
             _pauseButton.SetActive(false); // nothing to pause once the run is over
+
+            ShowCharacter(summary.IsNewRecord, showCrashEffect);
         }
+
+        /// The card's centrepiece: the player's own runner, live, wearing what it ran in.
+        ///
+        /// Built on the FIRST result and kept after that. The preview owns a 768x768 RenderTexture
+        /// and an offscreen camera, so it must not be rendering during a run: it lives under the
+        /// result panel, which HideResult deactivates, and RunnerPreview.OnDisable parks its whole
+        /// stage with it. Clear() - the abandoned-run path into the menu, which builds previews of
+        /// its own - destroys it outright, which is what releases the texture instead of leaving
+        /// one behind per run.
+        void ShowCharacter(bool celebrate, bool crashEffect)
+        {
+            if (_stage == null) return;
+            // Defensive: the preview instantiates character art and allocates a RenderTexture.
+            // A host with no graphics device (or no art) must still get a result card - losing
+            // the character is a worse card, losing the card is a lost run. Nothing here may
+            // throw out of RunSession.Crash, and one failed card does not condemn the next one.
+            try
+            {
+                if (_preview == null) _preview = RunnerPreview.Create(_stage);
+                _preview.Show(Look());
+
+                // Immediate: the preview's framing normally eases in over a few frames, and the
+                // card does not have a few frames before somebody screenshots it.
+                if (celebrate) _preview.Focus(CosmeticSlot.Skin, true);
+                else _preview.FrameFallen(); // the defeat pose ends on the floor - frame the floor
+                if (_preview.Visual != null) _preview.Visual.PlayResultPose(celebrate);
+                if (crashEffect) _preview.Burst();
+            }
+            catch (Exception error)
+            {
+                Debug.LogWarning("RunHud: result character unavailable - " + error.Message);
+            }
+        }
+
+        CosmeticLoadout Look() => (Loadout != null ? Loadout() : null) ?? new CosmeticLoadout();
 
         static string SchemeName(ControlScheme scheme) =>
             scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
 
         void Update()
         {
-            if(_resultCanvas==null || !_resultPanel.activeSelf || _resultCanvas.alpha>=1)return;
-            _resultCanvas.alpha=Mathf.Clamp01((Time.unscaledTime-_resultRevealAt)/0.18f);
-            _resultCanvas.interactable=_resultCanvas.alpha>=1;
+            TickShareHold();
+            if (_resultCanvas == null || !_resultPanel.activeSelf) return;
+
+            float alpha = Mathf.Clamp01((Time.unscaledTime - _resultRevealAt) / FadeSeconds);
+            _resultCanvas.alpha = alpha;
+
+            // Interactable only once the card is fully up, and the tap hint with it: a control
+            // the player cannot see is a control they cannot have meant to use.
+            bool visible = alpha >= 1f;
+            _resultCanvas.interactable = visible;
+            if (_hint.activeSelf != visible) _hint.SetActive(visible);
+
+            if (!_badge.activeSelf) return;
+            float pop = Mathf.Clamp01((Time.unscaledTime - _resultRevealAt - FadeSeconds) / BadgePopSeconds);
+            _badgeRect.localScale = Vector3.one * Mathf.LerpUnclamped(BadgeStartScale, 1f, Overshoot(pop));
+        }
+
+        /// Ease-out-back: lands on 1 having gone past it, which is what reads as a stamp rather
+        /// than as a fade.
+        static float Overshoot(float t)
+        {
+            float back = t - 1f;
+            return 1f + 2.70158f * back * back * back + 1.70158f * back * back;
+        }
+
+        // ---- the share hold (see HoldRun) ----
+
+        void ShareTapped()
+        {
+            // Held BEFORE the sheet opens: ShareSheet.Send may hand the app straight to Android,
+            // and the frame this runs on is the one that must not reach the restart check.
+            _shareHoldUntil = Time.unscaledTime + ShareHoldSeconds;
+            HoldRun?.Invoke(true);
+            RunShare.Share(_summary);
+        }
+
+        void TickShareHold()
+        {
+            if (_shareHoldUntil <= 0f || Time.unscaledTime < _shareHoldUntil) return;
+            ReleaseShareHold();
+        }
+
+        void ReleaseShareHold()
+        {
+            if (_shareHoldUntil <= 0f) return;
+            _shareHoldUntil = 0f;
+            HoldRun?.Invoke(false);
+        }
+
+        /// The share sheet takes focus; coming back re-arms the hold for one more short window, so
+        /// whatever the platform replays on the way back is spent against a frozen session too.
+        void OnApplicationFocus(bool focused)
+        {
+            if (focused && _shareHoldUntil > 0f) _shareHoldUntil = Time.unscaledTime + ShareHoldSeconds;
         }
 
         public void HideResult()
         {
+            ReleaseShareHold();
             _resultCanvas.alpha=1;_resultCanvas.interactable=true;
             _resultPanel.SetActive(false);
             SetXpStatus("");
@@ -139,10 +373,13 @@ namespace MotionRunner.Gameplay
         }
 
         /// Wipes the readout when a run is abandoned. The mode menu that follows covers the
-        /// screen, but nothing behind it should still be showing a run that no longer exists.
+        /// screen, but nothing behind it should still be showing a run that no longer exists -
+        /// including the card's character, whose RenderTexture the menu's own previews should not
+        /// have to share the frame with.
         public void Clear()
         {
             HideResult();
+            DisposePreview();
             _pauseButton.SetActive(false);
             _score.text = string.Empty;
             _coins.text = string.Empty;
@@ -150,10 +387,18 @@ namespace MotionRunner.Gameplay
             _mode.text = string.Empty;
         }
 
+        void DisposePreview()
+        {
+            if (_preview == null) return;
+            var go = _preview.gameObject;
+            _preview = null;
+            if (Application.isPlaying) Destroy(go); else DestroyImmediate(go);
+        }
+
         void BuildCanvas()
         {
             RuntimeUi.PortraitCanvas(gameObject);
-            var backing = RuntimeUi.Panel("Score backing", transform, Menu.MenuTheme.Card);
+            var backing = RuntimeUi.Panel("Score backing", transform, MenuTheme.Card);
             RuntimeUi.Stretch(backing.rectTransform, new Vector2(0,1), Vector2.one,
                 new Vector2(0,-216), Vector2.zero);
             backing.raycastTarget = false;
@@ -179,7 +424,7 @@ namespace MotionRunner.Gameplay
                 34, TextAnchor.UpperLeft, ModeColor);
 
             BuildPauseButton();
-            BuildResultPanel();
+            BuildResultCard();
             _resultPanel.SetActive(false);
         }
 
@@ -191,7 +436,7 @@ namespace MotionRunner.Gameplay
         {
             _pauseButton = RuntimeUi.TextButton("Pause", transform,
                 new Vector2(0f, 0f), new Vector2(120f, 120f), new Vector2(140f, 140f),
-                Menu.MenuTheme.Card,
+                MenuTheme.Card,
                 "II", 52, TextColor,
                 () => PauseRequested?.Invoke()).gameObject;
 
@@ -200,52 +445,158 @@ namespace MotionRunner.Gameplay
             _pauseButton.SetActive(false);
         }
 
-        void BuildResultPanel()
+        // ---- the result card ----
+
+        void BuildResultCard()
         {
             _resultPanel = RuntimeUi.FullScreenPanel("Result", transform, DimColor);
-            _resultCanvas=_resultPanel.AddComponent<CanvasGroup>();
+            _resultCanvas = _resultPanel.AddComponent<CanvasGroup>();
 
-            // 1120 tall rather than 920: the buttons below are the pause menu's stack, and QUIT
-            // TO MENU is the third row it grew by. The card grew by exactly what the stack did
-            // (200), so the stats block keeps the 50px of clearance above the buttons it had
-            // when there were two of them.
-            var card = RuntimeUi.Card("Card", _resultPanel.transform, new Vector2(760f, 1120f), PanelColor);
+            RuntimeUi.Element("Card", _resultPanel.transform, out var card);
+            card.anchorMin = card.anchorMax = new Vector2(0.5f, 0.5f);
+            card.sizeDelta = new Vector2(CardWidth, CardHeight);
+            var surface = CosmeticUi.Surface(card, MenuTheme.ItemCard, CardRadius);
+            surface.Gradient = true;
+            surface.Bottom = MenuTheme.Card;
+            surface.raycastTarget = false;
 
-            RuntimeUi.Label("Title", card.transform,
+            BuildMasthead(card);
+            BuildHeadline(card);
+            BuildStage(card);
+            BuildStats(card);
+
+            _resultXp = Band("SeasonXp", card, 1092f, 42f, 24, MenuTheme.Faint);
+
+            BuildButtons(card);
+
+            // Anchored to the screen, not the card: inside the card it would sit under the
+            // buttons, which is exactly where it landed on the first device build. Hidden until
+            // the card has finished fading in - see Update.
+            var hint = RuntimeUi.Label("Hint", _resultPanel.transform,
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(24f, 72f), new Vector2(-24f, 132f),
+                34, TextAnchor.LowerCenter, ParkTheme.Paper);
+            hint.text = "tap anywhere or press space";
+            _hint = hint.gameObject;
+        }
+
+        /// Mode left, scheme right, both small and dim: metadata on a card, not a headline. The
+        /// wordmark lives down on the character stage instead (BuildStage), the way a photo is
+        /// signed rather than titled.
+        void BuildMasthead(RectTransform card)
+        {
+            _resultMode = RuntimeUi.Label("ResultMode", card,
+                new Vector2(0f, 1f), new Vector2(0.62f, 1f),
+                new Vector2(CardPad, -68f), new Vector2(0f, -26f),
+                26, TextAnchor.MiddleLeft, MenuTheme.Dim);
+
+            _resultScheme = RuntimeUi.Label("ResultScheme", card,
+                new Vector2(0.62f, 1f), new Vector2(1f, 1f),
+                new Vector2(0f, -68f), new Vector2(-CardPad, -26f),
+                26, TextAnchor.MiddleRight, MenuTheme.Faint);
+        }
+
+        /// SCORE, the number, then either the badge or the line that says what to beat. Both use
+        /// the same band, so the card's rhythm does not change with the result.
+        void BuildHeadline(RectTransform card)
+        {
+            Band("ScoreLabel", card, 78f, 34f, 26, MenuTheme.Faint).text = "SCORE";
+
+            _resultScore = Band("ResultScore", card, 112f, 156f, 132, MenuTheme.Text);
+            _resultScore.fontStyle = FontStyle.Bold;
+
+            RuntimeUi.Element("Badge", card, out _badgeRect);
+            _badgeRect.anchorMin = _badgeRect.anchorMax = new Vector2(0.5f, 1f);
+            _badgeRect.anchoredPosition = new Vector2(0f, -320f);
+            _badgeRect.sizeDelta = new Vector2(460f, 72f);
+            CosmeticUi.Surface(_badgeRect, MenuTheme.Gold, 36f).raycastTarget = false;
+            _badgeText = RuntimeUi.Label("Label", _badgeRect,
+                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
+                34, TextAnchor.MiddleCenter, MenuTheme.OnAccent);
+            _badgeText.fontStyle = FontStyle.Bold;
+            _badge = _badgeRect.gameObject;
+            _badge.SetActive(false);
+
+            _resultBest = Band("ResultBest", card, 292f, 60f, 28, MenuTheme.Faint);
+        }
+
+        /// The character, on the locker's own teal-to-cream wash so the two screens read as one
+        /// product. RunnerPreview brings its drag handler with it, so the card can be spun to a
+        /// better angle before it is shared.
+        void BuildStage(RectTransform card)
+        {
+            RuntimeUi.Element("Stage", card, out _stage);
+            RuntimeUi.Stretch(_stage, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(CardPad, -908f), new Vector2(-CardPad, -372f));
+            var wash = CosmeticUi.Surface(_stage, MenuTheme.PreviewTop, 36f);
+            wash.Gradient = true;
+            wash.Bottom = MenuTheme.PreviewBottom;
+            wash.raycastTarget = false;
+
+            // The signature. Small, cornered, lowercase: enough that a screenshot says which game
+            // this is without the card turning into an advert.
+            RuntimeUi.Label("Wordmark", _stage,
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(20f, 14f), new Vector2(-20f, 54f),
+                26, TextAnchor.LowerRight, MenuTheme.Faint).text = "veyro";
+        }
+
+        /// Three tiles, one row, nothing else: distance, coins, best combo. The old screen packed
+        /// the same three numbers PLUS both bests and the mode into one wrapped string, which is
+        /// the wall of text this card exists to replace.
+        void BuildStats(RectTransform card)
+        {
+            RuntimeUi.Element("Stats", card, out var row);
+            RuntimeUi.Stretch(row, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(CardPad, -1076f), new Vector2(-CardPad, -926f));
+
+            _resultDistance = BuildTile(row, 0, "DISTANCE");
+            _resultCoins = BuildTile(row, 1, "COINS");
+            _resultCombo = BuildTile(row, 2, "BEST COMBO");
+        }
+
+        static Text BuildTile(RectTransform row, int index, string caption)
+        {
+            RuntimeUi.Element("Tile" + index, row, out var tile);
+            RuntimeUi.Stretch(tile, new Vector2(index / 3f, 0f), new Vector2((index + 1) / 3f, 1f),
+                new Vector2(7f, 0f), new Vector2(-7f, 0f));
+            CosmeticUi.Surface(tile, MenuTheme.Slot, 22f).raycastTarget = false;
+
+            var value = RuntimeUi.Label("Value", tile,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(24f, -140f), new Vector2(-24f, -48f),
-                56, TextAnchor.UpperCenter, TextColor).text = "RUN OVER";
+                new Vector2(4f, -92f), new Vector2(-4f, -16f),
+                52, TextAnchor.MiddleCenter, MenuTheme.Text);
+            value.fontStyle = FontStyle.Bold;
 
-            _resultScore = RuntimeUi.Label("ResultScore", card.transform,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(24f, -350f), new Vector2(-24f, -160f),
-                140, TextAnchor.UpperCenter, TextColor);
+            RuntimeUi.Label("Caption", tile,
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(4f, 18f), new Vector2(-4f, 62f),
+                24, TextAnchor.MiddleCenter, MenuTheme.Faint).text = caption;
+            return value;
+        }
 
-            _resultBest = RuntimeUi.Label("ResultBest", card.transform,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(24f, -570f), new Vector2(-24f, -355f),
-                38, TextAnchor.UpperCenter, TextColor);
-
-            _resultXp=RuntimeUi.Label("SeasonXp",card.transform,new Vector2(0,1),Vector2.one,
-                new Vector2(24,-613),new Vector2(-24,-543),26,TextAnchor.MiddleCenter,Menu.MenuTheme.Dim);
-
-            // One primary and two secondaries, at the pause menu's exact sizes and y positions
-            // (520x140 at 430, 480x110 at 270 and 130): the two screens offer the same kind of
-            // choice, so the thumb finds RUN AGAIN where it finds RESUME and QUIT TO MENU where
-            // it already is.
-            RuntimeUi.TextButton("Restart", card.transform,
-                new Vector2(0.5f, 0f), new Vector2(0f, 430f), new Vector2(520f, 140f),
-                ButtonColor, "RUN AGAIN", 52, Menu.MenuTheme.OnAccent,
+        /// One primary, one share, two links. RUN AGAIN keeps the pause menu's weight and colour
+        /// so the thumb finds it where it finds RESUME; SHARE sits beside it because the card is
+        /// the thing worth sharing and a share button below the fold is a share that never
+        /// happens. The two ways OFF the card are text links: they are the rare choice, and the
+        /// card breathes better without three stacked slabs under the character.
+        void BuildButtons(RectTransform card)
+        {
+            CardButton("Restart", card, new Vector2(-142f, 200f), new Vector2(516f, 120f),
+                MenuTheme.Accent, "RUN AGAIN", 50, MenuTheme.OnAccent,
                 () => RestartRequested?.Invoke());
 
-            // Secondary on purpose: RUN AGAIN keeps the primary colour and size, the store is
-            // one visible tap away from every crash - which is what a judge needs (§6.3).
-            RuntimeUi.TextButton("Skins", card.transform,
-                new Vector2(0.5f, 0f), new Vector2(0f, 270f), new Vector2(480f, 110f),
-                SecondaryColor, "SKINS & SHOP", 42, TextColor,
+            // SHARE stays ON the card, which is exactly what makes it the one button here that
+            // needs the run held - see HoldRun.
+            CardButton("Share", card, new Vector2(266f, 200f), new Vector2(268f, 120f),
+                MenuTheme.Slot, "SHARE", 40, MenuTheme.Text, ShareTapped);
+
+            // Secondary on purpose: the store stays one visible tap away from every crash - which
+            // is what a judge needs (§6.3) - without competing with the next run.
+            CardLink("Skins", card, new Vector2(-206f, 78f), "SKINS & SHOP",
                 () => StoreRequested?.Invoke());
 
-            // Leaving is a button here for the reason it is one on the pause menu: back is
+            // Leaving is a link here for the reason it is a button on the pause menu: back is
             // otherwise the only way off this card that is not another run, and back is not
             // something a player is taught.
             //
@@ -254,19 +605,61 @@ namespace MotionRunner.Gameplay
             // RunSession.Stop(), which nulls Input, clears the pending restart and disables the
             // session - and RunSession's DefaultExecutionOrder(100) puts all of that strictly
             // before the Update that would otherwise have read this same TouchPhase.Ended as a
-            // jump (the 27 Aug store-tap bug). SKINS & SHOP above now takes the same route, which
-            // is why it stopped needing a guard of its own too.
-            RuntimeUi.TextButton("Quit", card.transform,
-                new Vector2(0.5f, 0f), new Vector2(0f, 130f), new Vector2(480f, 110f),
-                SecondaryColor, "QUIT TO MENU", 42, TextColor,
+            // jump (the 27 Aug store-tap bug). SKINS & SHOP above takes the same route.
+            CardLink("Quit", card, new Vector2(206f, 78f), "QUIT TO MENU",
                 () => QuitRequested?.Invoke());
+        }
 
-            // Anchored to the screen, not the card: inside the card it would sit under the
-            // button, which is exactly where it landed on the first device build.
-            RuntimeUi.Label("Hint", _resultPanel.transform,
-                new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(24f, 72f), new Vector2(-24f, 132f),
-                34, TextAnchor.LowerCenter, Art.ParkTheme.Paper).text = "tap anywhere or press space";
+        /// A rounded, filled button placed from the BOTTOM of the card, which is the edge the
+        /// thumb measures from.
+        static Button CardButton(string name, RectTransform card, Vector2 position, Vector2 size,
+            Color fill, string label, int fontSize, Color labelColor, Action onTap)
+        {
+            RuntimeUi.Element(name, card, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+
+            var surface = CosmeticUi.Surface(rect, fill, size.y * 0.32f);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = surface;
+            button.onClick.AddListener(() => onTap());
+
+            var text = RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, fontSize, TextAnchor.MiddleCenter, labelColor);
+            text.text = label;
+            text.fontStyle = FontStyle.Bold;
+            return button;
+        }
+
+        /// A text-only tap target, the shape the profile tab's rows already use: the label is the
+        /// graphic, so the whole rect takes the tap without a slab behind it.
+        static Button CardLink(string name, RectTransform card, Vector2 position, string label, Action onTap)
+        {
+            RuntimeUi.Element(name, card, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(388f, 72f);
+
+            var text = RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 32, TextAnchor.MiddleCenter, MenuTheme.Dim);
+            text.text = label;
+            text.raycastTarget = true;
+
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = text;
+            button.onClick.AddListener(() => onTap());
+            return button;
+        }
+
+        /// A full-width line of the card, measured down from its top edge - the card's one layout
+        /// idiom, so a band can be moved by changing one number.
+        static Text Band(string name, RectTransform card, float top, float height, int fontSize, Color color)
+        {
+            return RuntimeUi.Label(name, card,
+                new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(CardPad, -top - height), new Vector2(-CardPad, -top),
+                fontSize, TextAnchor.MiddleCenter, color);
         }
     }
 }

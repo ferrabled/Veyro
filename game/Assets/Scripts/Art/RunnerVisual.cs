@@ -22,6 +22,7 @@ namespace MotionRunner.Art
         float _dodgeRemaining;
         int _moveDirection;
         string _dodge;
+        bool _crashed;
 
         public static RunnerVisual Create(Transform parent)
         {
@@ -67,21 +68,50 @@ namespace MotionRunner.Art
             _cosmetics.Apply(loadout,_animation,_outfit,_rig);
         }
         public bool HasCrashEffect => _cosmetics!=null && _cosmetics.HasCrashEffect;
-        public void Crash() => _cosmetics?.Crash();
+        /// The run just ended against an obstacle: the crash cosmetic fires and the runner takes
+        /// the crash pose - stopped dead against a wall, or tripping over a hurdle. The clips do
+        /// not loop and hold their last frame, and Step is ignored until ResetPose, so nothing
+        /// can slide the runner back into the run cycle while the card is up.
+        public void Crash(CrashKind crash)
+        {
+            PlayCrashEffect();
+            _crashed=true;
+            _dodgeRemaining=0;
+            if(_model!=null) _model.localRotation=Quaternion.identity;
+            Play(crash==CrashKind.WallSlam ? "crashWall" : "crashTrip", 0.05f);
+        }
+
+        /// How long the world crash pose needs on screen before the result card may cover it.
+        public const float CrashPoseSeconds = 1.0f;
+
+        /// The result card's character pose: a celebration when the run was a new record, a
+        /// defeat (falls to the ground) otherwise. Loops or holds its last frame until ResetPose.
+        public void PlayResultPose(bool celebrate)
+        {
+            _crashed=true;
+            if(_model!=null) _model.localRotation=Quaternion.identity;
+            _playing=null; // A fresh pose every time the card opens, even twice in a row.
+            Play(celebrate ? "celebrate" : "defeat", 0.15f);
+        }
+
+        /// Only the crash cosmetic (confetti etc.), no pose change - the locker preview's replay.
+        public void PlayCrashEffect() => _cosmetics?.Crash();
         public void ResetPose()
         {
             _cosmetics?.ResetEffects();
+            _crashed=false;
             _previousX=transform.position.x;
             _dodgeRemaining=0;
             _moveDirection=0;
             if(_model!=null) _model.localRotation=Quaternion.identity;
+            _playing=null;
             Play("idle");
             UpdateShadow();
         }
 
         public void Step(float deltaTime, bool airborne)
         {
-            if(deltaTime<=0) return;
+            if(deltaTime<=0 || _crashed) return;
             float velocity=(transform.position.x-_previousX)/deltaTime;
             _previousX=transform.position.x;
             int direction=Mathf.Abs(velocity)>0.3f ? (velocity>0 ? 1 : -1) : 0;
@@ -109,11 +139,15 @@ namespace MotionRunner.Art
             _shadow.localScale=new Vector3(0.60f*scale*PresentationScale,0.42f*scale*PresentationScale,1);
         }
 
-        void Play(string clip)
+        void Play(string clip, float fade=-1)
         {
             if(_animation==null || _playing==clip) return;
+            // A controller built before the crash/result clips were imported has no such state;
+            // the runner then simply keeps its current pose rather than logging every frame.
+            if(!_animation.HasState(0,Animator.StringToHash(clip))) return;
             _playing=clip;
-            _animation.CrossFadeInFixedTime(clip,clip.StartsWith("dodge") ? 0.035f : 0.10f,0,0);
+            if(fade<0) fade=clip.StartsWith("dodge") ? 0.035f : 0.10f;
+            _animation.CrossFadeInFixedTime(clip,fade,0,0);
         }
 
         void OnDestroy()

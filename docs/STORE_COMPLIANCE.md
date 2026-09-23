@@ -200,6 +200,40 @@ Use this table together with existing RevenueCat/OneSignal/Supabase declarations
   login note, Data safety adds account identifiers, Apple build must offer Sign in with
   Apple (guideline 4.8) the moment Google login exists on iOS.
 
+### T-024 — Share a run / challenge links (21 Sep 2026, feat/share-run)
+
+The result card's SHARE button opens the **system share sheet** (`Intent.ACTION_SEND` +
+`Intent.createChooser`, plain `AndroidJavaObject` JNI — no SDK, no UPM package), and the game
+registers two `<intent-filter>`s on the launcher activity so a challenge link opens the game
+(`AndroidChallengeLinks.cs`, the same post-generate patch technique as the billing launchMode
+fix — no committed `AndroidManifest.xml`).
+
+**Evidence and sources: `docs/SHARE_COMPLIANCE.md`** (21 Sep research — Data safety definitions,
+the user-initiated-transfer carve-out, the IARC "secondary apps" exclusion, App Links
+requirements). This table is the register of record; that file is why each row says what it says.
+
+| Declaration | Flip? | Why |
+|---|---|---|
+| Binary permissions | **No change** — still INTERNET + CAMERA | `ACTION_SEND` needs no permission; an `<intent-filter>` declares what the app can *open*, it grants nothing. **Verify, don't assume**: standing rule 3 applies because the manifest changed — `aapt2 dump permissions` diff + size diff against the previous release APK |
+| Data safety | **No change — no data collected** | the game transmits nothing. It hands a string to an app *the user picks* in the system chooser; from there it is their message in their messenger. No contacts are read (no picker of ours, no `READ_CONTACTS`), no share event is logged anywhere off-device, and the link itself holds only a seed triple and a score — no profile id, no device id |
+| App access | No change | nothing behind a share |
+| Content rating | **No change, and this is load-bearing** | the shared text is **generated**, never typed: there is no free-text field anywhere in the flow, so no UGC and no "users can interact" answer changes. A future "add a message" field would reopen the questionnaire |
+| Ads / Advertising ID | No change | none involved |
+| Privacy policy | **Add the "Sharing a run, and challenge links" section** (text ready in `SHARE_COMPLIANCE.md` §8), bump the effective date in BOTH `docs/PRIVACY_POLICY.md` and `site/public/privacy/index.html`, redeploy — standing rule 4. Nothing new is *collected*; the section exists because the policy describes what the app does, and "we hand a line of text to an app you pick" is a thing it now does. If a later version ever *counts* shares server-side, that becomes app-interaction telemetry and the Data safety row above flips too |
+| Store listing | **Only after it ships** (standing rule 5). The "challenge a friend" line may be added to the description in the same release that carries the button — not in a listing-only edit beforehand |
+
+Two follow-ups the owner owns, neither blocking the release:
+
+- **`https://veyro.ferrabled.com/.well-known/assetlinks.json`** with the *release* signing
+  certificate's SHA-256 — that is what makes the `autoVerify="true"` https filter actually take
+  over the link instead of the browser (**OPEN_QUESTIONS 24**). Shipping without it is safe and
+  degrades correctly: Android fails verification, the link opens the landing page, and the page's
+  "Open in Veyro" button hands the same query to `veyro://challenge?…`, which needs no
+  verification at all.
+- **Deploy `site/public/challenge/`** (`npx wrangler deploy` from `site/`) **before** any build
+  with a SHARE button reaches a tester — a shared link that 404s is worse than no share button.
+  The page is `noindex` and sets no cookie; it only reads its own query string.
+
 ### If camera data EVER leaves the device (any form, any reason)
 - Prominent disclosure + runtime consent before the transmission, Data safety camera
   collection, privacy policy rewrite. Today's "never transmitted" claims are load-bearing

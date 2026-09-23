@@ -30,6 +30,8 @@ jump tuning fixed while judging the art.
 | [Quaternius Ultimate Nature](https://quaternius.com/packs/ultimatenature.html) | Broader nature library | Good alternative if the owner wants a different silhouette family; not imported |
 | [Quaternius Modular Men](https://quaternius.com/packs/ultimatemodularcharacters.html) | Modular outfits and more animations | Possible character upgrade; not needed for this first pass |
 | [KayKit Character Animations](https://kaylousberg.itch.io/kaykit-character-animations) | Larger locomotion/emote library | Two lateral dodge takes imported and retargeted, 20 Sep; free 1.1 download, CC0 |
+| [Quaternius Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) | 120+ humanoid takes incl. hits, deaths, rolls, emotes | Three takes (`Death01`, `Roll`, `Dance_Loop`) imported for the crash poses and the result card, 21 Sep; Standard (free) tier, CC0. See `Assets/Art/Quaternius/SOURCES.md` |
+| KayKit Character Animations 1.2 (legacy "Prototype Pete") | Cheer / Dance / Defeat emotes | Tried and dropped 21 Sep: the rig has no foot bones, Unity cannot build a Humanoid avatar from it |
 
 The selected Kenney packs are CC0, permit commercial use and do not require attribution.
 Keep the bundled license files and provenance below. Never use Kenney's logo as our branding.
@@ -80,6 +82,15 @@ or build. `ParkArtPreview.Render` renders the real assets to `builds/art-review/
 `Veyro → Art → Update lane dodge animations` refreshes only the two dodge clips/controller
 states and their manifest references, preserving authored chunk data.
 
+`Veyro → Art → Update crash and result animations` (`RunnerCrashBuild`) does the same for the
+four crash/result states — `crashWall` (`Death01` ×1.7: stagger and fall on the back),
+`crashTrip` (`Roll` ×1.15: forward tumble), `celebrate` (`Dance_Loop`), `defeat` (`Death01`).
+Root rotation is baked to the **body** orientation, not the file's original: the Quaternius
+rest pose faces the opposite way from Kenney's, and with "original" the runner spun round at the
+moment of impact. `RunnerCrashBuild.RenderReview` writes contact-sheet frames of every state on
+all three skins to `builds/crash-review/` — the way the choice above was made without a device.
+`ParkArtBuild.BuildRunner` calls both configure methods, so a full rebuild keeps every state.
+
 ## Download provenance
 
 Downloaded 19 September 2026 from the links on the two official Kenney pack pages.
@@ -88,6 +99,7 @@ Downloaded 19 September 2026 from the links on the two official Kenney pack page
 |---|---|---|
 | `kenney_nature-kit.zip` | Nature Kit 2.1 | `FA7974A0D342BFE63C38664BA9F8EC1A4AAB8EA25F099BDC56870E33588C4D9D` |
 | `kenney_animated-characters-protagonists.zip` | Animated Characters Protagonists 1.1 | `EC3787DE70FA2200256848D74201B10F6B6C3126594E9857BF989753312C2B84` |
+| `universal_animation_librarystandard.zip` (21 Sep 2026, via opengameart.org mirror) | Quaternius Universal Animation Library, Standard | `18FF1A7215F4852B320203E8AAF02A1578B5C8EEF9027FBAEDFCEDC7B85A3AC2` |
 
 The character imports as a Humanoid, as specified in
 [Kenney's Unity import guide](https://kenney.nl/knowledge-base/game-assets-3d/importing-characters-and-animations).

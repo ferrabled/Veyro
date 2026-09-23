@@ -25,6 +25,11 @@ namespace MotionRunner.Menu
         int _stageId;
         public Camera PreviewCamera => _camera;
         public Transform Model => _runner;
+
+        /// The preview's own runner, for callers that need a pose rather than an outfit - the
+        /// result card asks for PlayResultPose here. Null before Build, and after the stage has
+        /// been destroyed.
+        public RunnerVisual Visual => _visual;
         public CosmeticSlot FocusedSlot => _focus;
         public static RunnerPreview Create(Transform parent)
         {
@@ -66,7 +71,7 @@ namespace MotionRunner.Menu
             if(_camera==null)return;
             UpdateAspect();
             if(_focus!=slot)_dragYaw=0;
-            _focus=slot;_repeatBurst=slot==CosmeticSlot.CrashFx;
+            _focus=slot;_repeatBurst=slot==CosmeticSlot.CrashFx;_fitFallen=false;
             _targetYaw=slot==CosmeticSlot.Back ? 20 : slot==CosmeticSlot.Trail ? 140:180;
             var target=new Vector3(0,0.82f,0);
             float pitch=4;_targetSize=0.94f;
@@ -123,7 +128,63 @@ namespace MotionRunner.Menu
             }
             if(_repeatBurst)Burst();
         }
-        public void Burst() { _visual?.Crash();_burstAt=Time.unscaledTime+2.6f; }
+        public void Burst() { _visual?.PlayCrashEffect();_burstAt=Time.unscaledTime+2.6f; }
+
+        /// Framing for a character that is about to end up on the floor (the result card's
+        /// defeat pose): seen from the side and a little from above, so the whole body reads as
+        /// lying down instead of a head looming at the bottom of a standing-height frame.
+        public void FrameFallen()
+        {
+            if(_camera==null)return;
+            UpdateAspect();
+            _focus=CosmeticSlot.Skin;_repeatBurst=false;_dragYaw=0;_fitFallen=true;
+            _targetYaw=_yaw=100;
+            _targetRotation=Quaternion.Euler(28,0,0);
+            _runner.localRotation=Quaternion.Euler(0,_yaw,0);
+            FitFallen();
+            _camera.transform.localPosition=_targetPosition;_camera.transform.localRotation=_targetRotation;
+            _camera.orthographicSize=_targetSize;
+        }
+
+        /// Frames whatever the body is doing right now, from its bones: a fall carries the hips
+        /// a body length away from the root, and the skinned renderers' bounds stay at the
+        /// bind pose, so neither the root nor renderer.bounds can be trusted once the character
+        /// is on the floor. Re-run every frame while the fallen framing is active, so the camera
+        /// follows the fall and settles on the body wherever it ends up.
+        void FitFallen()
+        {
+            var animator=_runner.GetComponentInChildren<Animator>();
+            if(animator==null || !animator.isHuman)return;
+            bool first=true;var bounds=new Bounds();
+            foreach(var bone in FramingBones)
+            {
+                var t=animator.GetBoneTransform(bone);if(t==null)continue;
+                var p=t.position-_stage.transform.position;
+                if(first){bounds=new Bounds(p,Vector3.zero);first=false;}else bounds.Encapsulate(p);
+            }
+            if(first)return;
+            foreach(var r in _runner.GetComponentsInChildren<MeshRenderer>())
+                if(r.name.StartsWith("Cosmetic "))bounds.Encapsulate(new Bounds(r.bounds.center-_stage.transform.position,r.bounds.size));
+            bounds.Expand(0.34f); // body thickness around the bone line, plus a little air
+            // Orthographic fit: the box's half-extents as seen from the camera's own axes.
+            var inverse=Quaternion.Inverse(_targetRotation);float halfX=0,halfY=0;
+            for(int i=0;i<8;i++)
+            {
+                var corner=bounds.center+Vector3.Scale(bounds.extents,new Vector3((i&1)==0?-1:1,(i&2)==0?-1:1,(i&4)==0?-1:1));
+                var local=inverse*(corner-bounds.center);
+                halfX=Mathf.Max(halfX,Mathf.Abs(local.x));halfY=Mathf.Max(halfY,Mathf.Abs(local.y));
+            }
+            float aspect=Mathf.Max(0.55f,_camera.aspect);
+            _targetSize=Mathf.Max(0.55f,halfY*1.12f,halfX*1.12f/aspect);
+            _targetPosition=bounds.center-_targetRotation*Vector3.forward*4;
+        }
+        static readonly HumanBodyBones[] FramingBones=
+        {
+            HumanBodyBones.Hips,HumanBodyBones.Head,HumanBodyBones.LeftFoot,HumanBodyBones.RightFoot,
+            HumanBodyBones.LeftHand,HumanBodyBones.RightHand,HumanBodyBones.LeftLowerLeg,HumanBodyBones.RightLowerLeg,
+            HumanBodyBones.Chest
+        };
+        bool _fitFallen;
         void UpdateAspect()
         {
             if(_camera==null)return;
@@ -133,7 +194,8 @@ namespace MotionRunner.Menu
         void LateUpdate()
         {
             float aspect=_camera.aspect;UpdateAspect();
-            if(Mathf.Abs(aspect-_camera.aspect)>0.01f)Focus(_focus);
+            if(Mathf.Abs(aspect-_camera.aspect)>0.01f && !_fitFallen)Focus(_focus);
+            if(_fitFallen)FitFallen();
             float blend=1-Mathf.Exp(-9*Time.unscaledDeltaTime);
             _camera.transform.localPosition=Vector3.Lerp(_camera.transform.localPosition,_targetPosition,blend);
             _camera.transform.localRotation=Quaternion.Slerp(_camera.transform.localRotation,_targetRotation,blend);

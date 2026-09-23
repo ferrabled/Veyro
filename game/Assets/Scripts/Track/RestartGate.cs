@@ -46,8 +46,10 @@ namespace MotionRunner.Track
         /// The post-crash lockout is still running: nothing can ask for a run yet.
         public bool IsLockedOut => _lockout > 0f;
 
-        /// The run just ended. Arms the lockout.
-        public void LockOut() => _lockout = LockoutSeconds;
+        /// The run just ended. Arms the lockout - by default the constant, or for as long as the
+        /// caller's result screen takes to appear, whichever it passes: a tap that lands while the
+        /// crash pose is still playing must not skip a card the player has not yet seen.
+        public void LockOut(float seconds = LockoutSeconds) => _lockout = seconds > LockoutSeconds ? seconds : LockoutSeconds;
 
         /// The run was abandoned rather than finished (RunSession.Stop): no queued restart may
         /// survive into whatever comes next.
