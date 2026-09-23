@@ -1,0 +1,5 @@
+<linker>
+  <!-- The platform implementation is located by reflection, including in IL2CPP builds. -->
+  <assembly fullname="OneSignal.Core" preserve="all" />
+  <assembly fullname="OneSignal.Android" preserve="all" ignoreIfMissing="1" />
+</linker>

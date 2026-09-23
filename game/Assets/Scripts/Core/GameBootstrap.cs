@@ -6,6 +6,8 @@ using MotionRunner.Social.Supabase;
 using MotionRunner.Track;
 using UnityEngine;
 using MotionRunner.Art;
+using MotionRunner.Notifications;
+using MotionRunner.Notifications.OneSignal;
 
 namespace MotionRunner.Core
 {
@@ -18,6 +20,10 @@ namespace MotionRunner.Core
         {
             Application.targetFrameRate = 60;
             Screen.orientation = ScreenOrientation.Portrait;
+            var growth = GrowthRuntime.Create();
+            var push = OneSignalPushService.Create();
+            growth.Attach(push);
+            push.Initialize(PlayerPrefs.GetInt(PushPromptPolicy.EnabledKey, 0) == 1);
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
             new GameObject("Art performance probe").AddComponent<ArtPerformanceProbe>();
 #endif
@@ -94,7 +100,7 @@ namespace MotionRunner.Core
             // Everything from here is transitions rather than construction: which screen is up,
             // which control scheme the run uses, when the camera is allowed to be on, and whether
             // the track is being driven by a run or by the menu's attract loop.
-            RunFlow.Create(session, hud, store, skins, profile);
+            RunFlow.Create(session, hud, store, skins, profile, push);
         }
 
         /// Mirrors CreateStore: the Editor exercises the profile tab against a ready fake, a

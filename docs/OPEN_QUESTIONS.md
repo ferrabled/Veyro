@@ -93,19 +93,13 @@ the question. Keep this file short; it is read every session.
     Store key, every other APK → no key (store disabled, fail-open); wrong pairings fail the
     build. Reminder unchanged: never paste an `sk_` secret key anywhere in the repo.
 
-10. **Ship a hidden "judge mode"?** Devpost promo codes are the primary judge path
-    (`REVENUECAT_PLAN.md` §6), but if a code fails at 11pm on 30 Sep there is no recovery: our app
-    user IDs are anonymous, so RevenueCat cannot grant an entitlement to a specific judge.
-    Proposal: a code-entry on the title screen that calls `LogIn(<code>)`, so that ID can be granted
-    the entitlements from the RevenueCat dashboard as a manual override.
-    *Recommended default: **yes** — roughly 20 lines, no APK cost, and the alternative failure mode
-    is an unscoreable submission.*
-
-    **Codes must be random, one per judge, and absent from the APK** (`REVENUECAT_PLAN.md` §6.4,
-    tightened 26 Aug): `judge-7f3a9c1e4b8d`-style, `openssl rand -hex 6`, generated out-of-band.
-    A predictable `shipaton-judge-<n>` would let anyone who guesses or extracts it inherit the
-    granted entitlement. The app validates nothing and ships no list — an unknown code just yields
-    an app user ID with no entitlements. Leaked codes are revoked per-ID in the dashboard.
+10. **Resolved by owner, 23 Sep 2026: Google Play promo codes are the primary judge-access route.**
+    The hidden judge-login proposal is retired; no custom login/code-entry feature is planned.
+    Generate product-specific codes for `season1.pass`, `skin.ember` and `skin.frost`, test them
+    through Google Play, and supply unused codes with redemption/restore instructions. Keep
+    access available throughout judging. `REVENUECAT_PLAN.md` §6 is the current runbook; §6.4
+    covers ordinary support without changing the existing profile/RevenueCat identity.
+    Number retained for historical references. *Owner: move to DECISIONS.md.*
 
 11. **Demo video: voiceover, and who is on camera?** (`docs/submission/VIDEO_SCRIPT.md` §"Owner
     decisions"). *Recommended default: voiceover — #BuildInPublic and Grand Prize reward a person
@@ -119,7 +113,7 @@ the question. Keep this file short; it is read every session.
     + ~8.8 MB inference package are in the Play build from day one; `docs/PRIVACY_POLICY.md` and
     the T-031 Data safety answers describe the camera as on-device-only; store description must
     mention camera mode (T-030). *(Was numbered 10 on `main`; renumbered 12 in the 24 Aug merge —
-    judge mode keeps 10, which REVENUECAT_PLAN §6.4 references.)*
+    judge-access question keeps 10, now resolved above.)*
 
 13. **Hands-free flow defaults (2026-09-01, `pause-game-feature`).** The resume flow shipped with
     the spec's defaults; each is one constant. Confirm or retune on device:
@@ -179,7 +173,74 @@ the question. Keep this file short; it is read every session.
     board as cheat-proof.** The cheapest first step lives in that task — a top-N sanity query
     before submission day, since nothing currently alerts on an implausible score.
 
-19. **Production Season 1 XP curve (T-025, before release).** Owner requested a tiny temporary
+19. **Sponsor-update release baseline (20 Sep, feat-implement-tracks).** The owner accepted
+    the OneSignal-to-Layers Daily Run loop and requested an integration guide. The 16 Sep
+    release plan keeps profiles out of that update, while this branch includes profiles and
+    art. Which baseline should ship the SDKs, and is versionCode 5 now public or still in
+    review? *Recommended default: keep the sponsor update on the existing release baseline
+    until the owner explicitly includes the newer features; adapters can proceed independently.*
+    P5/P6 account/FCM readiness and public SDK IDs remain owner prerequisites, with exact steps
+    in `SPONSOR_SDK_INTEGRATION_GUIDE.md` §1. No production state or release-scope choice was assumed.
+
+20. **Resolved: OneSignal FCM readiness (20 Sep, feat-implement-tracks / T-021).** The owner
+    uploaded the Firebase service-account JSON directly to OneSignal and reached SDK onboarding.
+    The same public App ID `1f6ba056-efe3-4bfe-a0cd-a9a26150720a` now returns a numeric
+    `android_sender_id` in its public Android configuration. Credential setup is sufficient to
+    proceed to the device test; this does not yet prove push delivery. No private credential
+    entered chat or the repository. Keep the Unity SDK for Android; the dashboard's native
+    Android prompt does not require a second SDK or Firebase database.
+
+21. **T-021 remaining device checks (20 Sep evening, feat-implement-tracks).** The connected
+    Nord 2 registered and is subscribed with a push token; SDK-enabled release/dev APKs were
+    installed without uninstalling or clearing data. The owner restricted interaction to the
+    game. **Test send answered:** the owner received the notification and tapping opened the
+    game; the OneSignal icon needs replacing. Exact build/message ID and warm/cold state were
+    not captured. Remaining owner action: coordinate a device slot and control only Veyro Run's
+    notification permission in Android Settings for further
+    diagnosis of the reproduced denial/retry hang: the phone rejects ADB permission revocation.
+    *Recommended default: keep this installation, no credential sharing/data reset, schedule
+    one coordinated device window, fix/retest the retry before SDK release.* Full test report:
+    `ONESIGNAL_DEVICE_TEST.md`. Retry root cause remains unconfirmed; foreground and separate
+    warm/cold checks remain. Campaign/Layers implementation can proceed separately under
+    `REMINDER_AUTOMATION_PLAN.md`. **21 Sep:** P6 App ID received; icon and bounded permission
+    retry changes implemented, physical retest remains required on the combined build.
+    **23 Sep coordinated session:** current development build installed with data preserved;
+    Android notification permission is OFF. May this game's permission be enabled and up to
+    three labelled test pushes sent only to this phone? This was asked during the session;
+    no approval is inferred from the request to install/test or from earlier receipt of a
+    different push. Recommended default: keep the current permission until the owner answers,
+    then check foreground suppression, warm/cold taps and the icon in the coordinated slot.
+    Native denial/retry may need a separate owner-controlled permission reset.
+    The current panel reports ALLOW IN ANDROID SETTINGS, so permission cannot be enabled
+    within the owner's existing no-settings constraint. Final local reminder preference and
+    SDK opt-in match the baseline; OS permission remains off. The 23 Sep `STATUS.md` entry
+    records the accidental reminder-off tap and its verified restoration.
+
+22. **Layers account and SDK distribution checks (21 Sep, feat-implement-tracks / T-022).**
+    App ID `app_4cf32e54fc359326` received; SDK consent and real-run instrumentation implemented.
+    **21 Sep update — stock migration implemented** (owner-approved same day): the patched
+    embedded package was replaced by the official unmodified SDK pinned by Git URL to commit
+    `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (v3.3.2), with advertising-ID and install-referrer
+    libraries excluded project-wide in the Gradle templates, and unsent events now purged on the
+    next enable instead of at turn-off. Outcome and rationale: `LAYERS_STOCK_SDK_REVIEW.md`.
+    Rebuilt-APK evidence landed the same evening (`builds/layers-stock-verification.json`:
+    515/515 tests, no AD_ID, no ads-identifier/installreferrer classes, native hash unchanged);
+    the physical device test is still pending.
+    **22 Sep — device test PASSED on the Nord 2** (all 7 steps: OFF-by-default, enable with both
+    GAID and install-referrer lookups failing, held-and-unsent run events, unchanged files across
+    a relaunch, purge + device-id rotation on re-enable; no `idfa` anywhere; `builds/layers-stock-verification.json`
+    → `device_test`). Only transport-level 2xx receipt was observable, so (b) below narrows to the
+    Layers **Events-screen** confirmation.
+    **Still owner actions:** (a) confirm no advertising/CAPI destinations are connected in the
+    Layers dashboard; (b) confirm the events arrived on the Layers Events screen (the device side
+    of enable / off / relaunch / re-enable is now verified). **License question downgraded:** upstream still ships
+    no LICENSE or package license field, but we redistribute no modified SDK source any more, so
+    asking Layers to add one is a courtesy request. *Recommended default: not a release gate;
+    send the request, ship the stock SDK. SDK analytics only, advertising off, explicit opt-in,
+    verified provider-deletion process.* Production feature baseline and unused Play
+    versionCode are still owner decisions in Q19; no signed Play release was assumed.
+
+23. **Production Season 1 XP curve (T-025, before release).** Owner requested a tiny temporary
     cap for testing. Development builds now use cumulative thresholds 0–9; actual server XP
     is unchanged. Choose production pacing after device acceptance. Suggested tuning starting
     point: 0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP, not yet approved. Production builds

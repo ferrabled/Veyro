@@ -254,9 +254,10 @@ the closed track.
 2. *"No data collection — the game makes zero network requests"* — **now false: T-020's SDK is in
    the build** and purchase history is collected. The rule this taught stands permanently: never
    put an absolute no-network claim in copy that outlives a build. Any wording about connectivity
-   is now the qualified form — *the game plays fully offline; the network is used only for optional
-   purchases (Google Play billing + RevenueCat); no analytics, no ads, no accounts, and camera
-   frames are never transmitted.* The full sweep of that wording across `site/` and this file was
+   must match the actual release: *the game plays fully offline; network services support
+   purchases, leaderboards in profile-enabled versions, and registration/delivery in notification-
+   enabled versions. Camera frames are never transmitted.* Do not reuse the old purchases-only
+   description or blanket no-analytics claim for the sponsor update. The full sweep of that wording across `site/` and this file was
    done 29 Aug 2026; the Data safety form flips in the same submission.
 
 ---
@@ -265,3 +266,25 @@ the closed track.
 
 - **[L1]** Play Console Help — store listing character limits (30 / 80 / 4,000) — https://support.google.com/googleplay/android-developer/answer/9859152
 - **[L2]** Play Console Help — graphic asset specs — https://support.google.com/googleplay/android-developer/answer/9866151
+
+## Notification-enabled update — held until T-021 release
+
+Suggested listing addition, publish with the SDK-enabled build and privacy/Console flips:
+
+> Optional Daily Run notifications: choose whether to receive them, and change your choice in PROFILE → NOTIFICATIONS. Every run remains playable without notification permission.
+
+Do not advertise a scheduled daily reminder or a notification-to-Daily-Run shortcut until the
+campaign/routing increment is implemented and verified. Registration and session processing begin
+at startup even when receiving notifications is off; the privacy policy and Data safety form
+must reflect this. See ONESIGNAL_SETUP.md and STORE_COMPLIANCE.md for release gates.
+
+## Layers-enabled update — held until T-022 verification and release
+
+Suggested addition alongside the notification text above (not yet submitted to Play):
+
+> Optional gameplay analytics helps improve Daily Run reminders. It stays off until you enable PROFILE → GAMEPLAY ANALYTICS, and you can turn it off there at any time. Camera images and motion readings stay on your device. See our privacy policy for collected data and deletion options.
+
+Publish with the verified SDK build and Data Safety changes, after fitting the complete
+listing within Play's 4,000-character limit. Do not describe a scheduled reminder campaign
+as available until the backend sender exists. The privacy/support website was updated on
+21 Sep; SDK integration and a website deployment are not themselves a new Play release.

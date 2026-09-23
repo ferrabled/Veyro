@@ -387,32 +387,45 @@ needs no new rendering work — the cheapest possible thing that is still a real
 
 Devpost requires: *"free trial access OR promo code enabling judge testing of premium features"*
 [S1][S2]. Our product is a **one-time cosmetic unlock**, so "free trial" does not apply — a free
-trial is a subscription concept. **Promo codes are the path.**
+trial is a subscription concept. **Google Play promo codes are the primary judge-access route,
+confirmed by the owner 23 Sep 2026 (OPEN_QUESTIONS 10, resolved).** No custom judge login or
+in-app code-entry system is planned; Google Play handles redemption.
 
 ### 6.1 What we generate (owner, in Play Console, once the app is live)
 
-1. Play Console → the app → **Monetize → Promotions → Promotion codes**.
-2. Create **one-time-use codes** for the cosmetic one-time product. Budget: Google allows **500
-   promo codes per quarter across all one-time products in an app** [S32] — generate **10**, not
-   more, and keep the rest in reserve.
+1. Play Console → the app → **Monetize with Play → Promo codes**.
+2. Create **one-time-use codes for each product**: 10 for `season1.pass`, 5 for `skin.ember`
+   and 5 for `skin.frost`, plus separate codes for the device test. The pass does not include
+   the two separately sold characters. Budget: Google allows **500 promo codes per quarter
+   across all one-time products in an app** [S32]; keep the rest in reserve.
 3. Codes are per-product, and *"promo codes can't be used for inactive products"* [S32] — so the
    product must be **active** in Play Console, which means the app must have a published release
    (the closed-testing track counts for creating them; production is what judges will use).
+4. Keep promotions active through the **1–13 October judging period**; use **31 October 2026**
+   as the planned end date. Check issued-code availability across the quarter change on 1 October.
+   Store actual codes outside the repository and public marketing copy, and provide unused
+   codes grouped by product in the submission's judge-access instructions.
 
 ### 6.2 What the judge does
 
 Two routes, and **both work for a one-time product** [S33]:
 
-- **Route A (in-app, the one we document):** open Veyro Run → tap the cosmetic → the Google Play
-  purchase sheet appears → tap the **down-arrow next to the payment method** → **Redeem code** →
-  paste → confirm. Cost: $0.
-- **Route B (Play Store app):** Play Store → menu → **Redeem code** → paste. *"Users redeem these
+- **Route A (in-app, the one we document):** open Veyro Run → **SHOP** → select the product
+  (continue through the paywall for the pass) → the Google Play purchase sheet appears →
+  tap the **down-arrow next to the payment method** → **Redeem code** → paste a code for that
+  product → verify it is free and confirm. Equip the unlocked item before the next run.
+- **Route B (Play Store app):** Play Store → profile icon → **Payments & subscriptions** →
+  **Redeem code** → paste. *"Users redeem these
   codes either directly from the Play Store or from within your app"* [S33]. The purchase then
   happens out-of-app.
 
 **Route A is the one to put in the Devpost description**, with the down-arrow step spelled out. The
 single most common support thread on this is developers and users looking for a "redeem" field
 *inside the app* and not finding it — it is Google's billing sheet that owns the UI, not us [S34].
+
+Each code is single-use and product-specific. Pass ownership gives the level-1 premium reward
+immediately; later rewards still require earned XP and collection. A promo code does not grant
+XP or bypass the season progression. Locked rewards can be previewed in the season screen.
 
 ### 6.3 What the app must do
 
@@ -425,34 +438,19 @@ single most common support thread on this is developers and users looking for a 
 - **Have a visible restore button.** Judges test on their own devices; a judge who redeems and then
   reinstalls must be able to get the entitlement back. `Restore` → `RestorePurchases`.
 
-### 6.4 The fallback, if a code fails during judging
+### 6.4 Support if redemption fails
 
-Do not improvise at 11pm on 30 Sep. RevenueCat lets an entitlement be **granted** to an app user ID
-from the dashboard without a store transaction. That is only usable if we can identify the judge's
-app user ID — which anonymous IDs make impossible. **Decision needed (OPEN_QUESTIONS 10):** ship a
-hidden "judge mode" — a code entry on the title screen that calls `LogIn(<code>)`, so that specific
-ID can be granted the entitlements from the dashboard as a manual override.
-Recommended default: **yes, build it** — it is ~20 lines, it costs nothing in the APK, and the
-alternative failure mode is an unscoreable submission.
+First check the product, promotion dates/status and whether the single-use code was already
+redeemed; supply another unused Google Play code if needed. Reopen the game and use
+**SHOP → RESTORE PURCHASES** for an already redeemed purchase.
 
-**The code must be random, and the app must not contain it.** The obvious version —
-`shipaton-judge-1`, `-2`, `-3` — is an unlocked door: the pattern is guessable, `strings` on the APK
-would confirm it, and the first person to try `shipaton-judge-2` inherits whatever that ID was
-granted. The blast radius is only a cosmetic, but the fix is free at design time and impossible
-afterwards, so:
-
-- **One high-entropy code per judge**, generated once and written down out-of-band — e.g.
-  `judge-7f3a9c1e4b8d` (≥ 12 hex chars ≈ 48 bits; `openssl rand -hex 6`). Not sequential, not
-  derived from anything.
-- **The app validates nothing and stores no list.** The screen passes whatever is typed straight to
-  `LogIn(code)`. An unknown code produces a real app user ID with zero entitlements — a harmless
-  no-op — which is exactly why no secret needs to ship in the binary.
-- **Revocable:** entitlements are granted per-ID in the dashboard, so a leaked code is revoked by
-  revoking that one ID. Nothing else is affected.
-- Keep the codes out of the repo, out of STATUS.md, and out of the Devpost description (promo codes
-  go there — §6 — this is the private fallback).
-- Log out (`LogOut()`) restores the anonymous ID, so a judge testing on a shared device does not
-  leave the entitlement behind.
+The old hidden judge-login proposal is **retired by the owner's 23 Sep decision**. Do not add
+code-based RevenueCat identity switching: the profile-enabled build uses the Supabase player
+UUID as its RevenueCat identity (D14). If manual support is needed on that build, the judge can
+copy **PROFILE → PLAYER ID**; once identity synchronization has completed, the owner can locate
+that customer in RevenueCat and grant the existing entitlements through the judging period.
+This is a support fallback, not a replacement for the tested promo codes supplied with the
+submission. The older v5 build does not expose this profile-based support path.
 
 **Compliance line, non-negotiable:** promo-code redemptions are $0 and are the intended judge path.
 Buying our own SKU to inflate revenue violates store policy and would poison the submission
@@ -531,10 +529,11 @@ catalog item is answered, and that number now refers to privacy-policy hosting).
 15. Paywall renders on device (it cannot render in the Editor).
 16. **Uninstall → reinstall → Restore → entitlement returns.** This is T-020's acceptance criterion
     and the thing §2.1 breaks if the product is a consumable.
-17. Redeem one real promo code on a *second* Google account, via Route A — this is exactly what a
-    judge will do, and it is the only way to know the instructions we ship are correct.
+17. On the signed, Play-installed build, test a real promo code for **each of the three products**
+    on a *second* Google account. Exercise both redemption routes, entitlement refresh on resume,
+    relaunch and restore. Use test codes distinct from the unused codes supplied to judges.
 18. STATUS.md entry: APK size + permission delta, which install route was used, sandbox result,
-    reinstall result, promo-code result, and the 10 codes' whereabouts (**not** committed to git).
+    reinstall result and promo-code results. Actual codes stay outside git and STATUS.md.
 
 ---
 

@@ -1,5 +1,391 @@
 # Status journal (newest at top)
 
+## 2026-09-24 — Consolidated SDK device notes
+
+Removed the redundant standalone device report and its references at the owner's request.
+The 23 Sep entry below retains the results, restoration incident and evidence location;
+`SDK_PRIVACY_RELEASE.md` retains the remaining checks. Verified reference removal and
+`hob git diff --check`; documentation only.
+
+## 2026-09-24 — Independent validation of PR #12 Copilot corrections
+
+`copilot-pr12-validation` / T-021, T-022. Read the five original GitHub review comments,
+the correcting agent's conversation and the actual working-tree diff. All five findings
+are valid against PR head `52e5201`; no additional implementation defect was found in
+the local corrections. Consent failure now attempts shutdown in a finally path, reports
+and retries incomplete shutdown, prevents re-enable from bypassing the purge, and rolls
+back an exception during partial enable. Confirmed against the pinned SDK that Android
+shutdown stops its uploader before persisting and releasing the core.
+
+The campaign change consumes attribution on the first Daily start while preserving its
+completion context; Free Runs do not consume it. Ready subscribers are excluded from the
+production offer without consuming eligibility, and development verification remains
+once-only. Both stale setup statements were corrected. The new visit counter confines
+Android-thread work to an atomic increment and is read at click/run time, avoiding a
+delayed background-clear callback erasing newer attribution. Checked its proxy override
+against [Unity 6000.5's implementation](https://github.com/Unity-Technologies/UnityCsReference/blob/6000.5/Modules/AndroidJNI/AndroidJava.cs)
+and the pause/stop distinction against [Android's activity lifecycle](https://developer.android.com/guide/components/activities/activity-lifecycle).
+
+Evidence audit, not a new test run: all 44 recorded runtime source hashes match the current
+files, and the development APK hash matches the verification record. Parsed both NUnit
+XMLs independently: the full run had 524 passes and two EditMode harness assertion failures;
+the four-case service rerun passed, leaving all 526 unique cases with passing final results.
+The test harness change uses reflection to invoke the lifecycle method without Unity's
+EditMode SendMessage restriction; it does not suppress the asserted behavior.
+
+Limits remain explicit: activity-stop/permission-dialog callbacks are Android-only and
+are simulated by a counter in the Editor tests, so native device verification remains
+necessary. The 23 Sep phone APK predates these corrections. The PR is still open at
+`52e5201`; the fixes remain local/uncommitted. This validation changed only the task/status
+record, with no runtime changes, rebuild, phone calls, provider actions, commit or push.
+
+## 2026-09-24 — PR #12 Copilot findings validated and corrected
+
+`copilot-pr12` / T-021, T-022. All five findings are valid against the reviewed
+snapshot; each has a corresponding correction:
+
+- [Consent failure](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512235):
+  shutdown is attempted even when consent revocation throws. The pinned Android SDK's
+  Shutdown aborts its HTTP uploader and writes a local disk snapshot; it does not call
+  the HTTP Flush operation. If shutdown itself fails, the saved choice remains OFF,
+  app events stop, the UI shows pending/error instead of OFF, and shutdown is retried
+  on an unscaled timer and focus return. Re-enabling cannot bypass pending shutdown or
+  the next-enable purge. A partially failed enable is rolled back through the same path.
+- [Permission-dialog pause](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512276):
+  Android activity-stop callbacks advance a visit counter. A pause-only dialog preserves
+  attribution; leaving the app (including while a dialog is open) invalidates it. The
+  counter is read when a click/run occurs, so a delayed Unity callback cannot clear a
+  newer notification. This follows Android's [pause versus stop lifecycle](https://developer.android.com/guide/components/activities/activity-lifecycle).
+- [Repeated campaign attribution](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512318):
+  only the next Daily Run consumes the campaign. Its completion keeps the copied fields;
+  restarting or abandoning that run cannot attribute another one. A Free Run does not
+  consume the Daily campaign.
+- [Already-enabled notification offer](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512340):
+  ready subscribers no longer receive the player offer; development verification stays
+  once-only and available.
+- [Stale setup status](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512369):
+  both setup statements now distinguish implemented Daily routing from outstanding
+  campaign deployment and device/public-build verification.
+
+Verification: **526 unique EditMode tests verified** across the full suite and a focused
+rerun. The first run passed 524/526; two new retry tests hit Unity's EditMode SendMessage
+assertion. After correcting only that test harness, all four service tests passed (including
+both previously failing cases); runtime sources were unchanged between runs. ARM64 Android
+development build **passed**, version `1.0.0-dev.20260924-0013.nogit`, APK **91,915,116 bytes**,
+with permissions identical to the 23 Sep development baseline. APK:
+`builds/MotionRunner-CopilotReviewDev.apk`; test XMLs, build log and source/artifact hashes:
+`builds/copilot-pr12-*`. Build/test inputs were checked for extra source files and all
+819 source/configuration files were hash-matched in the isolated scratch before the build;
+only its Android staging folder was cleared. `hob git diff --check` passes. Existing local
+SDK/device-review edits were retained. The corrections are local and have not been committed,
+pushed or posted to the review threads.
+
+Needs human device test on the resulting build: with analytics enabled, open a labelled
+Daily notification and enter camera mode through the OS permission dialog; verify its
+next start/completion has the campaign and the following Daily Run does not. Repeat with
+Home/app switching during setup: attribution must end. Also check normal analytics OFF,
+relaunch and purge on re-enable. Native persistent shutdown failures are covered by fault
+injection in Editor tests; if a real device cannot finish shutdown, the UI must retain its
+retry warning until success or restart. Existing push-send/permission and dashboard gates
+remain in `SDK_PRIVACY_RELEASE.md`; no phone, provider, campaign or release action is part
+of this review correction.
+
+## 2026-09-23 — Current combined SDK build installed; bounded phone checks complete
+
+`phone-sdk-verification` / T-021, T-022. Built the current `52e5201` runtime snapshot in
+an isolated Unity copy after matching 817 source/configuration files. Fresh focused tests:
+4 Layers consent + 26 growth/push tests passed. ARM64 development APK built and installed
+with `adb install -r`; original installation date/data retained. Version
+`1.0.0-dev.20260923-2324.nogit`, 91,912,748 bytes. Permissions unchanged; no AD_ID/location
+permission, advertising-ID or install-referrer implementation; stock Layers native hash
+unchanged. The concurrent source edit was comment-only. No release guard was bypassed.
+
+On Nord 2: explicit analytics enable, disable, restart while off and purge on re-enable
+worked. Held files stayed byte-identical across restart; Layers native library was absent
+from the restarted process maps. Purge removed the held queue, rotated both SDK identities
+and increased discard count without increasing delivery count. Two real Daily Runs
+completed (183 points, 7 coins, 63 m each); an attempted abort was correctly counted as the
+second completion. Parent then paused/quit a third run with no completion marker.
+Native transport counters advanced while enabled; Layers Events receipt and first-uploaded
+batch fields are still unverified.
+
+The cheaper tapping agent accidentally hit notification TURN OFF instead of Close.
+Parent stopped it, detected both app preference and SDK opt-in changes, restored only
+those two app-owned fields and verified the original values/subscription/token after
+relaunch. Android permission remained false throughout; no permission request, Settings,
+other app, purchase or equipment changes. Completed runs naturally changed history and
+progress. Final game state: menu, analytics off, original reminder choices/equipment.
+Restoration used a game-only force-stop and exact `run-as` edits to the two app-owned fields;
+game reminder preference=1 and SDK opt-in=true were verified after relaunch, with OS
+permission still false. Raw test/build and restoration evidence remains under ignored
+`builds/device/sdk-20260923/`, including `push-choice-restoration.json` and `root-final-off.json`.
+
+Remaining: owner-assisted notification permission/retry and real foreground/warm/cold
+push tests, Layers dashboard/startup-payload confirmation, then final signed Play build
+checks after the production XP-curve and release inputs are resolved. No push, campaign,
+website deployment or Play upload was performed. BACKLOG/OQ21 retain these gates; this
+does not mark sponsor-track/public-release acceptance complete.
+
+## 2026-09-23 — SDK review reconciled with existing device evidence
+
+`sdk-review-validation` / T-021, T-022 documentation follow-up to the forwarded SDK review.
+Reconciled the release checklist and stock-SDK assessment with the 22 Sep stock-build
+device evidence: baseline off, disable/relaunch and queue purge on re-enable were already
+observed; first-uploaded-batch fields, Layers Events receipt and the combined OneSignal
+flow remain open. Added explicit failure/migration checks and retained the production
+XP-curve release guard (OPEN_QUESTIONS 23).
+
+Corrected one overbroad adapter comment after checking the pinned upstream SDK: Initialize
+starts an immediate remote-configuration GET, while the managed periodic event uploader
+waits for its interval. The app gates initialization on the player's accepted analytics
+choice; mocked SDK consent-order tests cannot establish real first-batch payload fields.
+No runtime behavior changed. Verification: pinned upstream/cache source inspection,
+existing build/device evidence cross-check and `hob git diff --check`; no fresh Unity
+test/build run was needed for comments and documentation. The 515-test result belongs
+to the earlier stock-build verification, not this review.
+
+No phone, dashboard, website deployment or Play actions were performed. The existing
+`phone-sdk-verification` BACKLOG claim was preserved. Its 23 Sep handoff reports a
+prepared, syntax-checked harness and action sequence, with no device calls; that is not
+a current-build test result. Next: coordinate and complete the device pass and dashboard checks, then verify
+the final release artifact after the owner resolves the release inputs.
+
+## 2026-09-23 — Judge access standardized on Google Play promo codes
+
+`judge-premium-access` / T-035 documentation follow-up. Owner requested retiring the old
+judge-login proposal and making Google Play promo codes the primary route. OPEN_QUESTIONS 10
+is resolved in place; its number remains stable and DECISIONS.md remains owner-maintained.
+
+Updated the RevenueCat runbook, catalog, Play setup guide and submission instructions/checklist
+to use the three real product IDs (`season1.pass`, `skin.ember`, `skin.frost`), grouped unused
+codes and the current Shop/Google payment-sheet redemption flow. The pass does not grant the
+separate characters or higher-level XP. Access must cover judging, 1–13 October; the planned
+promotion end date is 31 October, with issued-code availability checked at the quarter change.
+The profile-enabled build can use its existing Player ID for manual RevenueCat support if
+needed; no identity-switching feature is planned. Historical proposals below are marked retired.
+
+Verification: documentation-wide search for old judge-login instructions and example identifiers,
+cross-check against existing restore/resume/profile behavior, and whitespace/diff checks. No game
+code or store configuration changed. Next: owner generates the product-specific codes; verify
+both redemption routes, resume/relaunch and restore on a second Google account using the signed,
+Play-installed build. Codes have not been generated or tested by this documentation task.
+
+## 2026-09-21 — Stock Layers SDK migration (supersedes the patched integration below)
+
+**Device test — 22 Sep (OnePlus Nord 2, Android 13, 00:09–00:18 WEST).** The pending
+physical test of the consent lifecycle was run on `builds/MotionRunner-StockLayersDev.apk`
+(installed with `adb install -r` over the existing profile — no uninstall, no data clear;
+prior build `1.0.0-dev.20260922-0003.nogit` → `1.0.0-dev.20260921-2227.nogit`, firstInstallTime
+unchanged, streak/season/hat intact). **All seven steps passed**; full evidence in the
+`device_test` object of `builds/layers-stock-verification.json`. Baseline OFF: launched and
+idled 25 s — no `[Analytics]`/`[LayersSDK]` line and `liblayers_core.so` never loaded, so the
+SDK really is inert until the player opts in. Enable: `[Analytics] Optional analytics
+initialized; advertising disabled.` preceded by **both** `[LayersSDK] Install referrer fetch
+failed: java.lang.ClassNotFoundException: com.android.installreferrer.api.InstallReferrerClient`
+and `[LayersSDK] GAID fetch failed: Object reference not set to an instance of an object.` —
+the Gradle exclusion is confirmed to work at runtime, not just in the dex. Two real Daily tilt
+runs were played to a crash; turning analytics off 12 s after the second one left
+`events_shutdown_1790028883260` on disk holding `daily_run_completed` + `$sdk_health`, both
+unsent, with `$health_consent_analytics: "denied"`, `$health_flush_allowed: false`, and
+`$ad_personalization`/`$ad_user_data` = false on every event; `grep -ril 'idfa|advertis|gaid'`
+over the whole SDK directory matched **nothing** at any point. Force-stop + relaunch while off
+left both files byte-identical (md5 unchanged) and produced no SDK activity. Re-enabling
+deleted the queue file, cleared `veyro.analytics.purge_pending`, and **rotated the device id
+891407e2-5cca-4bb4-acc7-ba435ce0852b → 664aeacd-43f2-434f-8413-c6f9af6ce349** (anonymous id
+rotated too); the SDK's own health record proves discard rather than delivery —
+`hydrated_events: 2`, `dropped: {"reset_discarded": 3}` at 22:16:20Z while `delivered` stayed
+at 6 and `batches_attempted` at 3. Analytics was left OFF and the phone on the Home screen with
+the teal top hat and 5-day streak showing.
+
+Two corrections to the entry below. (1) Storage: stock persists to
+`/storage/emulated/0/Android/data/com.ferrabled.veyro.run/files/layers_sdk` — this project's
+`Application.persistentDataPath` is **external app-scoped storage, not `/data/data/<pkg>/files`**,
+so "the app's private storage" is imprecise (the folder is visible to the device owner via a
+file manager or MTP); nothing Layers-related was written to the internal `files/` dir. Stock
+also does create its own `layers_sdk` subfolder, so files are not literally mixed in with game
+saves. Observed filenames were `identity_state`, `events_shutdown_<epoch_ms>` and
+`super_properties` — no `events_snapshot` or `remote_config` appeared. (2) The one-shot
+`veyro-layers` cleanup was **not exercised**: the previously installed build came from a
+non-Layers branch, so no legacy directory existed.
+
+Could not be verified here, and remains owner work: **Layers Events-screen receipt** (needs the
+owner's dashboard) — what was observed is transport-level only, `batches_by_status {"2xx": 3}`
+with `delivered: 6` while consent was granted, i.e. six events were accepted by the endpoint;
+**no on-wire payload was captured** (no TLS interception), so the first-batch `idfa`/ad-consent
+check was done against the persisted queue file instead; `layers_init_timing` was never seen in
+a persisted queue (if emitted, it was inside those six delivered events); the OneSignal→Daily
+measurement loop was not touched (no pushes sent); and the release flavour is still blocked by
+OPEN_QUESTIONS 23. Screenshots and the pulled queue/identity files are under `builds/device/`;
+device-side screenshots were deleted. No commit was made by this pass.
+
+`feat-implement-tracks` / T-022. The owner approved replacing the locally patched
+Layers SDK after reading the assessment, and the migration was implemented the same
+day across three parallel tracks: the package swap plus Gradle changes, the adapter
+and test rewrite, and this documentation/copy pass.
+
+What changed. The embedded `com.layers.analytics` 3.3.2 package with `VEYRO_PATCH.md`
+is gone; the project now references the official unmodified SDK by Git URL at upstream
+commit `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (tag v3.3.2, still the latest
+upstream release — upstream has no LICENSE file and no releases/changelog). No modified
+SDK source is redistributed any more. Advertising-ID and install-referrer collection is
+now prevented at the project level: a `configurations.all { exclude ... }` block in
+`mainTemplate.gradle` and `launcherTemplate.gradle` drops
+`com.google.android.gms:play-services-ads-identifier` and
+`com.android.installreferrer:installreferrer` from every configuration.
+
+Key findings behind that choice. EDM4U is installed with auto-resolve on build, so the
+stock SDK's `Editor/LayersDependencies.xml` would otherwise pull ads-identifier 18.1.0
+and its AD_ID manifest entry. More importantly, RevenueCat's Android SDK already depends
+on ads-identifier 17.0.1, so `AdvertisingIdClient` is present in today's release APK —
+without the exclusion the stock SDK's automatic lookup would read a **real GAID on
+Android 8–12** (minSdk 26); Android 13+ returns zeros without the permission. With the
+exclusion the JNI lookups fail and return null, which is the behaviour upstream's own
+README describes for the no-EDM4U case. Also found: the Rust core exposes
+`consent_required`, `respect_dnt`, `cookieless_mode` and `requires_explicit_consent`,
+none of which the Unity wrapper surfaces — recorded as an upstream feature request
+(it would give "no events before consent" natively), not as something we use.
+
+Behaviour changes that had to reach the copy. Analytics stays off until PROFILE →
+GAMEPLAY ANALYTICS; on enable the adapter initializes the SDK and sets consent
+analytics=true / advertising=false before any event can be transmitted, then identifies
+with the separate random support ID. On turn-off it revokes consent and shuts the SDK
+down, so unsent events can never be sent while analytics is off — but, unlike the patch,
+they are not discarded at that moment: they are deleted on the next enable (deny consent
+→ the SDK's `Reset`, which discards the queue and rotates the SDK device ID → grant
+analytics consent) or when app data is cleared. The stock SDK always emits an
+initialization-timing event (`layers_init_timing`) alongside `$sdk_health`; both are
+covered by the existing delivery-diagnostics disclosure. Isolated SDK storage is no
+longer claimed anywhere: stock persists in the app's private storage next to game data,
+and the old `veyro-layers` folder is deleted once on first launch.
+
+Documentation/copy updated in this pass: `PRIVACY_POLICY.md` and the byte-synced
+`site/public/privacy/index.html` (Turning-it-off bullet, diagnostics sentence, header
+note, Changes paragraph), `site/public/support/index.html`, the two
+`AnalyticsPanel.cs` string literals, `STORE_COMPLIANCE.md`, `SDK_PRIVACY_RELEASE.md`,
+`LAYERS_STOCK_SDK_REVIEW.md` (dated Outcome section), `OPEN_QUESTIONS.md` 22 and the
+T-022 backlog line.
+
+Verification (same evening, fresh scratch copy `C:\scratch\veyro-layers-stock`, evidence in
+`builds/layers-stock-verification.json`). Unity resolved `com.layers.analytics` from the Git
+URL at hash `7d28dcda…` (packages-lock source `git`, copied back to the worktree); the
+resolved source has none of the three patch APIs. **515/515 EditMode tests pass**, including
+the four rewritten `LayersConsentTests`. `BuildAndroidDev` succeeded (the release flavour is
+blocked by the Season 1 XP-curve guard, OPEN_QUESTIONS 23, so the dev APK is the artifact;
+manifest merge and dependency resolution are identical). EDM4U did add the stock SDK's
+ads-identifier 18.1.0 + installreferrer 2.2 lines to the generated `unityLibrary/build.gradle`,
+and the `configurations.all` exclusion (present in both generated Gradle files) removed them:
+permission set **identical** to the release baseline, **no AD_ID**, **no ads-identifier
+implementation and no installreferrer classes in any dex** (only RevenueCat's own type
+reference remains, as before), `liblayers_core.so` sha256 unchanged. Artifacts:
+`builds/MotionRunner-StockLayersDev.apk`, `builds/layers-stock-permissions.txt`,
+`builds/layers-stock-editmode.xml`. Scratch drift after the build was Unity/EDM4U write-back
+only (resolver lines in the template, an `APP_UI_EDITOR_ONLY` define, URP assets) and was not
+copied back. The site was **not** deployed and no commit was made by this pass.
+
+Next. Owner: confirm no advertising/CAPI destinations are connected in the Layers
+dashboard; send the courtesy LICENSE/terms request to Layers (no longer a release gate,
+since no modified source ships); run the combined-build device test of enable / off /
+relaunch / re-enable with Events-screen receipt; then the Play Console flips per
+`STORE_COMPLIANCE.md`. Nothing is released.
+
+## 2026-09-21 - Main merge and stock Layers SDK assessment
+
+Owner requested preserving both SDK commits, bringing this branch up to main, and
+assessing the original SDK patch before replacing it. Merged `origin/main` at
+`d888a44` into `feat/implement-tracks`, preserving OneSignal `acc646e` and Layers
+`2edbd92`; backup branch `backup/sdk-before-main-20260921` retains the pre-merge tip.
+Resolved five conflict files by retaining both features: SDK initialization and
+main's camera state handling, all LFS rules, and both sets of documentation updates.
+Renumbered main's Season XP question to Q23 and updated its references because the
+SDK branch already used Q19-Q22.
+
+Verification: no unresolved paths; staged C#, JSON, asmdef and Markdown whitespace
+checks passed. Isolated Unity 6000.5.9f1 EditMode verification could not reach tests:
+package resolution repeatedly timed out. Exact-version cached-package fallbacks
+also stalled; only our isolated Unity process was stopped. No test pass or Android
+build is claimed. Logs: `builds/sdk-merge*-tests.log`. Source files were hash-checked
+against the isolated copy; repository package configuration was not altered.
+
+SDK assessment: compared the three patched source files with upstream Layers
+v3.3.2 at `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b`. The patch was chosen for
+analytics-only consent ordering, disabled advertising attribution, isolated
+persistence and discarding unsent data on withdrawal; it was not needed for our
+gameplay events. Stock SDK migration steps and privacy gaps are recorded in
+`LAYERS_STOCK_SDK_REVIEW.md`. SDK code remains unchanged, as requested for this
+assessment stage. Next: resolve the consent/attribution behavior with the owner
+and vendor as needed, migrate the adapter and dependency together, then rerun
+EditMode tests and verify Android permissions, offline withdrawal and real Events
+receipt on the device. No privacy scope change or release approval was assumed.
+
+## 2026-09-21 — Layers SDK, consent controls and privacy website; release gates remain
+
+`feat-implement-tracks` / T-021 + T-022. Owner supplied Layers App ID
+`app_4cf32e54fc359326`. The Layers project URL is the browser address of the open
+project; useful for dashboard verification, unnecessary for SDK initialization.
+
+Implemented a pinned Layers 3.3.2 adapter with a separate PROFILE → GAMEPLAY ANALYTICS
+choice, off until explicit acceptance. SDK initialization waits for acceptance; off
+revokes consent, cancels transport and clears only the dedicated SDK queue directory.
+The separate random analytics support ID remains copyable for provider deletion.
+Advertising-ID/install-referrer collection, advertising consent, automatic application
+error reports and gameplay performance traces are disabled. Native SDK delivery-health
+reporting is distinct: the public configuration returns health enabled, and the core
+contains queue/delivery/drop/retry/consent counters. The policy and Diagnostics declaration
+include these counters. No synthetic health probe or event was sent.
+
+Real run starts/results and consented notification opens feed Layers. Versioned,
+allowlisted campaign values follow a clicked visit into Daily runs; duplicate clicks,
+abandoned runs, mid-run consent and expiry are covered by tests. Notifications route to
+the Daily menu only when safe, never auto-start gameplay/camera. No Supabase identity
+alias, custom purchase event, sender function or scheduled campaign was enabled.
+
+Replaced OneSignal's default small/large sample graphics with the Veyro V vector.
+The observed deny/retry continuation path now uses bounded Unity Android permission
+callbacks. This addresses the suspected path; its physical deny/retry verification is
+still pending, as are separate foreground/warm/cold notification checks.
+
+**Verified:** 468/468 tests pass. Three SDK consent tests enter Play Mode with the
+official native/network-free mock; initial test-only failures from using a persistent
+MonoBehaviour outside Play Mode were corrected. Android ARM64 release-format APK built:
+`builds/MotionRunner-SponsorSDK-release.apk`, 73,469,525 bytes (+972,600 versus the prior
+OneSignal release check), SHA-256
+`7f4b86a25e4e4664e7e384c533962ce04bf0560d8cea9d76346d7ff41b12a522`.
+Permissions are unchanged from that OneSignal APK: no AD_ID or location permissions.
+UnityPlayerGameActivity remains the launcher. Packaged Layers code matches the pinned
+native library after Unity's debug-symbol stripping; ELF and ZIP 16 KiB alignment pass.
+The compiled drawable contains the V path, and the vendor default large icon is absent.
+246 implementation/resolved-build inputs match the scratch build. EDM4U's generated
+Maven Central entry was synchronized to the source Gradle settings template.
+
+This is an **uncombined verification APK**, existing versionName 1.0.0 / code 5 and the
+keyless-shop local release flavour, not a Play upload. The subsequent development build
+was intentionally cancelled in our isolated scratch project and deferred until combined
+scope is confirmed; it is not recorded as a passing build. Scratch PlayerSettings were
+restored from source. No phone operation occurred, and the owner's latest design build
+and saved loadout remain untouched. No other agent/editor process was stopped.
+
+**Website deployed and verified:** home, privacy, support and terms at
+`https://veyro.ferrabled.com/` match the prepared files byte-for-byte. Current Cloudflare
+version `0242994e-c899-4634-a3cf-c188218cf2f1`; privacy/terms effective 21 September 2026.
+Copy describes separate push/analytics choices, IP-derived country/region, SDK delivery
+diagnostics, US processing, queued data and separate provider deletion. The website
+itself gained no tracking. `STORE_COMPLIANCE.md` contains the revised Play declaration
+table; `SDK_PRIVACY_RELEASE.md` is the ordered owner/integration/release guide.
+
+**Blocked for final release acceptance / needs human device test:** Q19 feature baseline
+(latest design has uncommitted fitting fixes), highest uploaded Play versionCode and
+production status; Q22 advertising-forwarding/account terms and missing upstream SDK
+license confirmation for the documented local privacy patch. Exact next device steps
+are in SDK_PRIVACY_RELEASE: default-off/no traffic, enable + Events receipt, real
+start/result/abandon, targeted push with campaign data, foreground/warm/cold, opt-out
+and no replay. No real Layers event receipt, combined build, signed AAB, Console change,
+Play upload or hackathon experiment result is claimed.
+
+Evidence: `builds/layers-verification.json`, final test XML/build log, compiled icon and
+permission dumps, public SDK-config response and `builds/site-layers-deployment.json`.
+Private API keys/keystore secrets were not read or requested. Public SDK config HTTP
+200 / success is configuration evidence only, not proof of SDK ingestion.
+
 ## 2026-09-21 — PR #11 review fix: a reroll can no longer be undone by an older profile read
 
 `_profileRequest` ordered `LoadProfile` GETs against each other, but nothing else. A reroll is a
@@ -64,6 +450,192 @@ reverted afterwards — `GameBootstrap` is unchanged in this commit) showed LEVE
 bar and "Finish a run to start recording XP.", the same line the season page renders. The
 Ember/Frost case where the character id stands in for built-in FX could not be reached on that
 phone — both slots were already set explicitly — and is covered by the unit test instead.
+
+## 2026-09-20 — Owner confirmed OneSignal delivery/open; automation and Layers next-step plan
+
+Owner received the targeted test notification and tapping opened the game. Recorded as
+owner-observed success; no exact message ID, installed build or warm/cold state was supplied.
+This closes the basic delivery/open question, not foreground suppression or every lifecycle
+case. Owner reported OneSignal branding: Veyro small/large default icon replacement is pending.
+The earlier denial/retry hang is still unresolved; no source change or new device call this turn.
+
+Added `docs/REMINDER_AUTOMATION_PLAN.md`: complete the notification UX, integrate consent-gated
+Layers events, carry campaign context from push to Daily start/completion, then use a protected
+Supabase Edge Function and Cron for automatic OneSignal sends. Includes private server secrets,
+dry-run/one-device test, send deduplication/cap, QA exclusion, attribution window and experiment
+evidence. This is proposed implementation work; no function, secret, campaign or schedule was
+deployed. Existing release-baseline question Q19 still applies to identity/release scope.
+
+Verified current official OneSignal API/icons, Layers SDK/events, Supabase scheduling/secrets
+and Layers category documentation. Requested the public Layers SDK App ID/project URL; private
+keys stay out of chat. Updated setup/backlog/prerequisites and Q21 to reflect delivery success.
+Next milestone: one branded push opens the Daily entry and real run events appear once in Layers.
+Documentation-only verification: diff whitespace check; prior binary/test results unchanged.
+
+## 2026-09-20 — T-021 Nord 2 device pass; permission retry defect and delivery gate
+
+Owner authorized game-only device testing with no uninstall or changes elsewhere on the phone.
+Installed the verified release APK and a newly built development APK over the existing game;
+firstInstallTime remains 18 Sep 13:16:09 and existing profile, scores, streak and history remain.
+Sent a device reservation to the other active game agent before testing. Each tap checked the
+foreground package and install timestamp. Screenshots streamed to local builds; no phone files,
+other apps, global settings, system Settings screen or notification shade were manipulated.
+
+**Passed:** server-assigned subscription registration, FCM token readiness, contextual prompt,
+Android permission ask after a tap, denial without blocking play, allow after game restart,
+in-game off/on, once-only offer, subscription/opt-in persistence after restart, Daily tilt run,
+profile/online-score loading, camera staging/cancel. Development/Test Store checks passed for
+restore, simulated failed purchase, valid Ember purchase/unlock and restart persistence. No
+real payment; sandbox Ember remains owned and original Frost selection restored.
+
+**Failed / unresolved:** after denying the first Android permission request, a second Enable
+in the same process stayed on PLEASE WAIT with no second native permission activity. Close
+still worked; restarting only the game restored the request path. Root cause is unconfirmed.
+Further negative diagnosis is **blocked on owner-controlled game permission state**: ADB revoke
+of this game's POST_NOTIFICATIONS returned SecurityException, leaving permission granted.
+Did not attempt a security workaround or navigate Settings outside the owner's scope. Q21
+records the needed handoff. The existing shop also shows stale "store unavailable" text despite
+working Test Store actions; noted separately for the ongoing shop redesign.
+
+**Build:** BuildAndroidDev succeeded in the verified scratch copy with two native build workers.
+`builds/MotionRunner-OneSignalDev.apk`, 88,380,680 bytes, versionCode 5,
+`1.0.0-dev.20260920-2051.nogit`, SHA-256
+`ac79659175f38d8a6f2502d242f3b4590d6cbbd0b9f8f34b826c8d07b8de2ac1`.
+Verified Development flag and Test Store key presence; log saved in builds. The nogit stamp is
+from the isolated scratch checkout; 183 relevant source/configuration inputs matched before
+building. No source code changed; prior 451/451 EditMode results still apply. No game crash;
+optional Play AssetPackManager lookup and OEM camera-provider warnings are recorded in report.
+
+**Needs owner/dashboard test:** no signed-in OneSignal browser is available to the agent.
+Supplied the exact subscription for a one-device Send test. Actual FCM delivery, foreground
+suppression and background/cold/warm notification taps are not verified. Final phone state is
+the development APK, notifications on, same one-PUSH subscription (SUBSCRIBED with token),
+Frost selected and notification panel open. Test record: `ONESIGNAL_DEVICE_TEST.md`.
+T-021 is not release-ready until the permission retry is fixed/retested and message delivery
+passes; campaign/tags/Daily routing, public-build evidence and privacy/Console release work
+are still outstanding. No campaign, policy deployment or Play upload was performed.
+
+## 2026-09-20 — T-021 Firebase configured; Android onboarding prompt checked
+
+Owner uploaded the Firebase service-account JSON directly to OneSignal and reached the SDK
+integration step. Read both official Android and Unity prompts. Android is the push delivery
+platform; keep the existing Unity SDK and its native dependency, with no second Kotlin/Java
+initializer or package version. The public configuration for the supplied App ID now returns
+a numeric `android_sender_id`, absent at the earlier check. P5 and OPEN_QUESTIONS 20 updated.
+This establishes configured sender settings, not successful delivery.
+
+Rechecked the existing APK against the new prompt: INTERNET, POST_NOTIFICATIONS and
+`com.onesignal.core.activities.PermissionsActivity` are in its merged manifest. SHA-256 still
+matches the previously verified build. Connected Nord 2 runs Android 13 with a development
+versionCode 5 game installed; its signing certificate matches our versionCode 5 test APK.
+Pulled the existing APK to ignored `builds/onesignal-device-before.apk` for signature comparison.
+No device installation, app data reset, notification opt-in or message send occurred.
+
+**Needs human device test:** phone availability was requested because another game-design
+Android build is running on this computer. Leave that test installation intact until available.
+Then install the existing compatible APK preserving data, open PROFILE → NOTIFICATIONS, enable
+notifications, identify the exact subscription, and send a dashboard test to that device. The
+existing release test APK's shop is intentionally keyless; use BuildAndroidDev for the automatic
+vendor dialog and Test Store checks. No second Unity build was launched with only ~469 MiB free
+RAM. Guide updated with this onboarding checkpoint and optional Google Analytics guidance.
+No source code changed; prior 451/451 tests and successful release build remain applicable.
+
+## 2026-09-20 — T-021 initial OneSignal Android integration (feat-implement-tracks)
+
+Owner supplied the OneSignal App ID and asked to follow the vendor's minimal integration
+prompt. Added Core + Android **5.1.15 Stable** (native **5.1.37**), selected from the official
+release index; the earlier T-042 audit's 5.3.5 is the Current channel. Preserved RevenueCat
+9.8.1 and EDM4U 1.2.188, enabled custom Gradle templates, added the native dependency,
+notification resources and IL2CPP preservation. Supabase configuration/backend is unchanged.
+
+The bootstrap initializes one notification service behind `IPushService`; Editor uses a fake.
+Registration observes changes and reads cached state immediately, rejects local placeholder IDs,
+and is distinct from OS permission, opt-in and token readiness. No OS permission request at
+startup. Development builds have the vendor verification dialog after the guide; player builds
+offer notifications after a completed Daily Run when back on the home menu. PROFILE →
+NOTIFICATIONS allows enable/disable and copying a notification support ID. Foreground banners
+are suppressed, remote in-app messages are paused, location sharing is disabled. SDK errors
+leave gameplay available. This initial increment is anonymous per installation: Supabase UUID
+linking, campaign tags and notification payload routing are still the next T-021 increment.
+
+**Verified:** all **451/451 EditMode tests passed**, including 12 new prompt/registration-state
+cases. OneSignal package import and C# compilation succeeded; lock changes are limited to the
+two pinned OneSignal packages. Every scratch Assets/Packages/ProjectSettings input was hash-
+checked against this workspace before testing; asset GUIDs are unique. Reports copied to
+`builds/onesignal-tests.xml` and `builds/onesignal-tests.log`.
+
+**Android verification: PASSED.** Unity 6000.5.9f1 built the ARM64 release APK targeting API 36
+(minimum 26) in `C:\tmp\veyro-onesignal-check-20260920`, with `BEE_BUILD_THREADS=2` and
+`-job-worker-count 2`. Output copied to `builds/MotionRunner-OneSignal.apk`: **72,496,925 bytes
+(69.14 MiB)**; SHA-256 `5c9e8a3ab6ec21858bae79eb80f750438e6d6cf9d52f9adc7a5f9e14c9b60da9`.
+`com.onesignal.OneSignal` exists in classes3.dex; the OneSignalAndroid IL2CPP bridge and the
+owner's exact App ID are present in metadata; both notification icons exist in Android's
+resource table (AAPT shortens their packaged filenames, so ZIP-name matching is not a valid
+icon check). The launcher remains UnityPlayerGameActivity, launchMode **singleTop**. No AD_ID,
+fine-location or coarse-location permission was added. Permissions/manifest/verification JSON
+and the successful build log are under `builds/onesignal-*`.
+
+The preceding baseline-only native build exited with code -1 while Windows had about 400 MB
+free RAM, without a compiler error at the end of its log. A fresh same-tree size delta is not
+available; compared with the last existing release APK (1 Sep, 70,752,715 bytes), this APK is
+1,744,210 bytes larger. That older content baseline includes other differences and is **not a
+pure SDK-overhead measurement**. The permission diff is recorded separately.
+
+**Needs human device test:** validate FCM v1 in the OneSignal dashboard, install a compatible
+APK over the existing app without clearing data, verify the once-only dialog and opt-in, target
+one test subscription, then check background delivery, normal cold/warm tap, permission denial,
+Android-settings revocation and in-app TURN OFF. Full ordered steps: `ONESIGNAL_SETUP.md`.
+The public Android app configuration had no FCM sender/project fields when checked; no live
+delivery is claimed. No SDK-enabled build has been installed on the connected phone by this task.
+
+**Release work:** privacy Markdown + site privacy/support/home text and the store flip table
+are staged, not deployed. They disclose boot-time registration/session processing separately
+from optional push delivery and explain the separate notification record's deletion path.
+Owner must deploy these before distribution. T-021 remains incomplete until campaign/tag/routing
+work, release-device checks and deployed campaign/public-build evidence are done. P5 is partially
+met (App ID received; FCM confirmation pending); Layers account setup can follow independently.
+
+## 2026-09-20 — T-042 deep SDK feasibility and owner setup guide (feat-implement-tracks)
+
+Owner accepted the shared Daily Run reminder/measurement idea and requested a deeper integration
+review. Added `SPONSOR_SDK_INTEGRATION_GUIDE.md`, updated P5/P6 with exact prerequisites and recorded
+the unresolved release baseline in OPEN_QUESTIONS 19. The guide covers package installation,
+bootstrap/asmdef seams, consent/UI, safe notification routing, a six-tag campaign, event semantics,
+identity/deletion, build/device checks and the short handoff the owner should provide.
+
+**Evidence:** inspected downloaded OneSignal 5.3.5 and Layers v3.3.2 tagged archives outside the
+repo; verified tag commit IDs and OneSignal Android 5.3.5 npm availability. Our Unity 6000.5.9f1,
+API 26/36, ARM64 IL2CPP and existing EDM4U meet published requirements. NDK llvm-readelf verified
+Layers' supplied ARM64 library: 1,857,944 bytes, four LOAD segments aligned to 16 KB, all 62 C#
+native binding names present in its dynamic symbols. This checks that library only, not a final
+APK/AAB. Source review found Layers automatically enables diagnostics/performance and invokes
+GAID lookup at init; consent has no initial config field, the README's thirdPartySharing example
+does not match the two-argument API, and reset/shutdown are not deletion/opt-out shortcuts.
+
+**Outcome:** feasible, with Layers collection/withdrawal behavior an explicit implementation gate.
+No SDK/package/game changes, Unity import/build, campaign send, account mutation, or device test
+were performed. The guide states these limits. Needs human device test **after implementation**:
+follow §6 for consent, cold/warm/foreground notification taps, offline queue, identity where
+applicable, camera pause/resume and real Play purchase/restore. Next: owner provides public App
+IDs, validated FCM setup, release state/baseline and phone availability; implement T-021/T-022.
+
+## 2026-09-20 — T-042 OneSignal/Layers readiness review (feat-implement-tracks)
+
+Reviewed current official Shipaton requirements, vendor Unity SDK documentation and the repo's
+packages, bootstrap, run completion, streak storage and release notes. Neither SDK is installed;
+P5/P6 remain unconfirmed. Added `TRACKS_INTEGRATION_REVIEW.md` with a proposed Daily Run reminder
+loop, Layers-assisted experiment, owner setup, adapter/event plan, device checks, schedule and
+submission evidence. Corrected T-021/T-022 acceptance criteria: a deployed campaign and a
+documented experiment are required beyond the old draft/dashboard checks. T-024 remains separate.
+
+Material findings: the 16 Sep release plan keeps profiles out of the sponsor update although this
+branch contains them; Layers can inject AD_ID and needs release-build attribution checks;
+OneSignal collection disclosures extend beyond the existing push-ID note. SDK versions are
+candidates, not tested pins. No package/code, campaign, account, policy deployment or store state
+changed. Verified by source inspection and official web documentation; Unity tests/builds were
+not run for this documentation-only review. Next: owner confirms OneSignal + FCM/Layers setup
+and production state, then implement T-021/T-022. Future human-device verification steps are in
+the review; no device integration is claimed complete.
 
 ## 2026-09-20 — T-025 softer Ember/Frost proportions
 
@@ -251,7 +823,7 @@ free/paid timeline, current XP, next-level progress and explicit Collect actions
 Collection checks earned XP and the current entitlement; buying a pass never grants XP.
 The existing level-1 starter rule is retained. Development thresholds are cumulative 0–9 XP;
 production has a separate claims/loadout namespace and remains gated pending curve approval
-(OPEN_QUESTIONS 19). No server migration or store product was changed in this session.
+(OPEN_QUESTIONS 23). No server migration or store product was changed in this session.
 
 The Home character replaces the attract run and opens CosmeticsPage. SHOP/RUN/PROFILE stay
 the three tabs. The locker supports Skin, Body, Trail, Headwear, Aura and Crash FX, with
@@ -1416,11 +1988,10 @@ which is exactly why these mattered: the T-020 Unity session reads these docs as
 - **`PurchaseOutcome` is a struct, not an enum.** It was sketched as
   `enum { … Failed(reason) }`, which does not compile — a C# enum cannot carry a payload, and the
   reason is needed for §6 diagnostics. Now `PurchaseStatus` enum + optional `StoreError`.
-- **Judge codes are random and absent from the APK.** The proposed `LogIn("shipaton-judge-<n>")`
-  (OPEN_QUESTIONS 10) was a guessable shared identifier — `strings` on the APK confirms the pattern
-  and the next person to try `-2` inherits the granted entitlement. Now one high-entropy code per
-  judge (`openssl rand -hex 6`), generated out-of-band, validated by nothing, revocable per-ID.
-  Blast radius was only a cosmetic, but the fix is free at design time and impossible afterwards.
+- **Historical judge-login proposal — retired 23 Sep 2026.** This review had proposed random
+  identifiers in place of predictable shared identifiers. The owner subsequently chose Google
+  Play promo codes as the primary route; no custom judge login is planned. Current instructions:
+  REVENUECAT_PLAN §6 and resolved OPEN_QUESTIONS 10.
 - **Season 1 earning never closes for pass owners.** The catalog claimed paid items "stay owned"
   after 31 Oct because the entitlement is non-consumable. Not true: pass-track items unlock on
   *level*, level derives from local XP (D10), so reinstall → Restore returns `season1` but resets the
@@ -1516,7 +2087,8 @@ P10 merchant profile ✅ (payout bank still unwired — non-blocking, sales accr
    held-back cosmetics paragraph (LISTING.md §3) + privacy-policy purchases section on
    docs + site (redeploy = owner wrangler run).
 3. Owner-only, still open: **§D2 15% fee tier**, payout bank, address-publication decision
-   (register), OPEN_QUESTIONS 10/12 → DECISIONS.md.
+   (register), OPEN_QUESTIONS 12 → DECISIONS.md. Historical question 10 was subsequently resolved
+   on 23 Sep: Google Play promo codes are primary; the judge-login proposal is retired.
 
 ## 2026-08-25 — First Play upload done; site live + compliance register created (compliance session)
 
@@ -1561,7 +2133,7 @@ docs of this branch assumed; reconciled in this merge, not just spliced:
   listing description must mention camera mode (T-030).
 - **The privacy policy is drafted** (`docs/PRIVACY_POLICY.md`, linked in-app via `GameLinks`) —
   remaining is hosting + contact email, merged into OPEN_QUESTIONS **9** (was 12 on this branch;
-  judge mode keeps 10).
+  judge-access question retains 10, resolved 23 Sep in favor of Google Play promo codes).
 - **T-031 sequencing improved:** an AAB exists *now*, so the 12×14 clock starts with the current
   build; the RevenueCat build follows as a track update — which is also what unlocks Play in-app
   product creation. Backlog T-030/T-031 rewritten as the union of both branches.
@@ -1712,8 +2284,8 @@ assembly, so `-runTests` keeps working with or without the package (and the SDK 
 Editor at all, so this is a requirement, not a nicety).
 
 **Owner must review/decide:** OPEN_QUESTIONS **9** (SKU ids, entitlement name, prices — product ids
-are immutable once created) and **10** (ship a hidden judge-mode login as a promo-code fallback;
-recommended yes).
+are immutable once created). Historical question **10** is now resolved (23 Sep): the judge-login
+proposal is retired and Google Play promo codes are the primary route; see REVENUECAT_PLAN §6.
 
 **Two things found while reading the repo, both cheap, both embarrassing if missed:** Player Settings
 still say `productName: Motion Runner` / `companyName: DefaultCompany` (that string is the launcher

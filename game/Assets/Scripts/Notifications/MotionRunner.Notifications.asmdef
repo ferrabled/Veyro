@@ -1,0 +1,5 @@
+{
+    "name": "MotionRunner.Notifications",
+    "rootNamespace": "MotionRunner.Notifications",
+    "noEngineReferences": true
+}

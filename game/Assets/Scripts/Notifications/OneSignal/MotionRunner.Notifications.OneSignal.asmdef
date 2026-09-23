@@ -1,0 +1,5 @@
+{
+    "name": "MotionRunner.Notifications.OneSignal",
+    "rootNamespace": "MotionRunner.Notifications.OneSignal",
+    "references": ["MotionRunner.Notifications", "OneSignal.Core"]
+}

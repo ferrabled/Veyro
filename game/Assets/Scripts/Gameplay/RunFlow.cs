@@ -3,6 +3,7 @@ using MotionRunner.Commerce;
 using MotionRunner.Core;
 using MotionRunner.Inputs;
 using MotionRunner.Menu;
+using MotionRunner.Notifications;
 using MotionRunner.Social;
 using MotionRunner.Track;
 using UnityEngine;
@@ -46,9 +47,13 @@ namespace MotionRunner.Gameplay
         int _gameCullingMask;
         CameraClearFlags _gameClearFlags;
         FaceOverlay _overlay;
+        IPushService _push;
+        PushPromptPolicy _pushPrompt;
+        NotificationPanel _notificationPanel;
+        AnalyticsPanel _analyticsPanel;
 
         public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins,
-            IProfileService profile)
+            IProfileService profile, IPushService push)
         {
             var go = new GameObject("RunFlow");
             var flow = go.AddComponent<RunFlow>();
@@ -57,6 +62,8 @@ namespace MotionRunner.Gameplay
             flow._store = store;
             flow._skins = skins;
             flow._profile = profile;
+            flow._push = push;
+            flow._pushPrompt = new PushPromptPolicy(PlayerPrefs.GetInt(PushPromptPolicy.SeenKey, 0) == 1);
             flow._gameCamera = Camera.main;
             if(flow._gameCamera!=null) { flow._gameCullingMask=flow._gameCamera.cullingMask; flow._gameClearFlags=flow._gameCamera.clearFlags; }
             hud.PauseRequested += flow.RequestPause;
@@ -79,6 +86,8 @@ namespace MotionRunner.Gameplay
             _menu = MainMenu.Create(_store, _skins, _profile, tab);
             _menu.Chosen += StartRun;
             _menu.GuideRequested += ShowGuide;
+            _menu.NotificationsRequested += () => ShowNotifications(false);
+            _menu.AnalyticsRequested += ShowAnalytics;
 
             // The home screen now showcases the equipped character. Do not also render/simulate
             // the hidden attract run behind it, especially while a preview camera is active.
@@ -307,6 +316,23 @@ namespace MotionRunner.Gameplay
         void Update()
         {
             TickCameraOutage();
+            bool safeForOffer = _menu != null && _menu.Tab == MenuTab.Run &&
+                !_menu.IsStagingCamera && _guide == null && _notificationPanel == null && _analyticsPanel == null;
+            if (GrowthRuntime.Tracker != null && GrowthRuntime.Tracker.DailyEntryPending &&
+                _menu != null && !_menu.IsStagingCamera && _guide == null &&
+                _notificationPanel == null && _analyticsPanel == null)
+            {
+                _session.Mode = RunMode.Daily;
+                _menu.GoHome();
+                GrowthRuntime.Tracker.ConsumeDailyEntry();
+            }
+            if (_pushPrompt.TryOffer(_push.Status, safeForOffer,
+                    ProgressStore.Streak.Length > 0, Debug.isDebugBuild))
+            {
+                PlayerPrefs.SetInt(PushPromptPolicy.SeenKey, 1);
+                PlayerPrefs.Save();
+                ShowNotifications(Debug.isDebugBuild);
+            }
 
             // Android delivers the back button as Escape (and so does the Editor, which is how
             // this gets exercised without a phone).
@@ -317,6 +343,12 @@ namespace MotionRunner.Gameplay
             // that used to live here would have made back fall through the guide whenever it was
             // opened from the menu.
             if (!UnityEngine.Input.GetKeyDown(KeyCode.Escape)) return;
+            if (_analyticsPanel != null) { _analyticsPanel.Close(); return; }
+            if (_notificationPanel != null)
+            {
+                _notificationPanel.Close();
+                return;
+            }
 
             switch (PauseState.BackFor(_pause.Phase, _session.IsRunning, MainMenu.IsOpen,
                         _guide != null, _session.enabled,
@@ -345,6 +377,19 @@ namespace MotionRunner.Gameplay
         }
 
         // ---- the camera going away mid-run ----
+
+        void ShowNotifications(bool verification)
+        {
+            if (_notificationPanel != null || _analyticsPanel != null || _menu == null || _menu.IsStagingCamera || _guide != null) return;
+            _notificationPanel = NotificationPanel.Show(_push, verification, () => _notificationPanel = null);
+        }
+
+        void ShowAnalytics()
+        {
+            if (_analyticsPanel != null || _notificationPanel != null || _menu == null ||
+                _menu.IsStagingCamera || _guide != null || GrowthRuntime.Analytics == null) return;
+            _analyticsPanel = AnalyticsPanel.Show(GrowthRuntime.Analytics, () => _analyticsPanel = null);
+        }
 
         /// A camera-mode run whose camera has stopped answering PAUSES ITSELF, and the pause menu
         /// takes it from there: its resume staging is already the "stand where the phone can see
@@ -479,6 +524,8 @@ namespace MotionRunner.Gameplay
 
         void OnDestroy()
         {
+            if (_notificationPanel != null) _notificationPanel.Close();
+            if (_analyticsPanel != null) _analyticsPanel.Close();
             DismissOverlay();
             StopAttract();
             if (_hud != null)

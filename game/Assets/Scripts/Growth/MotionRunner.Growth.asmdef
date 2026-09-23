@@ -1,0 +1,6 @@
+{
+  "name": "MotionRunner.Growth",
+  "rootNamespace": "MotionRunner.Growth",
+  "references": ["MotionRunner.Notifications"],
+  "noEngineReferences": true
+}

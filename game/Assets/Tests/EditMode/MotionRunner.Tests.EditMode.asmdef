@@ -8,8 +8,12 @@
         "MotionRunner.CameraInput",
         "MotionRunner.Progression",
         "MotionRunner.Social",
+        "MotionRunner.Notifications",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "MotionRunner.Growth",
+        "MotionRunner.Growth.Layers",
+        "Layers.Unity"
     ],
     "includePlatforms": [
         "Editor"

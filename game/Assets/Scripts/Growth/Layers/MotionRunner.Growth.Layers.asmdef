@@ -1,0 +1,5 @@
+{
+  "name": "MotionRunner.Growth.Layers",
+  "rootNamespace": "MotionRunner.Growth.Layers",
+  "references": ["MotionRunner.Growth", "Layers.Unity"]
+}

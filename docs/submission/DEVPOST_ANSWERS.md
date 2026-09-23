@@ -197,32 +197,41 @@ Outcome and what the signals showed: [N]
 ## 4. Judge access to the purchase
 
 Devpost requires a free trial **or** a promo code so judges can unlock the IAP [S1][S2]. Our product
-is a one-time cosmetic unlock, so free trials do not apply — promo codes are the path.
+is a set of one-time cosmetic purchases. **Google Play promo codes are the primary route**
+(owner-confirmed 23 Sep 2026); no custom judge login is planned.
 
 Paste into the submission's judge-access field:
 
 ```
-To test the purchase at no cost:
+To test premium purchases at no cost:
 
 1. Install Veyro Run from Google Play: [STORE URL]
-2. Play one run, then on the result screen tap the cosmetics button to open the paywall.
-3. Choose a cosmetic. When Google Play's purchase sheet appears, tap the small down-arrow next to
-   the payment method, then tap "Redeem code".
-4. Enter one of the codes below and confirm. The unlock applies immediately and the runner's look
-   changes in the next run.
+2. Open SHOP and select the product you want to unlock. For the Season 1 pass, continue through
+   its paywall to Google's purchase sheet.
+3. On Google Play's purchase sheet, tap the payment-method selector, then "Redeem code".
+4. Enter an unused code from the matching product group below. Verify the purchase is free,
+   then confirm. Equip the unlocked cosmetic before the next run.
 
-   [CODE 1]
-   [CODE 2]
-   [CODE 3]
+   Season 1 pass (season1.pass): [UNUSED PASS CODES]
+   Ember character (skin.ember): [UNUSED EMBER CODES]
+   Frost character (skin.frost): [UNUSED FROST CODES]
 
-Alternatively the codes can be redeemed in the Play Store app (menu → Redeem code) before opening
-the game; the entitlement is picked up when the app next resumes.
+Each code can be redeemed once for its named product. The pass and characters are separate
+purchases. Pass ownership unlocks the level-1 premium reward immediately; later rewards still
+require earned XP and collection. You can preview locked rewards on the season screen.
 
-Restore is available from the same screen if you reinstall.
+Alternatively, redeem in Google Play → profile icon → Payments & subscriptions → Redeem code,
+then reopen the game. SHOP → RESTORE PURCHASES is available for an already redeemed purchase.
+Restoring purchases restores ownership; recovering your player profile restores recorded XP.
+
+If a code fails, contact ferrabled+veyro@gmail.com for help or a replacement code.
 ```
 
-Step 3 is the one people miss — the redeem field belongs to Google's billing sheet, not to the app,
-and the down-arrow is not obvious. Full mechanics and the fallback if a code fails:
+Before submitting: replace placeholders with unused codes, verify these instructions against
+the published build, and keep promotions active throughout 1–13 October judging (planned end
+31 October). The profile/XP instructions apply to the profile-enabled update; omit that sentence
+if judges will receive v5. Actual codes stay outside this repository and public marketing copy.
+The redemption field belongs to Google's billing sheet. Full setup, tests and support:
 `docs/REVENUECAT_PLAN.md` §6.
 
 ---

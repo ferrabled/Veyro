@@ -77,16 +77,88 @@ the same change that ships a feature listed below.
   hold a purchasing build while the live policy says "no collection".
 
 ### T-021 — OneSignal push notifications
-- Data safety → device/push identifiers = collected.
+> Initial Android SDK/permission integration added 20 Sep, not yet released. See
+> `ONESIGNAL_SETUP.md` for exact versions and owner/device checks. This increment initializes
+> anonymous OneSignal registration at boot; push delivery is off until the player enables it.
+> **OS permission / TURN OFF do not disable registration and session collection.** No Supabase
+> alias, email, SMS, custom gameplay tags or Layers collection is enabled in this increment.
+- Data safety → device/push identifiers = collected from SDK initialization (required in this
+  build, not optional just because receiving a notification is optional).
+- App activity → App interactions = collected (sessions / notification interactions), with
+  Analytics and Developer communications purposes. OneSignal's
+  [declaration guide](https://documentation.onesignal.com/docs/en/google-play-data-safety-requirements)
+  also requires purchase-history disclosure in an IAP app; retain the existing purchase row
+  and review the SDK-enabled build alongside RevenueCat. This is more than an IDs-only flip.
+- No location permission is requested; location sharing is disabled in the wrapper. Do not
+  equate that with concealing the IP address used to connect to the provider.
 - **Check the merged manifest for `com.google.android.gms.permission.AD_ID`** after adding
   the SDK — if present, the separate Advertising ID declaration becomes mandatory (targeting
   API 33+). Strip the permission if unused.
+- **20 Sep APK verified:** no AD_ID, ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION. New
+  permissions are POST_NOTIFICATIONS, WAKE_LOCK, VIBRATE, RECEIVE_BOOT_COMPLETED, FCM RECEIVE,
+  the app's signature-protected C2D_MESSAGE, launcher badge permissions and base
+  FOREGROUND_SERVICE (the transitive WorkManager SystemForegroundService; no foreground-service
+  type is declared). Reconcile any Console foreground-service declaration with actual use;
+  this permission does not mean the game gained a background camera or tracking feature.
+  Complete dump: `builds/onesignal-permissions.txt`. UnityPlayerGameActivity remains singleTop.
 - POST_NOTIFICATIONS runtime permission → request in context, explain in listing if asked.
-- Privacy policy → push section; redeploy.
+- Privacy policy → push section + notification-support/deletion explanation staged in the
+  Markdown source and site privacy/support pages, dated 20 Sep. Deploy BEFORE this build reaches
+  testers. TURN OFF is not deletion; the current anonymous subscription is not deleted by the
+  Supabase DELETE ONLINE PROFILE path. Manual verified deletion uses the notification support
+  ID and published support contact. Supabase linking requires server-side provider cleanup
+  before enabling the alias. No site deploy or Console change has been performed by this task.
 
 ### Layers analytics
-- Data safety → app interactions / diagnostics = collected. Privacy policy section. Same
-  AD_ID check as OneSignal.
+21 Sep 2026 implementation: consent-gated Layers 3.3.2 — the **official unmodified**
+package, pinned by Git URL to upstream commit `7d28dcda555ab3ab3f0901c6c6e77f8710613f4b`
+(tag v3.3.2); App ID `app_4cf32e54fc359326`. Advertising-ID and install-referrer
+libraries are excluded project-wide in the Gradle templates, not by patching the SDK.
+No Console changes or uploaded release are implied.
+Use this table together with existing RevenueCat/OneSignal/Supabase declarations:
+
+| Play category | Collection / requirement | Purposes and handling |
+| --- | --- | --- |
+| App activity → App interactions | Collected. Layers portion OPTIONAL; combined app's row remains REQUIRED where OneSignal session processing is automatic. | Analytics; retain Developer communications for OneSignal notifications. Runs used for leaderboards remain the existing Other actions row. |
+| Device or other IDs | Collected. Layers portion OPTIONAL; combined row remains REQUIRED due to launch-time purchase/push identifiers. | Analytics plus existing app functionality. SDK installation/session IDs and random analytics support ID are pseudonymous, not anonymous data exempt from disclosure. |
+| Location → Approximate location | Collected, OPTIONAL for Layers; not ephemeral because derived country/region supports analytics. | Analytics. Provider derives region from network IP, then drops raw IP. No GPS permission. OneSignal currently states it does not collect approximate location. |
+| Personal info → User IDs | Keep existing REQUIRED profile declaration if profiles ship. | App functionality/account management/security as already recorded. Review Analytics purpose for the separate Layers custom user ID; do not remove this row merely because identifiers are random. |
+| Purchase history | Preserve existing RevenueCat and OneSignal purchase declarations. | No new custom Layers purchase event in this increment. |
+| App info/performance → Diagnostics | Collected, OPTIONAL for Layers. | Analytics and app functionality (delivery reliability). Public config enables native SDK health reporting; the bundled core contains delivery/queue/drop/retry/consent counters. Application crash/error reports and gameplay performance tracing remain disabled; do not declare crash logs merely because SDK delivery diagnostics exist. |
+
+- Shared vs collected: retain the existing public leaderboard sharing. Provider-only
+  processing may qualify for Google's service-provider sharing exception when done
+  solely on our instructions. Confirm Layers advertising/CAPI destinations are off
+  before relying on that exception; SDK consent alone is not account verification.
+- Advertising ID: expected **No**, subject to final artifact verification. With the
+  stock SDK, `mainTemplate.gradle` and `launcherTemplate.gradle` carry a
+  `configurations.all { exclude ... }` block dropping
+  `com.google.android.gms:play-services-ads-identifier` and
+  `com.android.installreferrer:installreferrer` from every configuration, so EDM4U's
+  resolution of the SDK's `Editor/LayersDependencies.xml` cannot reintroduce AD_ID and
+  the SDK's JNI lookups return null. This matters because RevenueCat's Android SDK
+  already pulls ads-identifier 17.0.1, so the class would otherwise be present and a
+  real GAID readable on Android 8–12 (minSdk 26). **Verified 21 Sep** on the stock
+  scratch build (`builds/layers-stock-verification.json`): permission set identical to
+  the release baseline, AD_ID absent, no ads-identifier implementation or installreferrer
+  classes in any dex. That artifact is the development flavour (release builds are
+  guarded until the XP curve is approved); repeat the permission dump on the final
+  signed AAB before answering the Console question.
+  Inspect the merged release manifest for AD_ID, location and foreground-service
+  changes; preserve the prior OneSignal permission baseline. No ads are added.
+- Network transports use HTTPS. No camera frames, raw motion readings, recovery
+  secrets, email or phone data are sent to Layers. Camera control labels are events,
+  not image collection. Account creation/access answers remain those of profiles.
+- Privacy policy effective **21 September 2026**, with separate opt-in, opt-out
+  (unsent events are held on the device, never sent, and deleted on the next enable or
+  when app data is cleared), US processing and support-ID deletion explanations. Public
+  deletion URL remains `https://veyro.ferrabled.com/support/#delete`. DELETE ONLINE
+  PROFILE does not delete the independent OneSignal/Layers records in this release.
+- Full ordered release procedure, owner/vendor checks and evidence gaps:
+  `SDK_PRIVACY_RELEASE.md`. The app now ships the stock SDK and redistributes no
+  modified SDK source, so the courtesy request asking Layers to add a LICENSE or
+  confirm terms is **not a release gate**. No fixed analytics retention period or
+  one-click provider deletion is promised without an implemented process.
 
 ### T-009 — Supabase profiles + leaderboard (post-v1.0, Update 1)
 > Redefined 3 Sep 2026: anonymous-first Supabase identity, **no Play Games sign-in in this
@@ -172,6 +244,51 @@ deleted or app data is cleared; the current profile receives its own code. Both 
 on the device, never public leaderboard data. No SDK, permission, or collected-data category
 is added by these corrections. The existing T-009 atomic binary/Console/policy flip remains
 required; this review made no Console or production deployment changes.
+
+### 21 Sep 2026 — policy website deployment verified
+
+Cloudflare `veyro-site` version `0242994e-c899-4634-a3cf-c188218cf2f1` is live.
+Home, privacy, support and terms were fetched from `veyro.ferrabled.com` and matched
+the prepared files byte-for-byte. Privacy/terms are effective 21 September 2026;
+`/privacy/#analytics` and `/support/#delete` exist. This supersedes earlier
+"not deployed" statements for website copy only. No Play declaration or upload was
+performed. SDK release checks and the owner/vendor gates above remain open.
+
+21 Sep Android artifact check: `MotionRunner-SponsorSDK-release.apk` is 73,469,525
+bytes (+972,600). Its permission set equals the earlier OneSignal release check;
+AD_ID, ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION are absent. ARM64 native
+Layers and APK ZIP alignment are 16 KiB compatible. This verifies the current SDK
+increment only; repeat on the final combined/signed Play artifact. Code 5 was not
+incremented and this local keyless-shop APK must not be uploaded as a new release.
+
+### 21 Sep 2026 — stock Layers SDK migration (supersedes the patched-SDK entry above)
+
+The embedded, locally patched `com.layers.analytics` package was removed and replaced
+by the official unmodified package pinned by Git URL to upstream commit
+`7d28dcda555ab3ab3f0901c6c6e77f8710613f4b` (tag v3.3.2, still the latest upstream
+release). Advertising-ID and install-referrer collection is now prevented at the
+project level by a `configurations.all { exclude ... }` block in `mainTemplate.gradle`
+and `launcherTemplate.gradle` rather than by editing SDK source, because EDM4U would
+otherwise resolve the stock SDK's `Editor/LayersDependencies.xml` and add AD_ID via
+ads-identifier 18.1.0, and RevenueCat already ships ads-identifier 17.0.1 in today's
+APK. Declarations in the table above are unchanged in substance; the Advertising ID
+answer stays **No**, evidenced by the rebuilt stock artifact the same evening
+(`builds/layers-stock-verification.json`: no AD_ID, permission set identical to the
+previous release, no ads-identifier/installreferrer classes). Re-check on the final
+signed artifact.
+
+Opt-out semantics changed with the stock SDK and are already reflected in the policy
+and in-game copy: turning analytics off revokes consent and shuts the SDK down, unsent
+events are held on the device and can never be sent while analytics is off, and they
+are deleted on the next enable (deny consent → SDK Reset → grant analytics consent) or
+when the player clears app data. The stock SDK also always emits an initialization-
+timing event, covered by the existing Diagnostics declaration. No isolated-storage
+claim remains anywhere: SDK files sit in the app-specific external folder
+`Android/data/<pkg>/files/layers_sdk/` (device-verified 22 Sep), unreadable by other apps.
+
+Owner items that remain: confirm no advertising/CAPI destinations are connected in the
+Layers dashboard; send the courtesy license request (not a gate); run the combined-build
+device test; then the Console flips in the table above. No Console change was made here.
 
 
 ### T-025 — Season timeline and cosmetic locker (20 Sep implementation)

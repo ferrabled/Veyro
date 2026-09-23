@@ -190,9 +190,21 @@ namespace MotionRunner.Menu
             // not only on the store listing. DELETE PROFILE is Play's account-deletion policy:
             // the moment a server-side profile exists, an in-app deletion path must too
             // (STORE_COMPLIANCE T-009). Two taps, because it is immediate and permanent.
-            BuildLink(slot, "Guide", -30f, "HOW TO PLAY", () => Menu.RequestGuide());
-            BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
+            var guide = BuildLink(slot, "Guide", -30f, "HOW TO PLAY", () => Menu.RequestGuide());
+            guide.rectTransform.anchorMax = new Vector2(.5f, 1f);
+            var notifications = BuildLink(slot, "Notifications", -30f,
+                "NOTIFICATIONS", () => Menu.RequestNotifications());
+            notifications.rectTransform.anchorMin = new Vector2(.5f, 1f);
+            ShrinkToFit(guide, 32);
+            ShrinkToFit(notifications, 32);
+            var privacy = BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
                 () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
+            privacy.rectTransform.anchorMax = new Vector2(.5f, 1f);
+            var analytics = BuildLink(slot, "Analytics", -30f - LinkSpacing, "GAMEPLAY ANALYTICS",
+                () => Menu.RequestAnalytics());
+            analytics.rectTransform.anchorMin = new Vector2(.5f, 1f);
+            ShrinkToFit(privacy, 28);
+            ShrinkToFit(analytics, 28);
             _delete = BuildLink(slot, "Delete", -30f - 2 * LinkSpacing,
                 "DELETE ONLINE PROFILE", DeleteTapped);
             ShrinkToFit(_delete, 32);

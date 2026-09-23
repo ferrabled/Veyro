@@ -96,9 +96,13 @@ revisable after the store build freezes.
 
 ### Judge promo codes (updates `REVENUECAT_PLAN.md` §6)
 
-Codes are per-product: generate **10 for `veyro.season1.pass` and 5 per skin** (well inside the
-500/quarter budget). The pass code is the one that goes in the Devpost description — it demos the
-richest premium surface (paid track + instant level-1 unlock, §3).
+**Google Play promo codes are the primary judge-access route** (owner-confirmed 23 Sep 2026).
+Codes are per-product: generate **10 for `season1.pass`, 5 for `skin.ember` and 5 for `skin.frost`**,
+plus separate test codes (well inside the 500/quarter budget). Supply unused codes for all three
+products in the submission's judge-access instructions: the pass does not include the separate
+characters. It demonstrates the paid track and instant level-1 unlock (§3); later rewards still
+require XP. Keep promotions active through judging; setup, tests and support are in
+`REVENUECAT_PLAN.md` §6. No custom judge login is planned.
 
 ---
 

@@ -41,20 +41,28 @@ permalink: /privacy/
      SCOPED ("the leaderboard update onward") so the page stays truthful whenever it deploys.
      Deploy WITH or BEFORE the first build that carries profiles; the Data safety flips ride
      the same release (STORE_COMPLIANCE.md T-009). The old "no accounts / nothing else leaves
-     your phone" absolutes are gone from every page (18 Sep review R3). -->
+     your phone" absolutes are gone from every page (18 Sep review R3).
+     T-022 REVISED 21 Sep 2026 (same day, before any analytics build is distributed): the
+     locally patched Layers SDK was replaced by the official unmodified package, so the
+     "Turning it off" bullet no longer promises that unsent events are discarded at that
+     moment — with the stock SDK they stay on the device, can never be sent while analytics
+     is off, and are deleted on the next enable or when app data is cleared. The delivery-
+     diagnostics sentence now also names the initialization-timing event the stock SDK always
+     emits, and no page claims a dedicated/isolated SDK storage folder any more (the SDK's
+     files live in the app-specific storage folder; device test 22 Sep found them under Android/data/<pkg>/files/layers_sdk). Effective date unchanged: same-day revision. -->
 
 
 # Veyro Run — Privacy Policy
 
-**Effective date:** 19 September 2026
+**Effective date:** 21 September 2026
 **App:** Veyro Run (`com.ferrabled.veyro.run`), published by Fernando Rabasco ("ferrabled")
 **Contact:** ferrabled+veyro@gmail.com
 
 ## The short version
 
-The game itself plays entirely on your device — every camera frame is processed and discarded in memory, and no advertising, ad identifier, or tracking SDK exists in any version. The network is used for two things. Versions with the in-game shop ask our purchase provider which cosmetics you own. Versions with the shared leaderboard (the **leaderboard update** onward) additionally create an **anonymous player profile** — a random ID and a generated name like SWIFT-FOX-42, no email, no sign-in — and upload your **finished run results** so the daily and all-time leaderboards can exist. Your name and score on those boards are visible to other players; you can rename the profile at any time and delete it, with everything it holds, from inside the game.
+The game itself plays entirely on your device — every camera frame is processed and discarded in memory, and the game serves no ads. Online services support purchases, leaderboards and, in notification-enabled versions, notification registration and delivery. Versions with GAMEPLAY ANALYTICS offer a separate, optional analytics service that stays off until you enable it. Versions with the in-game shop ask our purchase provider which cosmetics you own. Versions with the shared leaderboard (the **leaderboard update** onward) additionally create an **anonymous player profile** — a random ID and a generated name like SWIFT-FOX-42, no email, no sign-in — and upload your **finished run results** so the daily and all-time leaderboards can exist. Your name and score on those boards are visible to other players; you can rename the profile at any time and delete it, with everything it holds, from inside the game.
 
-**Which version do you have?** Closed-beta versions before the shop update (September 2026) make no network requests at all. Versions with a SHOP tab but no LEADERBOARD card have purchases only. Versions showing a player name on the PROFILE tab have both — and every section below applies.
+**Which version do you have?** Closed-beta versions before the shop update (September 2026) make no network requests at all. A SHOP tab indicates purchase services; a generated player name indicates online profiles. Versions showing a player name on the PROFILE tab have both — and the profile section below applies. Versions with PROFILE → NOTIFICATIONS also include the notification service described below. PROFILE → GAMEPLAY ANALYTICS identifies versions offering the optional Layers service described below.
 
 ## Camera (optional game mode)
 
@@ -97,9 +105,32 @@ Veyro Run is free, and the whole game is in the free download. You can optionall
 - **Google Play handles the payment.** Purchases are made through your own Google account under Google Play's terms. We never see or receive your payment details — no card number, no billing address, no name. Google's handling of the transaction is covered by [Google's privacy policy](https://policies.google.com/privacy).
 - **Buying is what adds the purchase itself.** When you buy or restore, RevenueCat also receives the **purchase token and purchase history** that Google Play issues for the transaction, and keeps them so your purchase can be given back to you when you reinstall or switch phones.
 - **That identifier is pseudonymous.** It is not linked to your name or email. In shop-only versions it is generated per installation; in versions with online profiles it is your player profile's random ID (see the profile section above), so cosmetics and profile belong to one identity. Reinstalling normally produces a new one, though Android's backup service — or, in profile versions, the recovery code — can bring the previous identity back.
-- **Purchase records double as our sales statistics.** RevenueCat shows us aggregate numbers derived from purchases — how many of each cosmetic have been bought, revenue totals. That is the extent of the "analytics" in this game: it comes from the purchase records themselves, not from any tracking of you or your play. No advertising, no ad identifiers, no separate analytics SDK, no profiling, and no gameplay data is sent anywhere. Buying a skin does not start any other collection.
+- **Purchase records double as our sales statistics.** RevenueCat shows us aggregate numbers derived from purchases — how many of each cosmetic have been bought, revenue totals. These statistics come from purchase records. Profile-enabled versions additionally send finished-run results as described above; notification-enabled versions also process sessions and notification interactions as described below. We do not serve ads or collect advertising identifiers. Buying a skin does not enable additional gameplay tracking.
 
 Camera mode is unaffected by all of this: camera frames are never part of a purchase, never sent to Google Play or RevenueCat, and never transmitted anywhere at all.
+
+## Notifications (versions with PROFILE → NOTIFICATIONS)
+
+The game uses **OneSignal**, with **Firebase Cloud Messaging (FCM)** for Android delivery. Firebase is a delivery service here; the profile database remains Supabase.
+
+- **Registration starts when the app starts**, even before you allow notifications. OneSignal processes an installation/user identifier, push subscription identifier and device push token when available, notification permission/subscription state, app/device/OS information, language/time zone, sessions and notification interactions. Network requests expose your IP address to the service. In an app with purchases, OneSignal may also process purchase history for messaging statistics. This processing supports notifications and their delivery/engagement measurements.
+- **Receiving notifications is optional.** A menu explanation lets you choose; Android asks for permission when needed. PROFILE → NOTIFICATIONS → TURN OFF stops push delivery, and Android settings also control permission. These actions do not delete the provider record or stop SDK registration/session processing while the app is used. Every run remains playable without notification permission or a network connection.
+- **No camera frames, motion readings or precise location are sent to OneSignal.** Location sharing is disabled. This first notification version does not send your Supabase player ID, email, phone number or custom run-result tags to OneSignal. Its installation record is separate from your online profile.
+- **Retention and deletion:** the notification record remains with OneSignal until deleted. To request deletion, copy PROFILE → NOTIFICATIONS → COPY NOTIFICATION SUPPORT ID and email [ferrabled+veyro@gmail.com](mailto:ferrabled+veyro@gmail.com). The ID locates the record; we verify control before deleting. We handle requests within 30 days, normally sooner. DELETE ONLINE PROFILE only deletes the profile-related records described above, not this separate notification record. Using the app after deletion can create a new notification record; uninstalling stops further SDK activity but is not itself a provider-deletion request.
+
+## Gameplay analytics (optional, versions with PROFILE → GAMEPLAY ANALYTICS)
+
+We use Layers to understand how players use the game and whether a notification leads to a played Daily Run. This is separate from notification permission and from the leaderboard service.
+
+- **Off until you choose.** The Layers SDK does not start or contact Layers until you enable PROFILE → GAMEPLAY ANALYTICS. Your choice is remembered between launches. Declining has no effect on gameplay, purchases, leaderboards or notification delivery.
+- **What is sent after enabling.** A random analytics support ID and SDK installation/device and session identifiers; app version and build type; device model, operating system, language, time zone and screen information; app visits; notification opens; and real run starts and results, including mode, control choice, track/day/version, score, coins, distance and duration. A notification may carry campaign and variant labels so we can connect that click to a later run. The SDK also reports delivery diagnostics, such as queued/delivered/dropped event counts, retry status, SDK version and consent state, and one measurement of how long the SDK took to start, to help detect delivery problems. We do not send the notification text or arbitrary notification payloads to Layers.
+- **Approximate location.** Network requests expose your IP address to Layers. Layers states that it derives country and region from the address and then discards the raw IP. This is approximate location processing; the game does not request GPS/location permission.
+- **What is excluded.** We disable advertising-ID and install-referrer collection, advertising consent, and automatic application crash/error reports and gameplay performance traces in this integration. SDK delivery diagnostics described above remain enabled while analytics is on. No camera frames, motion-sensor readings, recovery codes, email addresses or phone numbers are sent. Choosing camera controls sends only the control-mode label, never what the camera sees. This version uses a separate analytics ID rather than your Supabase player ID.
+- **Turning it off.** PROFILE → GAMEPLAY ANALYTICS → TURN ANALYTICS OFF withdraws consent and shuts the SDK down, so nothing further is sent. While enabled, up to 200 pending events may be stored in the app's own storage area on your device (an app-specific folder that other apps cannot read) for delivery when connected. Events still unsent when you turn analytics off stay on the device and can never be sent while analytics is off; they are deleted the next time you enable analytics, or when you clear the app's data. Events already delivered cannot be recalled by the switch. The support ID remains on the device so you can request deletion of earlier records.
+- **Retention, access and deletion.** Previously delivered analytics remains with Layers until deleted under its retention arrangements or a verified deletion request; turning off or uninstalling does not itself delete provider records. Copy PROFILE → GAMEPLAY ANALYTICS → COPY ANALYTICS SUPPORT ID, then email ferrabled+veyro@gmail.com to request access or deletion. The ID locates records; we verify control before acting. Requests are handled within 30 days, normally sooner. DELETE ONLINE PROFILE does not delete this separate analytics record. Enable analytics again after deletion and new records can be created.
+- **Provider and international processing.** Layers processes analytics for us and states that its primary processing region is the United States. Its data-protection documentation describes its processing, international-transfer arrangements and deletion process. Contact us with questions about our use of the service.
+
+Provider information: [Layers data protection](https://layers.com/docs/api/operational/data-protection).
 
 ## Children
 
@@ -107,9 +138,9 @@ Veyro Run is not directed at children under 13.
 
 ## Your rights
 
-In versions with online profiles, your profile and runs are yours to manage directly: rename in the PROFILE tab, delete everything with DELETE ONLINE PROFILE (immediate and permanent), or email us. The PROFILE tab shows a **Player ID** (locates your records) and a **recovery code** (proves control of the profile — only your device holds it; the server keeps a fingerprint). An ID alone locates a record but does not authorize: before acting on an emailed request we verify control, and the recovery code is the way to demonstrate it. The same code also re-imports your profile on another install (IMPORT PROFILE on the PROFILE tab).
+In versions with online profiles, your profile and runs are yours to manage directly: rename in the PROFILE tab, delete profile-related records with DELETE ONLINE PROFILE (immediate and permanent), or email us. The PROFILE tab shows a **Player ID** (locates your records) and a **recovery code** (proves control of the profile — only your device holds it; the server keeps a fingerprint). An ID alone locates a record but does not authorize: before acting on an emailed request we verify control, and the recovery code is the way to demonstrate it. The same code also re-imports your profile on another install (IMPORT PROFILE on the PROFILE tab).
 
-For versions without online profiles, the game holds no data about you, so there is nothing to request, export, correct, or delete — uninstalling removes the local scores and settings from the device (subject to Android's backup behaviour, above).
+For versions without online profiles, purchases, notifications or gameplay analytics, no data leaves the game, so there is nothing held by our providers to request, export, correct, or delete — uninstalling removes the local scores and settings from the device (subject to Android's backup behaviour, above).
 
 In shop-enabled versions, RevenueCat holds the anonymous identifier for your installation from the first launch onwards, and — if you have bought a cosmetic — the record of that purchase, which it keeps so the purchase can be restored. A purchase also appears in your own Google Play order history, which you see and manage in your Google account.
 
@@ -126,7 +157,7 @@ This website (veyro.ferrabled.com) sets no cookies and runs no analytics or trac
 
 ## Changes
 
-The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. If a future version of the game starts any further data collection (for example push notifications), this policy will be updated here first, and the app's store listing will reflect it.
+The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. The Notifications section was added on 20 September 2026, ahead of the notification-enabled update. The optional Gameplay analytics section was added on 21 September 2026, ahead of the analytics-enabled update, and its description of turning analytics off was corrected the same day, before distribution. Future collection changes will be described here before distribution and reflected in the store listing.
 
 ## Contact
 
