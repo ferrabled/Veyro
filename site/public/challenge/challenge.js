@@ -54,16 +54,33 @@
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   }
 
+  /* The page must read a link exactly the way the app will (ChallengeMessage.TryParse), or it
+     shows a challenge that changes or does nothing once the game opens. So: the LAST value of
+     a repeated key wins, and a number is the WHOLE value as a signed 32-bit integer —
+     parseInt would show "4210oops" as 4210 and accept an out-of-range seed, where the app
+     reads the first as 0 and refuses the second. */
   var params = new URLSearchParams(window.location.search);
-  var seed = params.get("s");
-  var score = parseInt(params.get("p"), 10);
-  var daily = params.get("m") === "daily";
-  var day = params.get("d") || "";
-  var world = params.get("w") || "";
-  var version = params.get("v") || "";
 
-  var hasChallenge = seed !== null && seed !== "" && /^-?\d+$/.test(seed);
-  var hasScore = hasChallenge && !isNaN(score) && score > 0;
+  function last(key) {
+    var all = params.getAll(key);
+    return all.length ? all[all.length - 1] : null;
+  }
+
+  function int32(value) {
+    if (value === null || !/^[-+]?\d+$/.test(value)) return null;
+    var n = Number(value);
+    return n >= -2147483648 && n <= 2147483647 ? n : null;
+  }
+
+  var seed = int32(last("s"));
+  var score = int32(last("p"));
+  var daily = (last("m") || "").toLowerCase() === "daily";
+  var day = last("d") || "";
+  var world = last("w") || "";
+  var version = last("v") || "";
+
+  var hasChallenge = seed !== null;
+  var hasScore = hasChallenge && score !== null && score > 0;
 
   /* No usable parameters: leave the static copy alone. It already reads as an invitation rather
      than an error, which is the right thing for a link a chat app truncated. */

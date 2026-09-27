@@ -224,7 +224,17 @@ namespace MotionRunner.Tests
             Assert.AreEqual(0, link.Score);
             Assert.AreEqual(RunSeed.DefaultWorldId, link.Seed.WorldId,
                 "a missing world id falls back to the shipped content set, not to empty");
+            Assert.AreEqual(ChunkLibrary.ContentVersion, link.Seed.ContentVersion,
+                "a missing content version is this build's - RunFlow refuses any other, so an " +
+                "empty one would silently discard the link this test promises still plays");
             Assert.IsFalse(link.WasDaily);
+        }
+
+        [Test]
+        public void AnEmptyVersionValueCountsAsAbsent()
+        {
+            Assert.IsTrue(ChallengeMessage.TryParse("veyro://challenge?s=5&v=&p=10", out var link));
+            Assert.AreEqual(ChunkLibrary.ContentVersion, link.Seed.ContentVersion);
         }
 
         [Test]

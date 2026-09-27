@@ -129,7 +129,10 @@ namespace MotionRunner.Track
             bool hasSeed = false;
             int seed = 0;
             int score = 0;
-            string contentVersion = string.Empty;
+            // A missing `v` means this build's content, like a missing `w` means the shipped
+            // world: the sender's version is unknown rather than different, and RunFlow refuses
+            // a version it cannot generate - so defaulting to "" would drop every truncated link.
+            string contentVersion = ChunkLibrary.ContentVersion;
             string worldId = RunSeed.DefaultWorldId;
             string dailyLabel = string.Empty;
             bool daily = false;
@@ -152,7 +155,11 @@ namespace MotionRunner.Track
                         case KeySeed: hasSeed = TryParseInt(value, out seed); break;
                         // Bounded: both end up in a RunSeed and in a board submission, and a
                         // link is attacker-typed text.
-                        case KeyContentVersion: if (value.Length <= MaxTokenLength) contentVersion = value; break;
+                        // An oversized one is present but no version any build ships: kept
+                        // unmatchable ("") so it is refused, not mistaken for an absent one.
+                        case KeyContentVersion:
+                            if (value.Length > 0) contentVersion = value.Length <= MaxTokenLength ? value : string.Empty;
+                            break;
                         case KeyWorldId: if (value.Length > 0 && value.Length <= MaxTokenLength) worldId = value; break;
                         case KeyScore: TryParseInt(value, out score); break;
                         case KeyMode: daily = string.Equals(value, ModeDaily, StringComparison.OrdinalIgnoreCase); break;

@@ -29,6 +29,22 @@
 **Verified:** `node --check` on `challenge.js`; sample intent URL inspected (a `#` in a value is
 encoded to `%23`, so it cannot end the data URI early). No game code changed, so no Unity run.
 
+**Second Copilot pass, same day — two "previously missed" findings, both real, both fixed:**
+- **A seed-only (truncated) link was parsed and then thrown away.** `TryParse` left a missing `v`
+  as `""`, and `RunFlow.TryStartPendingChallenge` refuses any version but `ChunkLibrary.ContentVersion`
+  — so `AHalfBrokenLinkStillPlaysIfItHasASeed` promised a run that never started. A missing or empty
+  `v` now means this build's version, the same rule a missing `w` already had. An *oversized* `v`
+  stays `""` and is still refused (present but no version any build ships). Tests: the half-broken
+  link now asserts the version; new `AnEmptyVersionValueCountsAsAbsent`.
+- **The landing page read numbers more loosely than the app.** `parseInt("4210oops")` showed 4210
+  where the app reads 0, and an out-of-range seed showed a challenge the app refuses. `challenge.js`
+  now requires the whole value to be a signed 32-bit integer, takes the last of a repeated key and
+  compares the mode case-insensitively — all three exactly as `ChallengeMessage.TryParse` does.
+  Edge cases checked in node (`4210oops`, `2147483648`, `%2B7`, `+3`, `s=1&s=x`, `007`).
+
+The XAttribute finding was listed again only because its thread was still unresolved — the code is
+unchanged and the reasoning above stands.
+
 **Needs a human device test** (after `npx wrangler deploy` from `site/`, owner-only): on an Android
 phone **without** the game, open a challenge link in Chrome and tap **Open in Veyro** → the Play
 listing must open, not an error page. With the game installed → the game opens on the challenge.
