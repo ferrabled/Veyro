@@ -57,5 +57,20 @@ namespace MotionRunner.Tests
         {
             Assert.That(Registered(permission, optIn, token).ReadyForPush, Is.EqualTo(expected));
         }
+
+        [Test] public void PlayerAlreadyReadyDoesNotReceiveAnOfferOrConsumeEligibility()
+        {
+            var policy = new PushPromptPolicy(false);
+            Assert.That(policy.TryOffer(Registered(true, true, true), true, true, false), Is.False);
+            Assert.That(policy.Seen, Is.False);
+            Assert.That(policy.TryOffer(Registered(), true, true, false), Is.True);
+        }
+
+        [Test] public void DevelopmentVerificationStillOffersWhenPushIsReady()
+        {
+            var policy = new PushPromptPolicy(false);
+            Assert.That(policy.TryOffer(Registered(true, true, true), true, false, true), Is.True);
+            Assert.That(policy.TryOffer(Registered(true, true, true), true, false, true), Is.False);
+        }
     }
 }

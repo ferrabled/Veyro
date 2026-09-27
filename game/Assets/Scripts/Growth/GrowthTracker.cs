@@ -11,16 +11,20 @@ namespace MotionRunner.Growth
         readonly string _build;
         readonly bool _qa;
         readonly Func<DateTime> _clock;
+        readonly Func<int> _visitVersion;
         readonly HashSet<string> _clicks = new HashSet<string>();
         Dictionary<string, object> _campaign;
         Dictionary<string, object> _run;
         DateTime _expires;
+        int _campaignVisit;
         string _runId;
         public bool DailyEntryPending { get; private set; }
 
-        public GrowthTracker(IAnalyticsService analytics, string build, bool qa, Func<DateTime> clock)
+        public GrowthTracker(IAnalyticsService analytics, string build, bool qa, Func<DateTime> clock,
+            Func<int> visitVersion = null)
         {
             _analytics = analytics; _build = build; _qa = qa; _clock = clock;
+            _visitVersion = visitVersion ?? (() => 0);
             analytics.Changed += ConsentChanged;
         }
 
@@ -48,6 +52,7 @@ namespace MotionRunner.Growth
                         if (value != null) _campaign[key] = value;
                     }
                     _expires = _clock().AddHours(24);
+                    _campaignVisit = _visitVersion();
                     Copy(_campaign, properties);
                 }
             }
@@ -65,7 +70,11 @@ namespace MotionRunner.Growth
             _run = Common();
             _run["run_id"] = runId; _run["mode"] = mode; _run["input_mode"] = control;
             _run["utc_day"] = day; _run["world_id"] = world; _run["content_version"] = contentVersion;
-            if (_campaign != null && _clock() < _expires && mode == "daily") Copy(_campaign, _run);
+            if (mode == "daily" && _campaign != null)
+            {
+                if (_clock() < _expires && _campaignVisit == _visitVersion()) Copy(_campaign, _run);
+                _campaign = null; // only the next Daily Run; its completion keeps the copied fields
+            }
             _analytics.Track(mode == "daily" ? "daily_run_started" : "free_run_started", _run);
         }
 

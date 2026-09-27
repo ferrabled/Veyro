@@ -1,5 +1,9 @@
 # OneSignal Android device verification — 20 September 2026
 
+**Later combined-build check:** the 23 September `STATUS.md` entry records the installation
+and device results. The 21 September retry fix still needs native verification; the
+historical failure below was not reproduced on the 23 September build.
+
 Task: T-021, `feat-implement-tracks`. Device: OnePlus Nord 2 / DN2103, Android 13.
 Package: `com.ferrabled.veyro.run`. Public OneSignal App ID:
 `1f6ba056-efe3-4bfe-a0cd-a9a26150720a`.

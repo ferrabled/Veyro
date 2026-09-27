@@ -1,6 +1,6 @@
 # OneSignal + Layers release checklist
 
-21 September 2026 — feat/implement-tracks. This records the implementation and the
+Updated 23 September 2026 — feat/implement-tracks. This records the implementation and the
 remaining release gates, not an uploaded Play release.
 
 ## Accounts and the project URL
@@ -23,8 +23,8 @@ Events screen to check delivery after the game test.
   redistributed. Native binaries are unchanged. RevenueCat stays 9.8.1.
 - PROFILE → GAMEPLAY ANALYTICS is a separate explicit choice, off by default.
   Layers is not initialized before acceptance. An accepted choice survives restart.
-  On enable the adapter initializes the SDK and sets consent analytics=true,
-  advertising=false before any event can be transmitted, then identifies with the
+  On enable the adapter initializes the SDK and synchronously sets consent analytics=true,
+  advertising=false, then identifies with the
   separate random analytics support ID. Turning it off revokes both consents and shuts
   the SDK down; unsent events stay on the device, can never be sent while analytics is
   off, and are deleted the next time analytics is enabled — the adapter denies consent,
@@ -75,6 +75,47 @@ The analytics identity is currently a separate random installation support ID.
 There is no automatic OneSignal/Supabase/Layers identity linkage or new purchase
 analytics event in this increment. DELETE ONLINE PROFILE does not delete the two
 separate SDK records. Their support/deletion routes are disclosed in the app/site.
+
+## Current verification status — 23 Sep review
+
+The stock-build evidence in `builds/layers-stock-verification.json` and STATUS's
+22 Sep device entry supersedes the older patched-build checkpoint below. It does
+not certify a later build or the final Play artifact.
+
+| Check | Evidence / remaining work |
+| --- | --- |
+| Stock package and Android exclusions | 515/515 tests passed; development APK has no AD_ID permission or ads-identifier/installreferrer implementation classes. Runtime lookups failed as intended on the Nord 2. |
+| Analytics initially off | 22 Sep: no SDK initialization or native library load during the observed baseline. |
+| Disable, relaunch off, re-enable | 22 Sep: held queue remained byte-identical across relaunch; re-enable discarded it and rotated SDK identities without increasing delivered-event counters during the purge. |
+| Delivery while enabled | SDK counters recorded six events accepted across three HTTP 2xx batches. This does not establish Events-screen receipt or inspect those uploaded payloads. |
+| First uploaded batch | Pending: inspect startup events, including `layers_init_timing`, for absent advertising IDs and false advertising-consent fields. The persisted shutdown queue passed these checks; the first uploaded batch was not captured. |
+| Failure and migration paths | Pending: failed initialization with an existing queue, disable/relaunch, then successful enable must preserve the pending purge and discard old events before delivery. Legacy `veyro-layers` cleanup was not exercised because the folder did not exist on the tested phone. |
+| OneSignal | The owner's earlier basic receive/open test passed. Still pending on the combined build: permission-denial retry in the same process, menu/gameplay foreground suppression, warm/cold click routing, campaign attribution and the Veyro icon. |
+| Final release | Release-flavour build and Play installation remain pending; the production XP-curve guard is unresolved (OPEN_QUESTIONS 23). |
+
+**Consent timing distinction.** The player accepts analytics before the adapter calls
+Initialize (or an earlier accepted choice is restored). Events queued during initialization
+therefore follow the player's choice, but can precede the SDK's SetConsent call. At the
+pinned stock revision, the Android managed periodic event-flush coroutine waits for its
+configured interval (15 seconds here); remote configuration starts an HTTP GET immediately
+during Initialize. The old blanket statement that no HTTP runs before the next frame was
+incorrect. The native/network-free consent tests establish adapter call ordering, not
+first-batch fields or real transport behavior. Check the startup events in Layers Events
+or an authorized payload inspection; if the dashboard omits those fields, leave that
+verification open. Do not treat a normal shutdown queue or HTTP 2xx as proof of the first
+batch. Source: pinned upstream
+[configuration poller](https://github.com/layers/layers-sdk-unity/blob/7d28dcda555ab3ab3f0901c6c6e77f8710613f4b/Runtime/Internal/RemoteConfigPoller.cs)
+and [event flush manager](https://github.com/layers/layers-sdk-unity/blob/7d28dcda555ab3ab3f0901c6c6e77f8710613f4b/Runtime/Internal/FlushManager.cs).
+
+**23 Sep phone check:** coordinated pass on development build
+`1.0.0-dev.20260923-2324.nogit`, 30 fresh
+focused tests and matching APK permission/dependency checks. Layers enable/off/relaunch,
+held queue and purge/identity rotation passed; two Daily Runs completed and a later
+paused run was quit without completion. Native delivery counters are not dashboard
+receipt. Notification permission remained blocked; no live push or permission retry
+was tested. An accidental in-game reminder-off tap was detected and both local app/SDK
+choices restored and verified after relaunch, as recorded in `STATUS.md`. These results
+predate the 24 Sep Copilot fixes; provider and final-release checks remain open.
 
 ## Prove the two-track loop
 
@@ -141,12 +182,12 @@ Owner/account checks:
 
 ## Release order and outstanding inputs
 
-1. Confirm whether to combine the latest cosmetics/character fixes and online
-   profiles. The design worktree contains additional uncommitted fixes beyond its
-   branch head; merging only that head does not include the current phone build.
+1. Record the exact combined commit and artifact selected for distribution. Main was
+   merged on 21 Sep; confirm whether any later cosmetics/profile changes must also ship.
 2. Confirm the highest versionCode ever uploaded and whether production is live.
    Last documented upload was code 5. Never assume code 6 is unused.
-3. Finish SDK consent/device checks on that exact combined snapshot. Run EditMode
+3. Resolve the production Season 1 XP curve (OPEN_QUESTIONS 23), which currently blocks
+   non-development builds. Finish SDK consent/device checks on the selected snapshot. Run EditMode
    tests, Android release/dev builds, check native libraries, permissions, size and
    notification UI. No AD_ID or location permission should be added. This includes
    the package even while consent is off, because packages can change manifests.
@@ -201,7 +242,8 @@ final signed artifact.
   This is the uncombined code-5 keyless-shop check, not a Play release or phone build.
   The subsequent development build was cancelled and deferred to the combined snapshot.
 - No phone calls, account changes, API-secret reads, campaign sends or Play uploads
-  were performed during this increment. Physical SDK/Events verification is pending.
+  were performed during that patched-build increment. The subsequent stock-build
+  phone results and remaining Events checks are recorded in the current status above.
 
 Public configuration check: `GET /config` for the supplied App ID and Android returned
 HTTP 200 / success, with `health.enabled=true` and clipboard attribution disabled.

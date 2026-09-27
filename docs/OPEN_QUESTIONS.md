@@ -204,6 +204,17 @@ the question. Keep this file short; it is read every session.
     warm/cold checks remain. Campaign/Layers implementation can proceed separately under
     `REMINDER_AUTOMATION_PLAN.md`. **21 Sep:** P6 App ID received; icon and bounded permission
     retry changes implemented, physical retest remains required on the combined build.
+    **23 Sep coordinated session:** current development build installed with data preserved;
+    Android notification permission is OFF. May this game's permission be enabled and up to
+    three labelled test pushes sent only to this phone? This was asked during the session;
+    no approval is inferred from the request to install/test or from earlier receipt of a
+    different push. Recommended default: keep the current permission until the owner answers,
+    then check foreground suppression, warm/cold taps and the icon in the coordinated slot.
+    Native denial/retry may need a separate owner-controlled permission reset.
+    The current panel reports ALLOW IN ANDROID SETTINGS, so permission cannot be enabled
+    within the owner's existing no-settings constraint. Final local reminder preference and
+    SDK opt-in match the baseline; OS permission remains off. The 23 Sep `STATUS.md` entry
+    records the accidental reminder-off tap and its verified restoration.
 
 22. **Layers account and SDK distribution checks (21 Sep, feat-implement-tracks / T-022).**
     App ID `app_4cf32e54fc359326` received; SDK consent and real-run instrumentation implemented.

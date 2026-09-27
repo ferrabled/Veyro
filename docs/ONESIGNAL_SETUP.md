@@ -49,11 +49,13 @@ Detailed build evidence: `builds/onesignal-verification.json`.
   Android permission, subscription opt-in and push token are separate states.
 - Development Android builds show the vendor's once-only verification dialog on the menu,
   after the first-run guide. Player builds use player-facing copy and offer notifications only
-  after a completed Daily Run, back on the home menu. Permission is requested only on the
+  after a completed Daily Run, back on the home menu, unless delivery is already ready.
+  Permission is requested only on the
   dialog's button tap. PROFILE → NOTIFICATIONS remains available for enabling/disabling.
 - Foreground notification banners are suppressed; remote in-app messages stay paused, so a
   campaign cannot cover an active run or camera staging. Background notifications can display
-  after the player enables them. No Daily Run payload routing or scheduled campaign yet.
+  after the player enables them. Versioned Daily Run payloads route safely to the Daily menu;
+  the scheduled campaign and public-build routing verification remain outstanding.
 - Location sharing is disabled. Email/SMS collection, player tags and Supabase identity linking
   are not enabled. The first subscription belongs to the installation; no new database exists.
   The wrapper reserves identity/tag operations for the campaign increment. When identity is
@@ -134,8 +136,9 @@ increment does not link it to the online profile, so DELETE ONLINE PROFILE does 
 
 ## Remaining T-021 campaign increment
 
-After device delivery works: implement the agreed tags, QA exclusion, opt-in audience, allowed
-Daily Run notification payload and cold/warm routing; connect profile identity and provider
+The allowed, versioned Daily Run payload and safe menu routing are implemented. Verify cold/warm
+notification taps on the combined build, then implement the agreed tags, QA exclusion and opt-in
+audience; connect profile identity and provider
 deletion if the profile-enabled baseline is selected. Then configure and deploy the actual
 Daily Run campaign, verify it against the public build, and capture judge evidence + App ID.
 Only that completes the OneSignal track. Layers can subsequently measure the same return loop.
