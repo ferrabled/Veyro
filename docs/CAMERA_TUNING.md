@@ -96,8 +96,11 @@ width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | g
   with that in hand.
 - SLIDE is a no-op: nothing consumes `IsSlidePressed`, no obstacle needs it; guide says so.
 - Back at the picker does nothing (exit the app?).
-- Result hint "tap anywhere or press space" is half-true with three buttons on the card.
-- Overlay placement (provisional; modular).
+- ~~Result hint "tap anywhere or press space" is half-true with three buttons on the card.~~
+  Resolved 25 Sep: tap-anywhere restart removed for every scheme; RUN AGAIN button only, plus a
+  HOP in camera mode (`RunSession.RestartGesture`), with a camera-only hint under the card.
+- Overlay placement (provisional; modular). On the camera result card it now sits above the
+  card (`FaceOverlay.ResultPosition`) rather than being hidden — STATUS 25 Sep.
 - Raise-hand confirm at the picker's **initial** staging too, replacing the 0.5 s face hold — one
   mechanic taught once, pairs with the Wii-style setup card (BACKLOG T-015).
 - Picker: show both schemes' boards, or only the selected one's?

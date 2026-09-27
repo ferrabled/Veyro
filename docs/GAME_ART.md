@@ -8,6 +8,13 @@ Two CC0 KayKit dodge clips add left/right lane-change poses, with root travel di
 The camera-position guide now shares MenuTheme's paper/teal/pink treatment and labels itself
 YOU · CAMERA. See `docs/SEASON_PASS_ASSETS.md` for the checked free/commercial reward sources.
 
+28 September guide follow-up: ten owner-supplied, AI-generated instructional illustrations
+now ship in the first-run guide (four tilt frames, five camera frames, one run still).
+Originals are kept in `screenshots/guide/`; byte-identical runtime copies and Unity import
+metadata live in `game/Assets/Resources/Art/Guide/`. Both PNG sets use Git LFS. The source art
+is preserved unchanged; Unity caps it at 1024 and uses ASTC 6x6 on Android. See
+`docs/GUIDE_ILLUSTRATIONS.md` for the naming contract and replacement workflow.
+
 ## Recommendation
 
 Use a small, coherent CC0 kit as the foundation, then make Veyro recognizable through its
@@ -32,6 +39,14 @@ jump tuning fixed while judging the art.
 | [KayKit Character Animations](https://kaylousberg.itch.io/kaykit-character-animations) | Larger locomotion/emote library | Two lateral dodge takes imported and retargeted, 20 Sep; free 1.1 download, CC0 |
 | [Quaternius Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) | 120+ humanoid takes incl. hits, deaths, rolls, emotes | Three takes (`Death01`, `Roll`, `Dance_Loop`) imported for the crash poses and the result card, 21 Sep; Standard (free) tier, CC0. See `Assets/Art/Quaternius/SOURCES.md` |
 | KayKit Character Animations 1.2 (legacy "Prototype Pete") | Cheer / Dance / Defeat emotes | Tried and dropped 21 Sep: the rig has no foot bones, Unity cannot build a Humanoid avatar from it |
+| Audio — [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds), [UI Audio](https://kenney.nl/assets/ui-audio) | Taps, back, confirm, deny, coin ping, countdown | Eight files imported 24 Sep; CC0, bundled licences kept under `Resources/Audio/Licenses/` |
+| Audio — [Kenney Casino Audio](https://kenney.nl/assets/casino-audio), [RPG Audio](https://kenney.nl/assets/rpg-audio), [Impact Sounds](https://kenney.nl/assets/impact-sounds) | Foley swishes for jump/slide/lane change, chip "stamp"; the Impact Sounds crash thud is retired | Four files in use, 24 Sep; CC0. Chosen over Digital Audio's synth bleeps to match the low-poly park rather than a retro arcade. The Kenney crash sum was dropped 25 Sep: 99 % of its energy sat below 250 Hz, which a phone speaker does not reproduce |
+| Audio — [rubberduck, 75 CC0 breaking / falling / hit sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx) and [100 CC0 SFX #2](https://opengameart.org/content/100-cc0-sfx-2) | Crash: mid-band bonk + wood splinter crack + clatter tail | Three samples layered 25 Sep; CC0 on the author's own pages. 0.70 s, 71 % of the energy in 500 Hz–5 kHz (centroid ≈ 2.8 kHz), decoded peak −0.5 dBFS, −14.8 dBFS RMS — the one cue deliberately louder than the rest |
+| Audio — [Wolfgang_, 8-Bit Victory Loop](https://opengameart.org/content/8-bit-victory-loop) | Result-screen loop after a new best (`result_best`) | 53.3 s, exactly 20 bars at 90 bpm, untouched apart from gain; CC0 on the author's page, 25 Sep. Sits with the chiptune run loops |
+| Audio — [Kenney Music Jingles](https://kenney.nl/assets/music-jingles) | Result stinger, new-best fanfare | Steel-pan and pizzicato jingles with rising contours; CC0. Longest Kenney jingle is 1.8 s, so `result_jingle` is 1.4 s rather than the 1.5–3 s brief |
+| Audio — [Juhani Junkala, 5 Chiptunes (Action)](https://opengameart.org/content/5-chiptunes-action) | Three seamless run loops | `run_01`–`run_03`, 73–82 s each, 24 Sep; CC0 per page badge and bundled `INFO.txt`. Gain-only normalisation so the loop points stay intact |
+| Audio — [Joth, Funked Up](https://opengameart.org/content/funked-up) and [congusbongus, Keep your dream alive!](https://opengameart.org/content/keep-your-dream-alive-seamless-loop) | Menu loop; fourth run loop; result-screen loop after a run that set no best | Both CC0 on the creator's OpenGameArt page, 24 Sep. Funked Up is the calmer funk menu bed; Keep your dream alive is the chiptune `run_04`. Joth's calm, CC0 [Speedier than Photons](https://opengameart.org/content/speedier-than-photons) (25 Sep) cut to its first 16 bars is `result_lost`, 40.9 s — warm rather than sad, same composer as the menu bed |
+| Freesound, Pixabay, cynicmusic (OGA) | Broader SFX/music libraries | Not used: Freesound needs a login; Pixabay's licence is not CC0; cynicmusic's CC0 pages add "contact me / mailing list" wording that muddies the grant |
 
 The selected Kenney packs are CC0, permit commercial use and do not require attribution.
 Keep the bundled license files and provenance below. Never use Kenney's logo as our branding.
