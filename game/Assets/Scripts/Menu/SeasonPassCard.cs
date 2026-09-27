@@ -40,6 +40,7 @@ namespace MotionRunner.Menu
             var button = background.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
 
             float pad = MenuTheme.CardPadding;
 

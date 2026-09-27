@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Growth;
 using UnityEngine;
@@ -39,11 +40,11 @@ namespace MotionRunner.Menu
                     "it does not delete past provider records.";
             });
             Button(card, "Policy", -470f, "READ PRIVACY POLICY", () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
-            Button(card, "Close", -580f, "CLOSE", Close);
+            Button(card, "Close", -580f, "CLOSE", Close, Sfx.UiBack);
         }
-        Button Button(Transform parent, string name, float y, string text, Action action) =>
+        Button Button(Transform parent, string name, float y, string text, Action action, Sfx sound = Sfx.UiTap) =>
             RuntimeUi.TextButton(name, parent, new Vector2(.5f, .5f), new Vector2(0f, y),
-                new Vector2(800f, 88f), MenuTheme.Bar, text, 28, MenuTheme.Text, () => action());
+                new Vector2(800f, 88f), MenuTheme.Bar, text, 28, MenuTheme.Text, () => action(), sound);
         static Text Label(string name, Transform parent, float y, float height, int size)
         {
             var text = RuntimeUi.Label(name, parent, new Vector2(.5f, .5f), new Vector2(.5f, .5f),

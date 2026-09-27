@@ -8,9 +8,10 @@ namespace MotionRunner.Tests
     /// the moment the run starts" and reproduces on demand for nobody.
     ///
     /// The invariant all of these circle: the input that ASKS for a run must be spent before that
-    /// run exists. On a phone the tap anywhere, the RUN AGAIN click and the SKINS & STORE click are
-    /// all the same TouchPhase.Ended, and RunSession's Update reads it after the EventSystem has
-    /// already dispatched the click.
+    /// run exists. The RUN AGAIN click lands in the EventSystem's dispatch, before RunSession's
+    /// Update reads the same frame; the camera hop is a 0.18 s pulse that the runner reads as a
+    /// level. Since 24 Sep those are the only two asks - a tap on the card outside its buttons
+    /// never reaches the gate at all.
     public sealed class RestartGateTests
     {
         const float Dt = 1f / 60f;
@@ -21,14 +22,49 @@ namespace MotionRunner.Tests
         public void SetUp() => _gate = new RestartGate();
 
         [Test]
-        public void ATapQueuesTheNextRunForALaterFrame()
+        public void AOneFrameGestureQueuesTheNextRunForTheFollowingFrame()
         {
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: true, overlayOpen: false),
-                "the frame that read the tap must not also start the run");
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: false),
+                "the frame that read the gesture must not also start the run");
             Assert.IsTrue(_gate.IsQueued);
 
-            Assert.IsTrue(_gate.Tick(Dt, restartPressed: false, overlayOpen: false));
+            Assert.IsTrue(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
             Assert.IsFalse(_gate.IsQueued);
+        }
+
+        [Test]
+        public void AHopHeldAcrossFramesStartsTheRunOnlyOnceItHasEnded()
+        {
+            // FaceSteering.IsJumpActive stays true for JumpWindowSeconds (0.18 s ~ 11 frames) and
+            // RunnerController reads jump as a level: a run started on any of those frames jumps
+            // on its own first frame. The queue must outlast the pulse.
+            for (int frame = 0; frame < 11; frame++)
+            {
+                Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: false),
+                    "no run may start on frame " + frame + " while the hop is still active");
+                Assert.IsTrue(_gate.IsQueued, "the hop is queued from its first frame");
+            }
+
+            Assert.IsTrue(_gate.Tick(Dt, gestureActive: false, overlayOpen: false),
+                "the first frame after the pulse starts the run");
+            Assert.IsFalse(_gate.IsQueued);
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: false, overlayOpen: false), "one hop, one run");
+        }
+
+        [Test]
+        public void WithNoGesture_OnlyTheButtonStartsARun()
+        {
+            // The "tap anywhere" contract is gone: RunSession feeds the gate from its optional
+            // RestartGesture only, so a tilt run (gesture null -> false every frame) can sit on
+            // the result card forever without a run starting under it.
+            for (int frame = 0; frame < 600; frame++)
+            {
+                Assert.IsFalse(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
+                Assert.IsFalse(_gate.IsQueued);
+            }
+
+            Assert.IsTrue(_gate.RequestFromButton());
+            Assert.IsTrue(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
         }
 
         [Test]
@@ -41,20 +77,23 @@ namespace MotionRunner.Tests
             Assert.IsTrue(_gate.RequestFromButton());
             Assert.IsTrue(_gate.IsQueued, "the click must not have started a run by itself");
 
-            Assert.IsTrue(_gate.Tick(Dt, restartPressed: false, overlayOpen: false));
+            Assert.IsTrue(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
         }
 
         [Test]
-        public void TheReleaseThatClickedTheButtonCannotAlsoQueueASecondRun()
+        public void AHopLandingWithTheClickBuysOneRunAfterTheHopEnds()
         {
-            // Same physical release, two readings: the EventSystem's click and TouchTapInput's
-            // jump. It has to buy exactly one run.
+            // A player at the phone tapping RUN AGAIN while the camera catches a bob of the head:
+            // the click queues, the hop holds, and there is exactly one run once it is over.
             _gate.RequestFromButton();
 
-            Assert.IsTrue(_gate.Tick(Dt, restartPressed: true, overlayOpen: false));
-            Assert.IsFalse(_gate.IsQueued,
-                "the release that clicked RUN AGAIN must not queue another run behind it");
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: false, overlayOpen: false));
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: false),
+                "held: the hop is still in flight");
+            Assert.IsTrue(_gate.IsQueued, "and the queued run must survive the hold");
+
+            Assert.IsTrue(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
+            Assert.IsFalse(_gate.IsQueued, "the hop must not have queued a second run behind the click");
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
         }
 
         [Test]
@@ -70,15 +109,15 @@ namespace MotionRunner.Tests
         [Test]
         public void ALongerLockoutCoversTheWholeCardReveal()
         {
-            // The result card takes crash pose + fade to appear; a tap anywhere in that window
+            // The result card takes crash pose + fade to appear; a hop anywhere in that window
             // must not restart the run before the card was ever drawn.
             _gate.LockOut(1.25f);
             float waited = 0f;
             while (_gate.IsLockedOut)
             {
-                Assert.IsFalse(_gate.Tick(Dt, restartPressed: true, overlayOpen: false));
-                // The tick that ends the lockout may accept that same tap (existing contract);
-                // no tick BEFORE it may.
+                Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: false));
+                // The tick that ends the lockout may accept that same gesture (existing
+                // contract); no tick BEFORE it may.
                 if (_gate.IsLockedOut) Assert.IsFalse(_gate.IsQueued);
                 waited += Dt;
             }
@@ -92,35 +131,35 @@ namespace MotionRunner.Tests
         }
 
         [Test]
-        public void TheCrashLockoutIgnoresTheTapThatKilledThePlayer()
+        public void TheCrashLockoutIgnoresTheHopThatKilledThePlayer()
         {
             _gate.LockOut();
             Assert.IsTrue(_gate.IsLockedOut);
 
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: true, overlayOpen: false));
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: false));
             Assert.IsFalse(_gate.IsQueued,
-                "the tap that killed the player must not also skip the result screen");
+                "the hop that killed the player must not also skip the result screen");
 
             float waited = Dt;
             while (_gate.IsLockedOut)
             {
-                Assert.IsFalse(_gate.Tick(Dt, restartPressed: false, overlayOpen: false));
+                Assert.IsFalse(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
                 waited += Dt;
             }
 
             Assert.AreEqual(RestartGate.LockoutSeconds, waited, 3f * Dt,
                 "the lockout must last the half second the result screen is written for");
 
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: true, overlayOpen: false));
-            Assert.IsTrue(_gate.IsQueued, "and then the same tap starts the next run");
-            Assert.IsTrue(_gate.Tick(Dt, restartPressed: false, overlayOpen: false));
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: false));
+            Assert.IsTrue(_gate.IsQueued, "and then a fresh hop asks for the next run");
+            Assert.IsTrue(_gate.Tick(Dt, gestureActive: false, overlayOpen: false));
         }
 
         [Test]
         public void TheCrashLockoutRefusesTheButtonToo()
         {
             // The RUN AGAIN button is on screen from the frame of the crash, so a player already
-            // tapping when they died can land on it. Same rule as the tap, or the result screen
+            // tapping when they died can land on it. Same rule as the hop, or the result screen
             // would flash past for exactly the players who crash mid-tap.
             _gate.LockOut();
             Assert.IsFalse(_gate.RequestFromButton());
@@ -128,23 +167,24 @@ namespace MotionRunner.Tests
         }
 
         [Test]
-        public void AnOpenStoreEatsTheQueuedRestartInsteadOfHoldingIt()
+        public void AnOpenMenuEatsTheQueuedRestartInsteadOfHoldingIt()
         {
-            // The 27 Aug device bug: SKINS & STORE opens the panel with the same release that would
-            // restart the run behind it. Dropped rather than held, because a run appearing the
-            // moment the store closes is the same surprise one frame later.
-            _gate.Tick(Dt, restartPressed: true, overlayOpen: false);
+            // The 27 Aug device bug, in its current shape: QUIT TO MENU / SKINS & SHOP put the
+            // main menu up with the same release that clicked them. Dropped rather than held,
+            // because a run appearing the moment the menu closes is the same surprise one frame
+            // later.
+            _gate.Tick(Dt, gestureActive: true, overlayOpen: false);
             Assert.IsTrue(_gate.IsQueued);
 
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: false, overlayOpen: true),
-                "no run may start behind the store");
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: false, overlayOpen: true),
+                "no run may start behind the menu");
             Assert.IsFalse(_gate.IsQueued, "and none may be waiting for it to close");
         }
 
         [Test]
-        public void AnOpenStoreNeverQueuesARestartAtAll()
+        public void AnOpenMenuNeverQueuesARestartAtAll()
         {
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: true, overlayOpen: true));
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: true, overlayOpen: true));
             Assert.IsFalse(_gate.IsQueued);
         }
 
@@ -153,13 +193,13 @@ namespace MotionRunner.Tests
         {
             // RunSession.Stop: the run was abandoned, so nothing about it survives into the mode
             // picker - including a restart that was one frame from happening.
-            _gate.Tick(Dt, restartPressed: true, overlayOpen: false);
+            _gate.Tick(Dt, gestureActive: true, overlayOpen: false);
             _gate.LockOut();
 
             _gate.Clear();
             Assert.IsFalse(_gate.IsQueued);
             Assert.IsFalse(_gate.IsLockedOut);
-            Assert.IsFalse(_gate.Tick(Dt, restartPressed: false, overlayOpen: false),
+            Assert.IsFalse(_gate.Tick(Dt, gestureActive: false, overlayOpen: false),
                 "an abandoned run must not restart itself");
         }
     }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Progression;
 using MotionRunner.Social;
@@ -105,6 +106,7 @@ namespace MotionRunner.Menu
             var rerollButton = _reroll.gameObject.AddComponent<Button>();
             rerollButton.targetGraphic = _reroll;
             rerollButton.onClick.AddListener(RerollHandle);
+            RuntimeUi.TapSound(rerollButton);
 
             _subline = RuntimeUi.Label("Stats", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -152,6 +154,7 @@ namespace MotionRunner.Menu
             var button = text.gameObject.AddComponent<Button>();
             button.targetGraphic = text;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
             return button;
         }
 
@@ -190,13 +193,21 @@ namespace MotionRunner.Menu
             // not only on the store listing. DELETE PROFILE is Play's account-deletion policy:
             // the moment a server-side profile exists, an in-app deletion path must too
             // (STORE_COMPLIANCE T-009). Two taps, because it is immediate and permanent.
+            // Three across on the first row (T-045 added SOUND next to NOTIFICATIONS): each link
+            // gets a third of the card and best-fits down from 32 if a width ever asks it to.
             var guide = BuildLink(slot, "Guide", -30f, "HOW TO PLAY", () => Menu.RequestGuide());
-            guide.rectTransform.anchorMax = new Vector2(.5f, 1f);
+            guide.rectTransform.anchorMax = new Vector2(1f / 3f, 1f);
             var notifications = BuildLink(slot, "Notifications", -30f,
                 "NOTIFICATIONS", () => Menu.RequestNotifications());
-            notifications.rectTransform.anchorMin = new Vector2(.5f, 1f);
+            notifications.rectTransform.anchorMin = new Vector2(1f / 3f, 1f);
+            notifications.rectTransform.anchorMax = new Vector2(2f / 3f, 1f);
+            notifications.alignment = TextAnchor.MiddleCenter;
+            var sound = BuildLink(slot, "Sound", -30f, "SOUND", () => Menu.RequestSound());
+            sound.rectTransform.anchorMin = new Vector2(2f / 3f, 1f);
+            sound.alignment = TextAnchor.MiddleRight;
             ShrinkToFit(guide, 32);
             ShrinkToFit(notifications, 32);
+            ShrinkToFit(sound, 32);
             var privacy = BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
                 () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
             privacy.rectTransform.anchorMax = new Vector2(.5f, 1f);
@@ -267,6 +278,7 @@ namespace MotionRunner.Menu
             var button = text.gameObject.AddComponent<Button>();
             button.targetGraphic = text;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
             return text;
         }
 
@@ -381,10 +393,12 @@ namespace MotionRunner.Menu
                 if (this == null || !gameObject.activeInHierarchy) return;
                 if (error != null)
                 {
+                    GameAudio.Deny();
                     _import.text = "import failed: " + error.Message;
                     _import.color = MenuTheme.Dim;
                     return;
                 }
+                GameAudio.Confirm();
                 _import.text = "profile imported";
                 _import.color = MenuTheme.Dim;
                 RefreshHeadline();
@@ -492,6 +506,7 @@ namespace MotionRunner.Menu
             var service = Menu.Profile;
             if (service == null || !service.IsReady)
             {
+                GameAudio.Deny();
                 _delete.text = "no online profile to delete";
                 _delete.color = MenuTheme.Faint;
                 return;
@@ -513,6 +528,7 @@ namespace MotionRunner.Menu
                 if (this == null || !gameObject.activeInHierarchy) return;
                 if (error != null)
                 {
+                    GameAudio.Deny();
                     _delete.text = "couldn't delete — try again (" + error.Code + ")";
                     _delete.color = MenuTheme.Dim;
                     return;

@@ -50,6 +50,7 @@ namespace MotionRunner.Menu
         public event Action GuideRequested;
         public event Action NotificationsRequested;
         public event Action AnalyticsRequested;
+        public event Action SoundRequested;
 
         /// The store view, built once and shared: the shop tab hosts it, and the season pass card
         /// on the home tab listens to it. One view means one set of SDK callbacks in flight,
@@ -235,6 +236,7 @@ namespace MotionRunner.Menu
         public void RequestGuide() => GuideRequested?.Invoke();
         public void RequestNotifications() => NotificationsRequested?.Invoke();
         public void RequestAnalytics() => AnalyticsRequested?.Invoke();
+        public void RequestSound() => SoundRequested?.Invoke();
 
         void OnChosen(bool cameraMode, FaceTrackingRig rig)
         {

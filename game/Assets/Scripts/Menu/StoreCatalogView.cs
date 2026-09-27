@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using UnityEngine;
@@ -102,7 +103,7 @@ namespace MotionRunner.Menu
             if (_busy) return;
             if (_skins.IsUnlocked(itemId))
             {
-                _skins.Equip(itemId);
+                if (_skins.Equip(itemId)) GameAudio.Confirm();
                 Refresh();
                 return;
             }
@@ -123,6 +124,7 @@ namespace MotionRunner.Menu
             if (packageId == null)
             {
                 // A catalog item with no package behind it: locked, but nothing to sell.
+                GameAudio.Deny();
                 _status.text = "this one is not for sale yet";
                 return;
             }
@@ -137,12 +139,23 @@ namespace MotionRunner.Menu
                 // succeeds; it silently does nothing if it somehow is not, because equipping never
                 // grants.
                 if (outcome.Succeeded) _skins.Equip(itemId);
+                Cue(outcome);
 
                 if (!StillBuilt) return;
                 _busy = false;
                 _status.text = Describe(outcome, "purchase");
                 Refresh();
             });
+        }
+
+        /// The sound of a commerce outcome: a success confirms, a cancel says nothing (the rows
+        /// are already right), anything else denies. Fired before the StillBuilt check on
+        /// purpose - a purchase that lands while the player is on another tab still landed.
+        static void Cue(PurchaseOutcome outcome)
+        {
+            if (outcome.Succeeded) GameAudio.Confirm();
+            else if (outcome.Status != PurchaseStatus.Cancelled && outcome.Status != PurchaseStatus.Pending)
+                GameAudio.Deny();
         }
 
         /// The pass's path: the dashboard paywall. Only ever called for something the player does
@@ -153,6 +166,7 @@ namespace MotionRunner.Menu
             _status.text = "opening store…";
             _store.PresentPaywall(outcome =>
             {
+                Cue(outcome);
                 if (!StillBuilt) return;
                 _busy = false;
                 _status.text = Describe(outcome, "purchase");
@@ -175,6 +189,15 @@ namespace MotionRunner.Menu
             var before = new HashSet<string>(_store.ActiveEntitlements);
             _store.Restore(outcome =>
             {
+                // A restore that found nothing is a success with nothing to celebrate: confirm
+                // only when the entitlement set actually grew.
+                if (outcome.Succeeded)
+                {
+                    if (_store.ActiveEntitlements.Count > 0 && !before.SetEquals(_store.ActiveEntitlements))
+                        GameAudio.Confirm();
+                }
+                else Cue(outcome);
+
                 if (!StillBuilt) return;
                 _busy = false;
                 _status.text = outcome.Succeeded

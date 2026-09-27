@@ -74,6 +74,7 @@ namespace MotionRunner.Menu
             var button = go.AddComponent<Button>();
             button.targetGraphic = background;
             button.onClick.AddListener(() => Tapped?.Invoke(tab));
+            RuntimeUi.TapSound(button);
 
             var marker = RuntimeUi.Element("Marker", go.transform, out var markerRect);
             RuntimeUi.Stretch(markerRect, new Vector2(0f, 1f), new Vector2(1f, 1f),

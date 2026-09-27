@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Progression;
 using UnityEngine;
@@ -26,6 +27,15 @@ namespace MotionRunner.Menu
         const float StampSize = 92f;
 
         readonly Func<DateTime> _utcNow;
+
+        /// The last day whose stamp this process has already celebrated, and whether a baseline
+        /// has been taken. Static because the card is rebuilt with every MainMenu (a run destroys
+        /// the menu), and "today was already stamped when the app launched" must not sound like
+        /// news: the first Refresh of the process only records what is there; a stamp that
+        /// APPEARS on a later Refresh - the menu coming back after the day's first Daily Run -
+        /// is the one that lands with a sound (T-045).
+        static bool _baselined;
+        static int _celebratedDay = int.MinValue;
 
         Text _streak;
         Text _note;
@@ -130,11 +140,27 @@ namespace MotionRunner.Menu
             _streak.color = length == 0 ? MenuTheme.Faint : MenuTheme.Accent;
 
             bool stampedToday = DailyStreak.PlayedOn(record, today);
+            CelebrateNewStamp(stampedToday, today);
             _note.text = stampedToday
                 ? "today is stamped — come back tomorrow"
                 : length == 0
                     ? "finish a daily run to start a streak"
                     : "run today to keep the streak alive";
+        }
+
+        /// One streak cue per stamped day, and only for a stamp that landed during this process -
+        /// see the statics above.
+        static void CelebrateNewStamp(bool stampedToday, int today)
+        {
+            if (!_baselined)
+            {
+                _baselined = true;
+                if (stampedToday) _celebratedDay = today;
+                return;
+            }
+            if (!stampedToday || _celebratedDay == today) return;
+            _celebratedDay = today;
+            GameAudio.Play(Sfx.Streak);
         }
 
         /// The first letter of the weekday, invariant rather than localized: the card is seven

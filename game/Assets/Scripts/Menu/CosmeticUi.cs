@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using UnityEngine;
@@ -20,10 +21,11 @@ namespace MotionRunner.Menu
             label.horizontalOverflow=HorizontalWrapMode.Wrap;
             label.text=text;return label;
         }
-        public static Button Button(Transform rect,string text,Action tapped,Color? background=null,int size=30)
+        public static Button Button(Transform rect,string text,Action tapped,Color? background=null,int size=30,Sfx sound=Sfx.UiTap)
         {
             var image=rect.gameObject.AddComponent<Image>();image.color=background??MenuTheme.Slot;
             var button=rect.gameObject.AddComponent<Button>();button.targetGraphic=image;button.onClick.AddListener(()=>tapped());
+            RuntimeUi.TapSound(button,sound);
             Text("Label",rect,text,size,MenuTheme.Text,TextAnchor.MiddleCenter);return button;
         }
         public static RectTransform Scroll(Transform parent,float top,out ScrollRect scroll)
@@ -55,11 +57,12 @@ namespace MotionRunner.Menu
         {
             var panel=parent.gameObject.AddComponent<CosmeticPanel>();panel.color=color;panel.Radius=radius;return panel;
         }
-        public static Button Pill(Transform parent,string text,Action tap,Color? color=null,int size=27)
+        public static Button Pill(Transform parent,string text,Action tap,Color? color=null,int size=27,Sfx sound=Sfx.UiTap)
         {
             var surface=Surface(parent,color??MenuTheme.Slot);
             var button=parent.gameObject.AddComponent<Button>();button.targetGraphic=surface;
-            button.onClick.AddListener(()=>tap());Text("Label",parent,text,size,MenuTheme.Text,TextAnchor.MiddleCenter);
+            button.onClick.AddListener(()=>tap());RuntimeUi.TapSound(button,sound);
+            Text("Label",parent,text,size,MenuTheme.Text,TextAnchor.MiddleCenter);
             return button;
         }
         public static void Thumbnail(Transform parent,string id)

@@ -43,7 +43,7 @@ namespace MotionRunner.Menu
             _preview=RunnerPreview.Create(character);
             var target=RuntimeUi.Panel("OpenLocker",character,new Color(0,0,0,0));
             var open=target.gameObject.AddComponent<UnityEngine.UI.Button>();open.targetGraphic=target;
-            open.onClick.AddListener(Menu.ShowCosmetics);
+            open.onClick.AddListener(Menu.ShowCosmetics);RuntimeUi.TapSound(open);
             RuntimeUi.Label("LockerHint",character,Vector2.zero,new Vector2(1,0),new Vector2(12,8),new Vector2(-12,62),
                 32,TextAnchor.MiddleCenter,MenuTheme.Text).text="YOUR LOOK  ·  TAP TO CUSTOMIZE";
             var picker = BuildPickerSlot();

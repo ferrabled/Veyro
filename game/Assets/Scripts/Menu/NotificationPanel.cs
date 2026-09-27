@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Notifications;
 using UnityEngine;
@@ -54,7 +55,7 @@ namespace MotionRunner.Menu
                 "COPY NOTIFICATION SUPPORT ID", 26, MenuTheme.Dim, CopyId);
             RuntimeUi.TextButton("Close", card, new Vector2(.5f, .5f),
                 new Vector2(0f, -470f), new Vector2(790f, 72f), MenuTheme.Bar,
-                "CLOSE", 30, MenuTheme.Text, Close);
+                "CLOSE", 30, MenuTheme.Text, Close, Sfx.UiBack);
         }
 
         static Text Label(string name, Transform parent, float y, float height, int size)

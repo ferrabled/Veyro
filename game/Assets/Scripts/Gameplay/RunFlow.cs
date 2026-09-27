@@ -1,3 +1,4 @@
+using MotionRunner.Audio;
 using MotionRunner.CameraInput;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
@@ -51,6 +52,11 @@ namespace MotionRunner.Gameplay
         PushPromptPolicy _pushPrompt;
         NotificationPanel _notificationPanel;
         AnalyticsPanel _analyticsPanel;
+        SoundPanel _soundPanel;
+
+        /// The three settings panels are mutually exclusive and all close on back; this is the
+        /// one question the guards below keep asking.
+        bool AnyPanelOpen => _notificationPanel != null || _analyticsPanel != null || _soundPanel != null;
 
         /// The challenge link the next run plays, if any (T-024). Held here rather than read
         /// straight out of PendingChallenge at StartRun, because taking it is what stops one link
@@ -98,6 +104,11 @@ namespace MotionRunner.Gameplay
             _menu.GuideRequested += ShowGuide;
             _menu.NotificationsRequested += () => ShowNotifications(false);
             _menu.AnalyticsRequested += ShowAnalytics;
+            _menu.SoundRequested += ShowSound;
+
+            // The menu loop (T-045). Coming back from a run this crossfades over the run track
+            // the crash faded down; at launch it is simply the first thing heard.
+            GameAudio.PlayMenuMusic();
 
             // The home screen now showcases the equipped character. Do not also render/simulate
             // the hidden attract run behind it, especially while a preview camera is active.
@@ -171,8 +182,16 @@ namespace MotionRunner.Gameplay
             // (Feature D, owner call: camera and tilt are separate games). It is fixed at
             // Begin on purpose - a camera run that DropCameraMode lands on tilt+touch still
             // scores as the camera run the player chose to start.
-            _session.Begin(BuildInput(cameraMode),
-                cameraMode ? ControlScheme.Camera : ControlScheme.Tilt);
+            IGameInput input = BuildInput(cameraMode);
+
+            // Which input may restart a finished run from the result card: the face adapter's
+            // hop in camera mode (the player is 2 m from the phone), nothing in tilt mode - the
+            // RUN AGAIN button is then the only way. The same CameraFaceInput instance the
+            // composite already ticks, so the hop the runner obeys and the hop that restarts are
+            // one reading. Cleared again by DropCameraMode.
+            _session.RestartGesture = _faceInput;
+
+            _session.Begin(input, cameraMode ? ControlScheme.Camera : ControlScheme.Tilt);
             ShowOverlay(cameraMode);
         }
 
@@ -192,9 +211,11 @@ namespace MotionRunner.Gameplay
             _overlay = null;
         }
 
-        /// Touch and keyboard stay in the mix in camera mode: they cost nothing, keep the result
-        /// screen restartable if tracking drops, and are how a bystander pauses the hands-free
-        /// demo without standing in frame.
+        /// Touch and keyboard stay in the mix in camera mode: they cost nothing, let a bystander
+        /// jump or pause the hands-free demo without standing in frame, and the RUN AGAIN button
+        /// is always there for the result card. What they do NOT do any more is restart a run by
+        /// tapping the card: only the face adapter, handed to RunSession.RestartGesture on its
+        /// own, may do that with a hop.
         IGameInput BuildInput(bool cameraMode)
         {
             _faceInput = cameraMode ? new CameraFaceInput(_rig) : null;
@@ -290,6 +311,7 @@ namespace MotionRunner.Gameplay
             if (_pause.DropCameraMode()) _session.NoteCameraDropped();
             DestroyRig();
             _session.Input = BuildInput(false);
+            _session.RestartGesture = null; // no camera, no hop: the fallen-back run is button-only
             ApplyPhase();
             ShowOverlay(false); // nothing left to show a face position from
         }
@@ -399,10 +421,9 @@ namespace MotionRunner.Gameplay
             TryStartPendingChallenge();
             TickCameraOutage();
             bool safeForOffer = _menu != null && _menu.Tab == MenuTab.Run &&
-                !_menu.IsStagingCamera && _guide == null && _notificationPanel == null && _analyticsPanel == null;
+                !_menu.IsStagingCamera && _guide == null && !AnyPanelOpen;
             if (GrowthRuntime.Tracker != null && GrowthRuntime.Tracker.DailyEntryPending &&
-                _menu != null && !_menu.IsStagingCamera && _guide == null &&
-                _notificationPanel == null && _analyticsPanel == null)
+                _menu != null && !_menu.IsStagingCamera && _guide == null && !AnyPanelOpen)
             {
                 _session.Mode = RunMode.Daily;
                 _menu.GoHome();
@@ -425,6 +446,7 @@ namespace MotionRunner.Gameplay
             // that used to live here would have made back fall through the guide whenever it was
             // opened from the menu.
             if (!UnityEngine.Input.GetKeyDown(KeyCode.Escape)) return;
+            if (_soundPanel != null) { _soundPanel.Close(); return; }
             if (_analyticsPanel != null) { _analyticsPanel.Close(); return; }
             if (_notificationPanel != null)
             {
@@ -462,15 +484,24 @@ namespace MotionRunner.Gameplay
 
         void ShowNotifications(bool verification)
         {
-            if (_notificationPanel != null || _analyticsPanel != null || _menu == null || _menu.IsStagingCamera || _guide != null) return;
+            if (AnyPanelOpen || _menu == null || _menu.IsStagingCamera || _guide != null) return;
             _notificationPanel = NotificationPanel.Show(_push, verification, () => _notificationPanel = null);
         }
 
         void ShowAnalytics()
         {
-            if (_analyticsPanel != null || _notificationPanel != null || _menu == null ||
+            if (AnyPanelOpen || _menu == null ||
                 _menu.IsStagingCamera || _guide != null || GrowthRuntime.Analytics == null) return;
             _analyticsPanel = AnalyticsPanel.Show(GrowthRuntime.Analytics, () => _analyticsPanel = null);
+        }
+
+        /// The SOUND link on the profile tab (T-045). Same guards and the same lifetime shape as
+        /// the two panels above; without an audio instance there is nothing to set.
+        void ShowSound()
+        {
+            if (AnyPanelOpen || _menu == null || _menu.IsStagingCamera || _guide != null ||
+                GameAudio.Instance == null) return;
+            _soundPanel = SoundPanel.Show(GameAudio.Instance.Settings, () => _soundPanel = null);
         }
 
         /// A camera-mode run whose camera has stopped answering PAUSES ITSELF, and the pause menu
@@ -538,30 +569,38 @@ namespace MotionRunner.Gameplay
         void LateUpdate()
         {
             if (!SyncOverlay()) return;
-            if (_session.Runner == null) return;
+            if (_session.Runner == null || !_session.IsRunning) return;
             _overlay.ReportLane(_session.Runner.Lane);
         }
 
-        /// Whether the face panel should be on screen at all, checked every frame rather than only
-        /// when the phase changes. Returns true while it is up.
+        /// Whether the face panel should be on screen at all, and where, checked every frame
+        /// rather than only when the phase changes. Returns true while it is up.
         ///
-        /// Two states hide it, and only one of them is a phase:
-        ///   * frozen - the pause menu puts up its own, larger copy of the panel while it
-        ///     re-acquires the camera, so the HUD one steps aside rather than sitting there showing
-        ///     a lost face;
-        ///   * the session not running - the crash/result screen. Nothing calls ApplyPhase on a
-        ///     crash (the phase is still Running: a run that ended is not a run that paused), so a
-        ///     visibility rule that lived only there left the stickman floating over the result card
-        ///     - the overlay canvas is sortingOrder 50 and the result card is on the HUD's own
-        ///     canvas at 0, so it drew on top of the score the player had just earned (PR #5
-        ///     review). Checking it here is what makes the rule hold for every way a run can stop.
-        /// It comes back by itself when the next run starts, including a RUN AGAIN restart, which
-        /// goes straight to RunSession and never reaches this class.
+        /// Hidden while FROZEN: the pause menu puts up its own, larger copy of the panel while it
+        /// re-acquires the camera, so the HUD one steps aside rather than sitting there showing a
+        /// lost face.
+        ///
+        /// Hidden when the session is not running UNLESS the camera is still the run's steering
+        /// (_faceInput != null: camera mode, and DropCameraMode has not happened). That is the
+        /// crash/result screen, where a camera player standing 2 m away needs to see they are in
+        /// frame in order to HOP the next run in (owner call, 24 Sep). Nothing calls ApplyPhase
+        /// on a crash (the phase is still Running: a run that ended is not a run that paused), so
+        /// the rule lives here, checked every frame, which is what makes it hold for every way a
+        /// run can stop. The panel is MOVED for that state rather than left where it was: at its
+        /// run position (top-centre, y -320) it drew straight over the card's masthead and score
+        /// - overlay canvas 50 above the HUD canvas 0 - which is why the PR #5 review had it
+        /// hidden there. FaceOverlay.Place parks it above the card's top edge instead, and the
+        /// lane bands follow the live axis (no runner is committed to a lane on a result card).
+        /// It comes back to its run position by itself when the next run starts, including a
+        /// hop or RUN AGAIN restart, which goes straight to RunSession and never reaches this
+        /// class.
         bool SyncOverlay()
         {
             if (_overlay == null) return false;
-            bool visible = _session.IsRunning && !_pause.IsFrozen;
+            bool running = _session.IsRunning;
+            bool visible = !_pause.IsFrozen && (running || _faceInput != null);
             if (_overlay.gameObject.activeSelf != visible) _overlay.gameObject.SetActive(visible);
+            if (visible) _overlay.Place(onResultCard: !running);
             return visible;
         }
 
@@ -574,6 +613,11 @@ namespace MotionRunner.Gameplay
         {
             Time.timeScale = _pause.IsFrozen ? 0f : 1f;
             _session.Frozen = _pause.IsFrozen;
+
+            // The music follows the phase from the same place the clock does: ducked while the
+            // run is frozen, full when it moves. Unscaled inside GameAudio, so the duck lands
+            // even though the scaled clock has stopped.
+            GameAudio.SetDucked(_pause.IsFrozen);
 
             // Applied here as well as every frame in LateUpdate, so a phase change lands on the
             // same frame it happens rather than one later. SyncOverlay is the only place that
@@ -608,6 +652,7 @@ namespace MotionRunner.Gameplay
         {
             if (_notificationPanel != null) _notificationPanel.Close();
             if (_analyticsPanel != null) _analyticsPanel.Close();
+            if (_soundPanel != null) _soundPanel.Close();
             DismissOverlay();
             StopAttract();
             if (_hud != null)

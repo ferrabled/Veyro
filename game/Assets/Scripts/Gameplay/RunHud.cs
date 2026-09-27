@@ -1,5 +1,6 @@
 using System;
 using MotionRunner.Art;
+using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using MotionRunner.Menu;
@@ -53,9 +54,14 @@ namespace MotionRunner.Gameplay
         /// The card fades in over this, once the world's crash pose has had its turn.
         const float FadeSeconds = 0.25f;
 
-        /// Crash to fully-visible card. RunSession locks the tap-anywhere restart out for this
-        /// long, so a tap during the crash pose cannot skip a card nobody has seen yet.
+        /// Crash to fully-visible card. RunSession locks the restart gate (RUN AGAIN and the
+        /// camera hop) for this long, so nothing during the crash pose can skip a card nobody
+        /// has seen yet.
         public const float RevealSeconds = RunnerVisual.CrashPoseSeconds + FadeSeconds;
+
+        /// The result loop starts this long after the stinger begins, crossfading in under its
+        /// tail (GameAudio's usual 0.8 s). Unscaled, like the reveal.
+        public const float ResultMusicDelaySeconds = 1.0f;
 
         /// The NEW BEST pill's pop, on unscaled time - the result screen can be up while the
         /// world is still at timeScale 0.
@@ -65,9 +71,15 @@ namespace MotionRunner.Gameplay
         /// How long the run stays held after a SHARE tap. See HoldRun.
         const float ShareHoldSeconds = 0.5f;
 
-        /// Raised by the restart button. RunSession also accepts a tap anywhere, because a
-        /// button is a nicety and being able to start the next run is not.
+        /// Raised by the RUN AGAIN button - the one way into the next run on a tilt card. In
+        /// camera mode RunSession also accepts a hop (its RestartGesture), because the player is
+        /// 2 m from the phone; a tap anywhere else on the card does nothing (owner call, 24 Sep).
         public event Action RestartRequested;
+
+        /// Whether the card may promise "HOP to run again". Set by RunSession before ShowResult:
+        /// true only while the camera is still the run's steering, so a camera run that fell back
+        /// to tilt gets the same button-only card a tilt run gets.
+        public bool HopRestartAvailable { get; set; }
 
         /// Raised by the SKINS & SHOP link on the result card - the store entry point (T-020).
         /// RunFlow owns what opens; the HUD only announces the tap. It leaves the run for the
@@ -92,27 +104,28 @@ namespace MotionRunner.Gameplay
 
         /// Holds / releases the run loop. Set by GameBootstrap to RunSession.Frozen.
         ///
-        /// It exists for exactly one caller: SHARE. Every other way off this card is already safe
-        /// against its own tap - RUN AGAIN wants a restart, and SKINS & SHOP and QUIT TO MENU go
-        /// through RunFlow.QuitToMenu -> RunSession.Stop(), which clears the pending restart and
-        /// disables the session in the same frame the button fires (the 27 Aug store-tap bug).
+        /// It exists for exactly one caller: SHARE, the one button that STAYS on the result
+        /// screen. Every other way off this card is already safe against its own tap - RUN AGAIN
+        /// wants a restart, and SKINS & SHOP and QUIT TO MENU go through RunFlow.QuitToMenu ->
+        /// RunSession.Stop(), which clears the pending restart and disables the session in the
+        /// same frame the button fires (the 27 Aug store-tap bug).
         ///
-        /// SHARE is the first button that STAYS on the result screen, and that is what makes it
-        /// different. The release that opens the share sheet is the same TouchPhase.Ended that
-        /// TouchTapInput reports as a jump, so RunSession's "tap anywhere" path (RestartGate, fed
-        /// by Input.IsJumpPressed) would queue a restart on that very frame and start it on the
-        /// next one the game gets - i.e. the moment the player comes back from the share sheet,
-        /// the card they were sharing is gone and a run they never asked for is under way.
-        /// ShareSheet.Send hands the app to an Android chooser activity, so "the next frame" is
-        /// after the round trip, which is precisely the worst moment for it.
+        /// It was written against the "tap anywhere" restart: the release that opened the share
+        /// sheet was the same TouchPhase.Ended TouchTapInput reported as a jump, so the card was
+        /// gone the moment the player came back from the chooser. That path is retired (24 Sep;
+        /// the gate is fed only by the camera hop), so on a TILT card the hold now guards
+        /// nothing. It is kept for the CAMERA card: RunSession's RestartGesture keeps reading the
+        /// face across the share round trip, and holding the loop for the tap's frame and for a
+        /// short window after focus returns is the cheap belt against a re-acquired face being
+        /// read as a hop while the chooser is closing. Not clearly dead, so not removed.
         ///
-        /// Freezing is the fix, and it is the mechanism the pause menu already uses: RunSession
-        /// ticks input while Frozen and returns BEFORE the restart check, so the tap is consumed
-        /// and dropped. RunSession's DefaultExecutionOrder(100) runs it after the EventSystem, so
-        /// a freeze set inside this click handler lands on the frame of the tap that caused it.
-        /// The hold releases on a short unscaled timer, re-armed whenever the app regains focus
-        /// (the sheet takes focus away), and unconditionally from HideResult/Clear - a leaked
-        /// hold would soft-lock the card, so every exit releases it.
+        /// Mechanism: the one the pause menu already uses. RunSession ticks input while Frozen
+        /// and returns BEFORE the restart check, so anything read on those frames is consumed and
+        /// dropped. RunSession's DefaultExecutionOrder(100) runs it after the EventSystem, so a
+        /// freeze set inside this click handler lands on the frame of the tap that caused it. The
+        /// hold releases on a short unscaled timer, re-armed whenever the app regains focus (the
+        /// sheet takes focus away), and unconditionally from HideResult/Clear - a leaked hold
+        /// would soft-lock the card, so every exit releases it.
         public Action<bool> HoldRun;
 
         Text _score;
@@ -139,6 +152,15 @@ namespace MotionRunner.Gameplay
         CanvasGroup _resultCanvas;
         float _resultRevealAt;
         GameObject _pauseButton;
+
+        /// Whether this card's stinger has played. Armed by ShowResult, spent by Update on the
+        /// frame the card starts to fade in.
+        bool _revealCued;
+
+        /// Unscaled time at which the result loop starts, or 0 when none is pending. Set when
+        /// the stinger fires; cleared by HideResult so a RUN AGAIN (or a quit) inside the delay
+        /// cannot land the result loop on top of the next run.
+        float _resultMusicAt;
 
         /// The run the card is showing - SHARE's whole payload (T-024).
         RunSummary _summary;
@@ -255,6 +277,8 @@ namespace MotionRunner.Gameplay
             // its own character so the cosmetic they paid for is in the screenshot.
             _badgeRect.localScale = Vector3.one * BadgeStartScale;
             _resultRevealAt = Time.unscaledTime + RunnerVisual.CrashPoseSeconds;
+            _revealCued = false;
+            _resultMusicAt = 0f;
             _resultCanvas.alpha = 0f;
             _resultCanvas.interactable = false;
             _resultPanel.SetActive(true);
@@ -307,14 +331,38 @@ namespace MotionRunner.Gameplay
             TickShareHold();
             if (_resultCanvas == null || !_resultPanel.activeSelf) return;
 
+            // The card's stinger, on the frame it starts to show - after the crash pose, on the
+            // bed RunSession.Crash faded the music down to. ONE stinger per card: a new all-time
+            // best gets the fanfare INSTEAD of the jingle (two stingers over each other read as
+            // a glitch, and the record is the bigger news). A new daily best keeps the jingle;
+            // its badge already says the rest.
+            if (!_revealCued && Time.unscaledTime >= _resultRevealAt)
+            {
+                _revealCued = true;
+                GameAudio.Play(_summary.NewAllTimeBest ? Sfx.NewBest : Sfx.ResultJingle);
+                _resultMusicAt = Time.unscaledTime + ResultMusicDelaySeconds;
+            }
+
+            // Then the loop under the card, a beat later: the "best" one for ANY record (all-time
+            // or daily - the badge's own rule), the other for every other run. It parks the run
+            // track on the deck's other slot rather than replacing it, which is what lets RUN
+            // AGAIN resume the same song mid-bar (MusicDeck).
+            if (_resultMusicAt > 0f && Time.unscaledTime >= _resultMusicAt)
+            {
+                _resultMusicAt = 0f;
+                GameAudio.PlayResultMusic(_summary.IsNewRecord);
+            }
+
             float alpha = Mathf.Clamp01((Time.unscaledTime - _resultRevealAt) / FadeSeconds);
             _resultCanvas.alpha = alpha;
 
-            // Interactable only once the card is fully up, and the tap hint with it: a control
-            // the player cannot see is a control they cannot have meant to use.
+            // Interactable only once the card is fully up, and the camera hint with it: a control
+            // the player cannot see is a control they cannot have meant to use. The hint exists
+            // only on a card a hop can restart.
             bool visible = alpha >= 1f;
             _resultCanvas.interactable = visible;
-            if (_hint.activeSelf != visible) _hint.SetActive(visible);
+            bool hint = visible && HopRestartAvailable;
+            if (_hint.activeSelf != hint) _hint.SetActive(hint);
 
             if (!_badge.activeSelf) return;
             float pop = Mathf.Clamp01((Time.unscaledTime - _resultRevealAt - FadeSeconds) / BadgePopSeconds);
@@ -363,6 +411,7 @@ namespace MotionRunner.Gameplay
         public void HideResult()
         {
             ReleaseShareHold();
+            _resultMusicAt = 0f; // a loop still pending must not start over the next run
             _resultCanvas.alpha=1;_resultCanvas.interactable=true;
             _resultPanel.SetActive(false);
             SetXpStatus("");
@@ -469,14 +518,18 @@ namespace MotionRunner.Gameplay
 
             BuildButtons(card);
 
+            // The camera card's one extra line, under the card: the player is 2 m away, so the
+            // card has to say that a hop restarts and that the phone must be able to see them
+            // (the YOU · CAMERA panel sits above the card meanwhile - FaceOverlay.ResultPosition).
             // Anchored to the screen, not the card: inside the card it would sit under the
-            // buttons, which is exactly where it landed on the first device build. Hidden until
-            // the card has finished fading in - see Update.
+            // buttons, which is exactly where the old "tap anywhere" hint landed on the first
+            // device build. Shown only once the card has finished fading in, and only when a hop
+            // can actually restart (HopRestartAvailable) - see Update.
             var hint = RuntimeUi.Label("Hint", _resultPanel.transform,
                 new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(24f, 72f), new Vector2(-24f, 132f),
                 34, TextAnchor.LowerCenter, ParkTheme.Paper);
-            hint.text = "tap anywhere or press space";
+            hint.text = "stand where the phone can see you · HOP to run again";
             _hint = hint.gameObject;
         }
 
@@ -600,14 +653,15 @@ namespace MotionRunner.Gameplay
             // otherwise the only way off this card that is not another run, and back is not
             // something a player is taught.
             //
-            // It cannot double as the "tap anywhere" restart the rest of the screen is, and it
-            // needs no overlay guard to say so: the tap runs RunFlow.QuitToMenu ->
-            // RunSession.Stop(), which nulls Input, clears the pending restart and disables the
-            // session - and RunSession's DefaultExecutionOrder(100) puts all of that strictly
-            // before the Update that would otherwise have read this same TouchPhase.Ended as a
-            // jump (the 27 Aug store-tap bug). SKINS & SHOP above takes the same route.
+            // The rest of the card is inert to taps now (the "tap anywhere" restart is gone), so
+            // this link no longer has to defend itself against being read as one. It still runs
+            // RunFlow.QuitToMenu -> RunSession.Stop(), which nulls Input and the restart gesture,
+            // clears the pending restart and disables the session - strictly before RunSession's
+            // own Update (DefaultExecutionOrder 100), so not even a camera hop landing on this
+            // frame can start a run behind the menu (the 27 Aug store-tap bug, generalised).
+            // SKINS & SHOP above takes the same route.
             CardLink("Quit", card, new Vector2(206f, 78f), "QUIT TO MENU",
-                () => QuitRequested?.Invoke());
+                () => QuitRequested?.Invoke(), Sfx.UiBack);
         }
 
         /// A rounded, filled button placed from the BOTTOM of the card, which is the edge the
@@ -624,6 +678,7 @@ namespace MotionRunner.Gameplay
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = surface;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
 
             var text = RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one,
                 Vector2.zero, Vector2.zero, fontSize, TextAnchor.MiddleCenter, labelColor);
@@ -634,7 +689,8 @@ namespace MotionRunner.Gameplay
 
         /// A text-only tap target, the shape the profile tab's rows already use: the label is the
         /// graphic, so the whole rect takes the tap without a slab behind it.
-        static Button CardLink(string name, RectTransform card, Vector2 position, string label, Action onTap)
+        static Button CardLink(string name, RectTransform card, Vector2 position, string label,
+            Action onTap, Sfx sound = Sfx.UiTap)
         {
             RuntimeUi.Element(name, card, out var rect);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
@@ -649,6 +705,7 @@ namespace MotionRunner.Gameplay
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = text;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button, sound);
             return button;
         }
 

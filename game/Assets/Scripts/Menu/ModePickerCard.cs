@@ -111,6 +111,7 @@ namespace MotionRunner.Menu
             var button = go.AddComponent<Button>();
             button.targetGraphic = image;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
 
             RuntimeUi.Label("Label", go.transform, Vector2.zero, Vector2.one,
                 Vector2.zero, Vector2.zero, 50, TextAnchor.MiddleCenter, labelColor).text = label;

@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.CameraInput;
 using MotionRunner.Core;
 using MotionRunner.Track;
@@ -124,6 +125,14 @@ namespace MotionRunner.Gameplay
         float _faceUnseenFor;
         int _pendingFrame = -1;
 
+        /// The numeral last ticked for. The tick plays on each change of DisplayDigit (3, 2, 1)
+        /// and the go on the frame the count completes - so the sound and the drawn digit are
+        /// the same edge, never one frame apart.
+        int _tickedDigit;
+
+        Text _musicToggle;
+        Text _sfxToggle;
+
         /// rig is null in tilt mode, and is dropped here when camera mode gives up.
         public static PauseMenu Show(FaceTrackingRig rig)
         {
@@ -229,7 +238,9 @@ namespace MotionRunner.Gameplay
             RuntimeUi.TextButton("Quit", card.transform,
                 new Vector2(0.5f, 0f), new Vector2(0f, 130f), new Vector2(480f, 110f),
                 SecondaryColor, "QUIT TO MENU", 42, TextColor,
-                () => QuitRequested?.Invoke());
+                () => QuitRequested?.Invoke(), Sfx.UiBack);
+
+            BuildSoundToggles(card.transform);
 
             // The 3-2-1 numeral, dead centre where no phone bezel or thumb hides it. A sibling of
             // the panel, NOT a child: the whole card steps aside for the count (owner call,
@@ -243,6 +254,57 @@ namespace MotionRunner.Gameplay
             countdownOutline.effectColor = Art.ParkTheme.Ink;
             countdownOutline.effectDistance = new Vector2(4f, -4f);
             _countdownDigits.gameObject.SetActive(false);
+        }
+
+        /// Two text-only mute toggles in the strip under QUIT (T-045). Text links rather than
+        /// slabs, sized to the 75 px the card already had spare below the last button, so the
+        /// three buttons above sit exactly where they did. The full levels live on the profile
+        /// tab's SOUND panel; this is the one-tap "not now" for a player who paused because the
+        /// room went quiet. Skipped entirely when there is no audio instance (tests, tooling).
+        void BuildSoundToggles(Transform card)
+        {
+            var settings = GameAudio.Instance != null ? GameAudio.Instance.Settings : null;
+            if (settings == null) return;
+
+            _musicToggle = BuildToggle(card, "MusicToggle", new Vector2(-190f, 44f), () =>
+            {
+                settings.SetMusicMuted(!settings.MusicMuted);
+                settings.Save();
+                RefreshSoundToggles(settings);
+            });
+            _sfxToggle = BuildToggle(card, "SfxToggle", new Vector2(190f, 44f), () =>
+            {
+                settings.SetSfxMuted(!settings.SfxMuted);
+                settings.Save();
+                RefreshSoundToggles(settings);
+                // Unmuting is the one tap here worth hearing; the TapSound listener that follows
+                // is muted-then-unmuted in the same frame and plays by itself.
+            });
+            RefreshSoundToggles(settings);
+        }
+
+        Text BuildToggle(Transform card, string name, Vector2 position, Action onTap)
+        {
+            RuntimeUi.Element(name, card, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(340f, 52f);
+
+            var text = RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 28, TextAnchor.MiddleCenter, StatusColor);
+            text.raycastTarget = true;
+
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = text;
+            button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
+            return text;
+        }
+
+        void RefreshSoundToggles(SoundSettings settings)
+        {
+            if (_musicToggle != null) _musicToggle.text = settings.MusicMuted ? "MUSIC OFF" : "MUSIC ON";
+            if (_sfxToggle != null) _sfxToggle.text = settings.SfxMuted ? "SOUNDS OFF" : "SOUNDS ON";
         }
 
         /// A tap on RESUME or RESTART never acts on the frame it arrives: TouchTapInput reports a
@@ -462,6 +524,8 @@ namespace MotionRunner.Gameplay
             _panel.SetActive(false);
             _countdownDigits.text = _countdown.DisplayDigit.ToString();
             _countdownDigits.gameObject.SetActive(true);
+            _tickedDigit = _countdown.DisplayDigit;
+            GameAudio.Play(Sfx.CountdownTick); // "3"
         }
 
         void TickCountdown()
@@ -499,10 +563,17 @@ namespace MotionRunner.Gameplay
                 _countdownDigits.gameObject.SetActive(false);
                 _wait = Wait.None;
                 _pendingFrame = Time.frameCount;
+                GameAudio.Play(Sfx.CountdownGo);
                 return;
             }
 
-            _countdownDigits.text = _countdown.DisplayDigit.ToString();
+            int digit = _countdown.DisplayDigit;
+            if (digit != _tickedDigit)
+            {
+                _tickedDigit = digit;
+                GameAudio.Play(Sfx.CountdownTick); // "2", "1"
+            }
+            _countdownDigits.text = digit.ToString();
         }
 
         /// The camera is not coming back (CameraStaging.Stage.Failed is the rig's own terminal
