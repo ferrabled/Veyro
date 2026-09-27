@@ -11,8 +11,8 @@ Feature under review, as implemented on `feat/share-run`:
 | SHARE button | `game/Assets/Scripts/Core/RunShare.cs` → `ShareSheet.cs` | `Intent.ACTION_SEND`, `type=text/plain`, wrapped in `Intent.createChooser`. Text only, no attachment. Falls back to the clipboard when the intent fails |
 | Share text | `game/Assets/Scripts/Track/ChallengeMessage.cs` | Fully app-generated. `"🏆 new personal best! I scored 4 210 in Veyro Run (1 820 m) — can you beat me? https://veyro.ferrabled.com/challenge/?s=1234&v=1&w=greybox&p=4210&m=free"` |
 | Link payload | same | `s` seed, `v` content version, `w` worldId, `p` score, `m` mode, `d` daily label. **No player name, no Player ID, no device identifier, no free text** |
-| Receive side | `game/Assets/Scripts/Core/DeepLinks.cs` + (to be written) `AndroidChallengeLinks.cs` | `veyro://challenge?…` custom scheme + `https://veyro.ferrabled.com/challenge/` App Link with `autoVerify` |
-| Landing page | (to be written) `site/public/challenge/index.html` | Static, Cloudflare Workers. Shows the score, tries `veyro://challenge?…`, falls back to the Play listing. No analytics |
+| Receive side | `game/Assets/Scripts/Core/DeepLinks.cs` + `game/Assets/Editor/AndroidChallengeLinks.cs` | `veyro://challenge?…` custom scheme + `https://veyro.ferrabled.com/challenge/` App Link with `autoVerify` |
+| Landing page | `site/public/challenge/index.html` + `challenge.js` (undeployed) | Static, Cloudflare Workers. Shows the score; on Android opens `intent://challenge?…#Intent;scheme=veyro;package=…;S.browser_fallback_url=<Play listing>;end` (§3.5), elsewhere tries `veyro://challenge?…` and falls back to the Play listing on a timer. Carries its own no-cookies/no-analytics line (§8.5). No analytics |
 
 ---
 
@@ -23,13 +23,13 @@ Feature under review, as implemented on `feat/share-run`:
 | 1 | Data safety: text share is **not** "collected" and **not** "shared" | Play Console Help 10787469 / Play Help 11416267 | Nothing. Form unchanged | ✅ no action |
 | 2 | Seed + score in the URL are **not** personal or sensitive user data | Play User Data policy 10144311 | Keep handle/Player ID out of the link (it already is) | ✅ enforced in code |
 | 3 | `ACTION_SEND` needs **no permission** | developer.android.com/training/sharing/send | Nothing | ✅ no action |
-| 4 | App Link intent-filter: VIEW + BROWSABLE + DEFAULT + http/https + `autoVerify` | developer.android.com/training/app-links/verify-android-applinks | Add to the GameActivity entry at build time | ⬜ to build |
+| 4 | App Link intent-filter: VIEW + BROWSABLE + DEFAULT + http/https + `autoVerify` | developer.android.com/training/app-links/verify-android-applinks | Add to the GameActivity entry at build time | ✅ built (`AndroidChallengeLinks.cs`; filters seen in the device build's manifest, STATUS 21 Sep) |
 | 5 | `android:exported="true"` on an activity with intent filters (API 31+) | developer.android.com/guide/topics/manifest/activity-element | Already true for the launcher activity; keep it | ✅ no Play declaration exists for this |
 | 6 | `assetlinks.json` must carry the **Play-managed app signing** SHA-256 | developer.android.com/training/app-links/configure-assetlinks | Owner copies the fingerprint from Play Console | ⬜ **owner action** |
 | 7 | IARC "Online interaction or content exchange" answer stays **No** | Play Console Help 7021383 | Nothing — sharing via secondary apps is explicitly excluded | ✅ no re-questionnaire |
 | 8 | Families policy does not apply (13+ target audience) | Play Console Help 9285070 / 9893335 | Nothing; keep listing art non-childlike | ✅ no action |
 | 9 | Listing must describe shipped functionality only | Play Deceptive Behavior / Misleading Claims 9888077 | Do not advertise "challenge your friends" until the receive side actually works on a released build | ⬜ **owner action** |
-| 10 | Privacy policy must describe the share + the challenge page | Play User Data policy 10144311 | New section below + effective-date bump + redeploy | ⬜ **owner action** |
+| 10 | Privacy policy must describe the share + the challenge page | Play User Data policy 10144311 | New section below + effective-date bump + redeploy | ✅ text applied to both copies 28 Sep · ⬜ **owner: redeploy** |
 
 **Net effect on the Console: nothing changes.** No new Data safety category, no content-rating
 re-submission, no new permission, no new app-access answer. The only mandatory owner work is the
@@ -275,7 +275,9 @@ made-up scheme is effectively never. Its two limits:
 - Navigating to `veyro://…` from a web page is a browser-mediated action; on Chrome for Android an
   `intent://challenge/?…#Intent;scheme=veyro;package=com.ferrabled.veyro.run;S.browser_fallback_url=<play url>;end`
   URL is the reliable form, because it carries the Play-listing fallback in the same navigation. The
-  plain `veyro://` href fails visibly (error page) when the app is absent.
+  plain `veyro://` href fails visibly (error page) when the app is absent. `challenge.js` therefore
+  uses the intent form whenever the user agent says Android, and keeps the bare scheme + timer only
+  for everything else.
 
 This is the layered design already implied by `GameLinks.cs`: verified App Link → custom scheme via
 the page → Play listing.
@@ -539,9 +541,9 @@ Ordered. Nothing here can be done by an agent.
       missing file means an unverified state that persists until the next re-verify.
 - [ ] **Verify the asset file by hand:** `curl -I https://veyro.ferrabled.com/.well-known/assetlinks.json`
       must return `200`, `content-type: application/json`, and **no** 301/302 anywhere in the chain.
-- [ ] **Privacy policy.** Apply §8.1–§8.4 to `docs/PRIVACY_POLICY.md` and
-      `site/public/privacy/index.html`, bump the **effective date in both** to the actual revision
-      date, redeploy (standing rule 4).
+- [ ] **Privacy policy.** §8.1–§8.4 are applied to `docs/PRIVACY_POLICY.md` and
+      `site/public/privacy/index.html` with the effective date bumped to 28 September 2026 in both
+      (done by an agent, 28 Sep PR review). Owner: read it, then redeploy (standing rule 4).
 - [ ] **Rebuild + diff.** Release APK/AAB, `aapt2 dump permissions` against the previous release,
       plus a size diff. Expect **no** permission change (standing rule 3, CLAUDE.md gotcha #10).
 - [ ] **Device check (needs human device test).** On a Play-installed build:

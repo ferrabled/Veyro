@@ -14,12 +14,15 @@ Imported as Humanoid and retargeted onto the Kenney runner and the KayKit advent
 Root position/rotation/height are baked into the pose: the runner's collision box never moves
 when it dies, and the result card's preview stage is a fixed frame.
 
-| Take | Controller state | Loops | Used for |
-|---|---|---|---|
-| `Hit_Chest` | `crashWall` | no | ran into a full-height block — stopped dead and recoiling |
-| `Roll` | `crashTrip` | no | clipped a hurdle — trips and tumbles forward |
-| `Dance_Loop` | `celebrate` | yes | result card, run was a new record |
-| `Death01` | `defeat` | no | result card, run was not a record — falls to the ground |
+| Take | Controller state | Speed | Loops | Used for |
+|---|---|---|---|---|
+| `Death01` | `crashWall` | 1.7× | no | ran into a full-height block — staggers and falls onto its back |
+| `Roll` | `crashTrip` | 1.15× | no | clipped a hurdle — trips and tumbles forward |
+| `Dance_Loop` | `celebrate` | 1× | yes | result card, run was a new record |
+| `Death01` | `defeat` | 1× | no | result card, run was not a record — falls to the ground |
+
+`Hit_Chest` was the first pick for `crashWall` and was dropped before shipping: its 0.33 s flinch
+was too subtle for a wall (STATUS 21 Sep). The source of truth is `RunnerCrashBuild.Final`.
 
 The other takes in the FBX are not referenced and therefore not shipped (Unity strips
 unreferenced sub-assets); the ~20 MB source stays under Git LFS like the other FBX files.

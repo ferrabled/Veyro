@@ -5,7 +5,9 @@
 
    This page's whole job is to get that query string into the app. It re-emits it unchanged as
    veyro://challenge?<same query> — the app parses BOTH shapes with the same code
-   (MotionRunner.Track.ChallengeMessage.TryParse), so the two can never drift.
+   (MotionRunner.Track.ChallengeMessage.TryParse), so the two can never drift. On Android the
+   scheme link is wrapped in an intent:// URL (see intentUrl); the app receives the same
+   veyro://challenge?… either way.
 
    Why a custom scheme at all, when the https link is registered as an Android App Link:
    verification needs /.well-known/assetlinks.json signed with the release certificate, which
@@ -16,8 +18,12 @@
 (function () {
   "use strict";
 
-  var PLAY_URL = "https://play.google.com/store/apps/details?id=com.ferrabled.veyro.run";
+  var PACKAGE = "com.ferrabled.veyro.run";
+  var PLAY_URL = "https://play.google.com/store/apps/details?id=" + PACKAGE;
   var SCHEME_URL = "veyro://challenge";
+
+  /* "Request desktop site" drops the Android token; such a visit gets the generic path below. */
+  var IS_ANDROID = /Android/i.test(navigator.userAgent);
 
   /* How long to wait before deciding the app is not installed. 1.5s is long enough for the
      system to hand over on a slow phone, and short enough that a person staring at a page that
@@ -29,6 +35,18 @@
   function text(id, value) {
     var node = el(id);
     if (node) node.textContent = value;
+  }
+
+  /* Android browsers (Chrome, Samsung Internet, Firefox) resolve an intent:// URL in ONE
+     navigation: open the app when it is installed, go to S.browser_fallback_url when it is
+     not. A plain veyro:// navigation with no app to take it makes Chrome replace this page
+     with ERR_UNKNOWN_URL_SCHEME (docs/SHARE_COMPLIANCE.md §3.5), which also kills the timer
+     that was meant to rescue it — so on Android the browser owns the fallback, not us. The
+     part before '#' becomes the intent's data: exactly veyro://challenge?<query>. */
+  function intentUrl(query) {
+    return "intent://challenge?" + query +
+      "#Intent;scheme=veyro;package=" + PACKAGE +
+      ";S.browser_fallback_url=" + encodeURIComponent(PLAY_URL) + ";end";
   }
 
   /* "4210" -> "4 210", the same grouping the in-game share text uses (ChallengeMessage). */
@@ -65,10 +83,19 @@
 
     /* The scheme link carries the query VERBATIM — including any parameter this page does not
        understand, so an older page can still hand a newer app everything it was sent. */
-    var schemeUrl = SCHEME_URL + "?" + params.toString();
+    var query = params.toString();
+    var schemeUrl = SCHEME_URL + "?" + query;
 
     var open = el("ch-open");
-    if (open) {
+    if (open && IS_ANDROID) {
+      /* A plain href and no click handler: browsers launch an external app only from a user
+         gesture, and the anchor's own click is the most direct one. No timer either — while
+         Chrome shows an "open in app?" prompt the page is still visible, and a timer would
+         send someone who HAS the game to the Play Store. */
+      open.setAttribute("href", intentUrl(query));
+    } else if (open) {
+      /* Everything else — desktop, and iOS until there is an iOS build (which will want a
+         Universal Link and an App Store fallback instead): the bare scheme plus a timer. */
       open.setAttribute("href", schemeUrl);
       open.addEventListener("click", function (e) {
         e.preventDefault();

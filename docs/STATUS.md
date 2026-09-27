@@ -1,5 +1,39 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — PR #13 (feat-share-run) Copilot review: 8 of 9 findings applied
+
+- **Landing page, Android:** `challenge.js` now opens `intent://challenge?<query>#Intent;scheme=veyro;package=com.ferrabled.veyro.run;S.browser_fallback_url=<Play listing>;end`
+  when the user agent says Android — the app still receives exactly `veyro://challenge?<query>`.
+  The bare scheme made Chrome replace the page with `ERR_UNKNOWN_URL_SCHEME` when the game was
+  missing (SHARE_COMPLIANCE §3.5), which also killed the 1.5 s Play fallback timer. The Android
+  path has no timer: while Chrome shows an "open in app?" prompt the page is still visible, and a
+  timer would send someone who has the game to the Play Store. Non-Android visitors keep the bare
+  scheme + timer.
+- **Landing page disclosure** (SHARE_COMPLIANCE §8.5): the no-cookies / no-analytics line and a
+  privacy-policy link are on the page itself.
+- **Privacy policy:** SHARE_COMPLIANCE §8.1–§8.4 applied to `docs/PRIVACY_POLICY.md` and
+  `site/public/privacy/index.html`, effective date 28 September 2026 in both. Corrected to the
+  shipped build on the way: real `v=greybox-1` example, the personal-best line and the `d` date
+  key are listed, the clipboard fallback is mentioned, and the link paragraph describes today's
+  unverified path (page → button) rather than assuming App Links already verify.
+- Doc fixes: App Links item is OPEN_QUESTIONS **24** (BACKLOG T-024, STATUS 21 Sep said 20);
+  SHARE_COMPLIANCE inventory no longer says "to be written"; the T-024 entry's "known, deliberate"
+  paragraph no longer claims the banner survives RUN AGAIN (the leak fixed in the review-fixes
+  entry); `Quaternius/SOURCES.md` now says `crashWall` = `Death01` ×1.7, matching
+  `RunnerCrashBuild.Final`.
+- **Not applied:** the "high" finding that `filter.Add(new XAttribute(...))` after child elements
+  throws in `AndroidChallengeLinks.cs`. It does not — LINQ to XML keeps attributes and child nodes
+  in separate lists (only XmlWriter has that ordering rule). Checked with a .NET snippet, and the
+  21 Sep device build's manifest already gained both filters, so the postprocessor ran cleanly.
+
+**Verified:** `node --check` on `challenge.js`; sample intent URL inspected (a `#` in a value is
+encoded to `%23`, so it cannot end the data URI early). No game code changed, so no Unity run.
+
+**Needs a human device test** (after `npx wrangler deploy` from `site/`, owner-only): on an Android
+phone **without** the game, open a challenge link in Chrome and tap **Open in Veyro** → the Play
+listing must open, not an error page. With the game installed → the game opens on the challenge.
+Repeat once in Samsung Internet if one is to hand.
+
 ## 2026-09-23 — Judge access standardized on Google Play promo codes
 
 `judge-premium-access` / T-035 documentation follow-up. Owner requested retiring the old
@@ -492,14 +526,16 @@ change; the website page must be deployed first (see below) for step 3.
 - **Deploy the site** — `npx wrangler deploy` from `site/` — *before* any build with a SHARE button
   reaches a tester, or shared links 404. Not deployed by this session, deliberately.
 - **`assetlinks.json`** with the Play *app signing* certificate SHA-256, so the https link opens the
-  app directly instead of the browser: **OPEN_QUESTIONS 20**, steps in `PLAY_CONSOLE_SETUP.md` §F.
+  app directly instead of the browser: **OPEN_QUESTIONS 24**, steps in `PLAY_CONSOLE_SETUP.md` §F.
   Shipping without it is safe — the link goes through the web page, which then opens the app via the
   custom scheme.
 - Privacy policy: add the sharing section (`SHARE_COMPLIANCE.md` §8), bump both copies, redeploy.
   Listing may mention "challenge a friend" only in/after the release that ships it.
 
 **Known, deliberate:** RUN AGAIN after a challenge is an ordinary free run with a fresh seed (the
-override is one-shot) while the `CHALLENGE · beat …` line stays up as the goal; the challenge run is
+override is one-shot) and shows **no** `CHALLENGE · beat …` line — `RunSession.StartRun` sets the
+banner from the run's own seed on every start (*corrected 28 Sep: this entry first said the banner
+stayed up, which was the leak fixed in the "review fixes" entry above*); the challenge run is
 always tilt+touch (a link must not open with a camera-permission dialog); a challenge scores on the
 free/all-time board and stamps no day, exactly like any other free run.
 

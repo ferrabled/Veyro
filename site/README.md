@@ -94,7 +94,9 @@ long as the two-ink rule holds and each pose still reads at a glance.
 5. **`/challenge/` (T-024, added 21 Sep 2026 — undeployed).** Where a shared run lands. It must be
    live *before* any build with a SHARE button reaches a tester, or every shared link 404s. The
    page only reads its own query string (`?s=&v=&w=&p=&m=&d=`) and re-emits it verbatim as
-   `veyro://challenge?…`; the app parses both shapes with the same code
+   `veyro://challenge?…` — wrapped in an `intent://…#Intent;…;S.browser_fallback_url=…;end` URL
+   on Android, so the browser itself falls back to the Play listing when the game is missing;
+   the app parses both shapes with the same code
    (`MotionRunner.Track.ChallengeMessage`), so **the key names are a contract — do not rename
    them**, links already in somebody's chat history have to keep working. Script is a separate
    file because `_headers` sets `script-src 'self'` (no inline JS anywhere on this site).
