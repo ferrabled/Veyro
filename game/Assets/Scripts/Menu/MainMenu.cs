@@ -73,6 +73,7 @@ namespace MotionRunner.Menu
         public bool IsAwayFromHome => Tab != MenuTab.Run || _detail != null;
 
         public bool IsStagingCamera => _home != null && _home.IsStagingCamera;
+        public bool HasPendingPick => _home != null && _home.HasPendingPick;
 
         readonly Dictionary<MenuTab, MenuPage> _pages = new Dictionary<MenuTab, MenuPage>();
 

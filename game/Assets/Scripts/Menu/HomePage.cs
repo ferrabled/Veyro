@@ -22,6 +22,7 @@ namespace MotionRunner.Menu
         public event Action<bool, FaceTrackingRig> Chosen;
 
         public bool IsStagingCamera => _modes != null && _modes.IsStagingCamera;
+        public bool HasPendingPick => _modes != null && _modes.HasPendingPick;
 
         public void CancelStaging() => _modes?.CancelStaging();
 

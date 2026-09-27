@@ -49,18 +49,24 @@ permalink: /privacy/
      is off, and are deleted on the next enable or when app data is cleared. The delivery-
      diagnostics sentence now also names the initialization-timing event the stock SDK always
      emits, and no page claims a dedicated/isolated SDK storage folder any more (the SDK's
-     files live in the app-specific storage folder; device test 22 Sep found them under Android/data/<pkg>/files/layers_sdk). Effective date unchanged: same-day revision. -->
+     files live in the app-specific storage folder; device test 22 Sep found them under Android/data/<pkg>/files/layers_sdk). Effective date unchanged: same-day revision.
+     T-024 ADDED 28 Sep 2026 (feat-share-run, PR #13 review): the "Sharing a run, and challenge
+     links" section, a short-version sentence, the challenge-page paragraph under "About this
+     website" and a Changes line — text from docs/SHARE_COMPLIANCE.md §8, version-scoped to
+     versions with the SHARE button. Nothing new is collected: the share is a user-initiated
+     hand-off to the system share sheet. Deploy WITH or BEFORE the first build with SHARE, in the
+     same `wrangler deploy` as /challenge/. Effective date moved to the revision date. -->
 
 
 # Veyro Run — Privacy Policy
 
-**Effective date:** 21 September 2026
+**Effective date:** 28 September 2026
 **App:** Veyro Run (`com.ferrabled.veyro.run`), published by Fernando Rabasco ("ferrabled")
 **Contact:** ferrabled+veyro@gmail.com
 
 ## The short version
 
-The game itself plays entirely on your device — every camera frame is processed and discarded in memory, and the game serves no ads. Online services support purchases, leaderboards and, in notification-enabled versions, notification registration and delivery. Versions with GAMEPLAY ANALYTICS offer a separate, optional analytics service that stays off until you enable it. Versions with the in-game shop ask our purchase provider which cosmetics you own. Versions with the shared leaderboard (the **leaderboard update** onward) additionally create an **anonymous player profile** — a random ID and a generated name like SWIFT-FOX-42, no email, no sign-in — and upload your **finished run results** so the daily and all-time leaderboards can exist. Your name and score on those boards are visible to other players; you can rename the profile at any time and delete it, with everything it holds, from inside the game.
+The game itself plays entirely on your device — every camera frame is processed and discarded in memory, and the game serves no ads. Online services support purchases, leaderboards and, in notification-enabled versions, notification registration and delivery. Versions with GAMEPLAY ANALYTICS offer a separate, optional analytics service that stays off until you enable it. Versions with the in-game shop ask our purchase provider which cosmetics you own. Versions with the shared leaderboard (the **leaderboard update** onward) additionally create an **anonymous player profile** — a random ID and a generated name like SWIFT-FOX-42, no email, no sign-in — and upload your **finished run results** so the daily and all-time leaderboards can exist. Your name and score on those boards are visible to other players; you can rename the profile at any time and delete it, with everything it holds, from inside the game. Versions with the SHARE button hand a single line of text to your phone's own share sheet: the game itself sends nothing, and the message carries a score and a track seed, never your name or your ID.
 
 **Which version do you have?** Closed-beta versions before the shop update (September 2026) make no network requests at all. A SHOP tab indicates purchase services; a generated player name indicates online profiles. Versions showing a player name on the PROFILE tab have both — and the profile section below applies. Versions with PROFILE → NOTIFICATIONS also include the notification service described below. PROFILE → GAMEPLAY ANALYTICS identifies versions offering the optional Layers service described below.
 
@@ -94,6 +100,14 @@ The recovery code is written to the app's own storage folder, and on some Androi
 - **The profile ID is also your purchase identifier.** The same random ID is used with RevenueCat (see Purchases below) so that your cosmetics and your profile belong to one identity. It remains a pseudonymous identifier: it is not linked to your name, email, or Google account by us, but records attached to it are your records, and we treat them that way — they are deletable, not "anonymous and unaccountable".
 - **Retention and deletion:** profile and runs are kept while the profile exists. **PROFILE → DELETE ONLINE PROFILE** deletes the profile, every run, and every leaderboard entry immediately and permanently, and asks RevenueCat to delete its customer record for the same ID. Local device stats stay on the device (they are yours, on your hardware) until you clear the app's data. Without the app, see [data deletion on the support page](https://veyro.ferrabled.com/support/#delete).
 - **Fair-play and security processing:** submitted runs are checked server-side against what the game can physically produce, and submission is rate-limited per profile. Implausible submissions are stored flagged (never shown on boards; entries over 30 days old are removed when the same profile submits another flagged run, and otherwise may remain until profile deletion). This processing exists to keep the leaderboard honest and the service available. For provider-deletion retries, former Player IDs may remain in a restricted cleanup queue until cleanup succeeds.
+
+## Sharing a run, and challenge links
+
+*This section applies to versions with a SHARE button on the run-over card (the challenge update onward).*
+
+- **Sharing is your action, and the game sends nothing.** Tapping SHARE opens Android's own share sheet — your phone's standard list of apps. The game hands that sheet one line of text and stops there (if the sheet cannot open, the same text is copied to your clipboard instead). Whether the message goes anywhere, and to whom, happens inside the app you pick, in your hands. We never see the message, the recipient, or which app you chose, and the game does not read your contacts or check which messaging apps you have installed.
+- **What the message contains.** Your score, the distance, whether it was a new personal best, whether it was that day's Daily Run, and a link like `https://veyro.ferrabled.com/challenge/?s=987654&v=greybox-1&w=greybox&p=4210&m=free`. Those values are the track's random seed, the content version, the world name, your score, the run mode and, for a Daily Run, the date — they describe *a run*, so your friend plays exactly the track you played. Your player name, your Player ID, your device, and anything from the camera or sensors are **not** in it, and there is no box for you to type your own text.
+- **Opening someone's challenge link.** The link opens the game directly where Android has verified it for Veyro Run; otherwise it opens a page on our website showing the score to beat, with a button that opens the game on the same track with the same seed, or takes you to the Google Play listing if you do not have the game. That page sets no cookies, runs no analytics, and does not know who you are — it reads the score and the seed out of the link's own address in your browser. See "About this website" below for what happens at the infrastructure level.
 
 ## Purchases (optional)
 
@@ -155,9 +169,11 @@ Any other privacy question or concern: email the same address, and a human will 
 
 This website (veyro.ferrabled.com) sets no cookies and runs no analytics or trackers. Two things happen at the infrastructure level when you visit: the site is served by Cloudflare, which processes visitor IP addresses to deliver pages (as any web host does), and pages load their fonts from Google Fonts, which means your browser requests the font files from Google's servers. We never see or store any of this ourselves.
 
+The challenge page (veyro.ferrabled.com/challenge/) works the same way: it reads the score and the track from the link's own address, in your browser, and stores nothing. As with every page here, the request itself passes through Cloudflare — which means the address you asked for, including the score and seed inside it, is handled by Cloudflare's infrastructure like any other URL. We add no tracking of our own and keep no logs.
+
 ## Changes
 
-The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. The Notifications section was added on 20 September 2026, ahead of the notification-enabled update. The optional Gameplay analytics section was added on 21 September 2026, ahead of the analytics-enabled update, and its description of turning analytics off was corrected the same day, before distribution. Future collection changes will be described here before distribution and reflected in the store listing.
+The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. The Notifications section was added on 20 September 2026, ahead of the notification-enabled update. The optional Gameplay analytics section was added on 21 September 2026, ahead of the analytics-enabled update, and its description of turning analytics off was corrected the same day, before distribution. The "Sharing a run, and challenge links" section was added on 28 September 2026, ahead of the challenge update. Future collection changes will be described here before distribution and reflected in the store listing.
 
 ## Contact
 

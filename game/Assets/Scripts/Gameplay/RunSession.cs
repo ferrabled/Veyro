@@ -78,6 +78,15 @@ namespace MotionRunner.Gameplay
         /// the path). Owns the key shapes and the one-time legacy migration.
         readonly BestBoard _board = new BestBoard(new PlayerPrefsScoreStore());
 
+        /// A challenge link's seed, waiting for the next StartRun (T-024). See BeginChallenge.
+        RunSeed _pendingSeed;
+        int _pendingTarget;
+        bool _hasPendingSeed;
+
+        /// Whether the CURRENT run is a challenge, and the score it is chasing (0 otherwise).
+        bool _isChallengeRun;
+        int _challengeTarget;
+
         int _runIndex;
         int _sessionSalt;
         float _elapsed;
@@ -154,6 +163,31 @@ namespace MotionRunner.Gameplay
         /// "camera_fallback" (see _cameraDropped).
         public void NoteCameraDropped() => _cameraDropped = true;
 
+        /// Plays somebody else's track: the seed from a challenge link (T-024) replaces the one
+        /// the next StartRun would have generated. Determinism is unaffected (CLAUDE.md rule 4) -
+        /// generation still comes from a RunSeed and nothing else; only where that seed came from
+        /// changes.
+        ///
+        /// Exactly ONE run: the override is consumed by the StartRun that follows, so RUN AGAIN
+        /// after a challenge is an ordinary free run rather than an endless rematch with the same
+        /// track. And it never touches the Daily Run - StartRun ignores it in RunMode.Daily,
+        /// because a link that could rewrite today's shared track is a link that breaks T-008.
+        public void BeginChallenge(RunSeed seed, int targetScore)
+        {
+            _pendingSeed = seed;
+            _pendingTarget = targetScore;
+            _hasPendingSeed = true;
+        }
+
+        /// The pause menu's RESTART RUN: the same run again. For a challenge that means the
+        /// challenged track and target once more - "restart" must not quietly swap the friend's
+        /// track for a random one while the banner still names their score.
+        public void RestartSameRun()
+        {
+            if (_isChallengeRun) BeginChallenge(CurrentSeed, _challengeTarget);
+            StartRun();
+        }
+
         public void StartRun()
         {
             _runIndex++;
@@ -171,9 +205,16 @@ namespace MotionRunner.Gameplay
             DailyBest = _board.DailyBest(Scheme, DailyLabel);
             AllTimeBest = _board.AllTimeBest(Scheme);
 
-            CurrentSeed = Mode == RunMode.Daily
-                ? DailySeed.ForUtcDate(utcNow, WorldId)
-                : new RunSeed(_sessionSalt + _runIndex * 7919, ChunkLibrary.ContentVersion, WorldId);
+            bool challenge = _hasPendingSeed && Mode != RunMode.Daily;
+            _hasPendingSeed = false;
+            _isChallengeRun = challenge;
+            _challengeTarget = challenge ? _pendingTarget : 0;
+
+            CurrentSeed = challenge
+                ? _pendingSeed
+                : Mode == RunMode.Daily
+                    ? DailySeed.ForUtcDate(utcNow, WorldId)
+                    : new RunSeed(_sessionSalt + _runIndex * 7919, ChunkLibrary.ContentVersion, WorldId);
 
             Runner.ResetState();
             Director.BeginRun(CurrentSeed);
@@ -182,6 +223,9 @@ namespace MotionRunner.Gameplay
             {
                 Hud.HideResult();
                 Hud.SetMode(Mode, DailyLabel, Scheme);
+                // The banner belongs to THIS run: set on every start, so RUN AGAIN after a
+                // challenge (an ordinary free run) does not keep chasing the friend's score.
+                Hud.SetChallenge(_challengeTarget);
                 Hud.SetLive(Score, Director.Difficulty);
             }
 
@@ -230,18 +274,21 @@ namespace MotionRunner.Gameplay
             Score.AddDistance(travelled);
             Score.Tick(deltaTime);
 
-            if (ResolveCollisions())
+            if (ResolveCollisions(out var hit))
             {
-                Crash();
+                Crash(CrashKinds.For(hit, Runner.Airborne));
                 return;
             }
 
             if (Hud != null) Hud.SetLive(Score, Director.Difficulty);
         }
 
-        /// Returns true when the runner hit something. Coins are collected on the way through.
-        bool ResolveCollisions()
+        /// Returns true when the runner hit something, and which kind of obstacle it was - the
+        /// crash pose depends on it (a wall stamps, a hurdle trips). Coins are collected on the
+        /// way through.
+        bool ResolveCollisions(out ObstacleKind hit)
         {
+            hit = ObstacleKind.FullBlock;
             var runner = Runner.Bounds;
             var chunks = Director.ActiveChunks;
 
@@ -259,26 +306,35 @@ namespace MotionRunner.Gameplay
                 }
 
                 for (int i = 0; i < chunk.ObstacleCount; i++)
-                    if (runner.Intersects(chunk.ObstacleBounds(i))) return true;
+                {
+                    if (!runner.Intersects(chunk.ObstacleBounds(i))) continue;
+                    hit = chunk.Definition.Obstacles[i].Kind;
+                    return true;
+                }
             }
 
             return false;
         }
 
-        void Crash()
+        void Crash(CrashKind crash)
         {
             if (!IsRunning) return;
-            Runner.Visual?.Crash();
+            Runner.Visual?.Crash(crash);
             IsRunning = false;
-            _restart.LockOut();
+            // For as long as the crash pose plays and the card fades in: a tap during the pose
+            // used to restart the run before the card had ever been drawn.
+            _restart.LockOut(RunHud.RevealSeconds);
 
             // The board owns which keys a scheme may touch (unit-tested there); this method only
             // decides WHEN a run scores, which is unchanged: crashes score, quits do not.
             int score = Score.Score;
 
-            if (_board.RecordAllTime(Scheme, score)) AllTimeBest = score;
-            if (Mode == RunMode.Daily && _board.RecordDaily(Scheme, DailyLabel, score))
-                DailyBest = score;
+            // The two booleans are the "new best" cue (BestBoard's contract) - captured here,
+            // because after the write AllTimeBest == score and the fact is gone.
+            bool newAllTime = _board.RecordAllTime(Scheme, score);
+            if (newAllTime) AllTimeBest = score;
+            bool newDaily = Mode == RunMode.Daily && _board.RecordDaily(Scheme, DailyLabel, score);
+            if (newDaily) DailyBest = score;
 
             // A FINISHED run is what earns the day's stamp and a row in the profile's history -
             // the same bar Crash already sets for a best score. Quitting or restarting mid-run
@@ -309,7 +365,8 @@ namespace MotionRunner.Gameplay
 
             if (Hud != null)
                 Hud.ShowResult(new RunSummary(Mode, Scheme, score, Score.Coins, Score.BestCombo,
-                    (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel), Runner.Visual!=null && Runner.Visual.HasCrashEffect);
+                    (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel,
+                    newAllTime, newDaily, crash, CurrentSeed), Runner.Visual!=null && Runner.Visual.HasCrashEffect);
         }
 
         /// Hands the finished run to the shared boards (T-009). Fire-and-forget from Crash:

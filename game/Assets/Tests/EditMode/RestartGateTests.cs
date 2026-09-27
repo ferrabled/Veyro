@@ -68,6 +68,30 @@ namespace MotionRunner.Tests
         }
 
         [Test]
+        public void ALongerLockoutCoversTheWholeCardReveal()
+        {
+            // The result card takes crash pose + fade to appear; a tap anywhere in that window
+            // must not restart the run before the card was ever drawn.
+            _gate.LockOut(1.25f);
+            float waited = 0f;
+            while (_gate.IsLockedOut)
+            {
+                Assert.IsFalse(_gate.Tick(Dt, restartPressed: true, overlayOpen: false));
+                // The tick that ends the lockout may accept that same tap (existing contract);
+                // no tick BEFORE it may.
+                if (_gate.IsLockedOut) Assert.IsFalse(_gate.IsQueued);
+                waited += Dt;
+            }
+            Assert.AreEqual(1.25f, waited, 3f * Dt);
+
+            // Never shorter than the constant, whatever a caller passes.
+            _gate.LockOut(0.01f);
+            Assert.IsTrue(_gate.IsLockedOut);
+            _gate.Tick(0.1f, false, false);
+            Assert.IsTrue(_gate.IsLockedOut);
+        }
+
+        [Test]
         public void TheCrashLockoutIgnoresTheTapThatKilledThePlayer()
         {
             _gate.LockOut();

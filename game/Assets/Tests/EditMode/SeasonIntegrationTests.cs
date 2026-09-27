@@ -111,18 +111,40 @@ namespace MotionRunner.Tests
         {
             var type=Runtime("Gameplay.RunHud");
             var hud=(Component)type.GetMethod("Create").Invoke(null,null);
+            var show=type.GetMethod("ShowResult");
+            var reveal=type.GetField("_resultRevealAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            var update=type.GetMethod("Update",BindingFlags.Instance|BindingFlags.NonPublic);
             try
             {
-                type.GetMethod("ShowResult").Invoke(hud,new object[]{new RunSummary(),true});
+                show.Invoke(hud,new object[]{new RunSummary(),true});
                 var group=hud.GetComponentInChildren<CanvasGroup>();
+                var badge=hud.GetComponentsInChildren<Transform>(true).Single(t=>t.name=="Badge").gameObject;
                 Assert.AreEqual(0,group.alpha);Assert.IsFalse(group.interactable);
                 Assert.IsTrue(group.blocksRaycasts,"An invisible result must not pass taps through to the run.");
-                type.GetField("_resultRevealAt",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(hud,Time.unscaledTime-1);
-                type.GetMethod("Update",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(hud,null);
+                Assert.IsFalse(badge.activeSelf,"A run that beat nothing must not claim a record.");
+                reveal.SetValue(hud,Time.unscaledTime-1);
+                update.Invoke(hud,null);
                 Assert.AreEqual(1,group.alpha);Assert.IsTrue(group.interactable);
                 type.GetMethod("HideResult").Invoke(hud,null);
-                type.GetMethod("ShowResult").Invoke(hud,new object[]{new RunSummary(),false});
+
+                // Every crash plays its pose before the card arrives now, so the second run is
+                // hidden exactly like the first: the reveal no longer depends on whether the
+                // player happened to own a crash cosmetic.
+                show.Invoke(hud,new object[]{new RunSummary(),false});
+                Assert.AreEqual(0,group.alpha);Assert.IsFalse(group.interactable);
+                reveal.SetValue(hud,Time.unscaledTime-1);
+                update.Invoke(hud,null);
                 Assert.AreEqual(1,group.alpha);Assert.IsTrue(group.interactable);
+
+                // A record swaps the quiet "what to beat" line for the badge, and says which
+                // record it was - all-time outranks daily.
+                var best=new RunSummary(RunMode.Daily,ControlScheme.Tilt,4210,12,7,880,4210,4210,
+                    "2026-09-21",true,true,CrashKind.WallSlam,default(RunSeed));
+                show.Invoke(hud,new object[]{best,false});
+                Assert.IsTrue(badge.activeSelf);
+                var textType=Type.GetType("UnityEngine.UI.Text, UnityEngine.UI",true);
+                Assert.AreEqual("NEW BEST",
+                    (string)textType.GetProperty("text").GetValue(badge.GetComponentInChildren(textType)));
             }
             finally { UnityEngine.Object.DestroyImmediate(hud.gameObject); }
         }

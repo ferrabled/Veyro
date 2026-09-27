@@ -27,8 +27,28 @@ namespace MotionRunner.Track
         /// "2026-08-21" — the UTC date this run belongs to.
         public readonly string DailyLabel;
 
+        /// True when THIS run just became the all-time best on its scheme's board. Captured from
+        /// BestBoard.RecordAllTime at crash time, because once the board is written
+        /// AllTimeBest == Score and the fact is no longer recoverable (ties do not record).
+        public readonly bool NewAllTimeBest;
+
+        /// True when this run just became today's daily best (always false in Free mode).
+        public readonly bool NewDailyBest;
+
+        /// What ended the run - drives the crash pose in the world and the card's character pose.
+        public readonly CrashKind Crash;
+
+        /// The seed the run was generated from: the share/challenge payload (T-024).
+        public readonly RunSeed Seed;
+
         public RunSummary(RunMode mode, ControlScheme scheme, int score, int coins, int bestCombo,
             int distance, int allTimeBest, int dailyBest, string dailyLabel)
+            : this(mode, scheme, score, coins, bestCombo, distance, allTimeBest, dailyBest, dailyLabel,
+                false, false, CrashKind.WallSlam, default) { }
+
+        public RunSummary(RunMode mode, ControlScheme scheme, int score, int coins, int bestCombo,
+            int distance, int allTimeBest, int dailyBest, string dailyLabel,
+            bool newAllTimeBest, bool newDailyBest, CrashKind crash, RunSeed seed)
         {
             Mode = mode;
             Scheme = scheme;
@@ -39,8 +59,33 @@ namespace MotionRunner.Track
             AllTimeBest = allTimeBest;
             DailyBest = dailyBest;
             DailyLabel = dailyLabel ?? string.Empty;
+            NewAllTimeBest = newAllTimeBest;
+            NewDailyBest = newDailyBest;
+            Crash = crash;
+            Seed = seed;
         }
 
         public bool IsDaily => Mode == RunMode.Daily;
+
+        /// The card's one headline: a new all-time best outranks a new daily best.
+        public bool IsNewRecord => NewAllTimeBest || NewDailyBest;
+    }
+
+    /// How the run ended, derived from the obstacle the runner hit and whether it was airborne.
+    /// Engine-free so the mapping is unit-testable (see CrashKinds).
+    public enum CrashKind
+    {
+        /// Ran face-first into a full-height block: the runner is stamped against the wall.
+        WallSlam = 0,
+        /// Clipped a knee-high hurdle: the runner trips and tumbles forward.
+        Trip = 1
+    }
+
+    public static class CrashKinds
+    {
+        /// A FullBlock is always a wall slam. A LowBarrier is a trip whether the runner never
+        /// jumped or came down onto it mid-air - either way the feet catch the hurdle.
+        public static CrashKind For(ObstacleKind kind, bool airborne) =>
+            kind == ObstacleKind.FullBlock ? CrashKind.WallSlam : CrashKind.Trip;
     }
 }

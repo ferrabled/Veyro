@@ -70,6 +70,10 @@ namespace MotionRunner.Menu
         /// The one state back has to be able to undo here: see BackAction.CancelStaging.
         public bool IsStagingCamera => !_done && _pending == Pick.None && _staging != null;
 
+        /// A mode was picked and its run starts on a coming frame. Anything else that could start
+        /// a run (a challenge link) must stand aside for it - see BeginPick / Commit.
+        public bool HasPendingPick => !_done && _pending != Pick.None;
+
         public void Build(RectTransform slot)
         {
             RuntimeUi.Panel("Card", slot, MenuTheme.Card);

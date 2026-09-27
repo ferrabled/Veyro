@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Veyro Run — a challenge</title>
+  <meta name="description" content="Somebody scored on Veyro Run and challenged you to beat it. Open the same track in the game, or get Veyro on Google Play.">
+  <meta name="theme-color" content="#FBF5E9">
+  <meta property="og:title" content="Beat my Veyro Run score">
+  <meta property="og:description" content="Same track, same seed, one score to beat.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <!-- A challenge link is disposable and personal: keep it out of search results. -->
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Atkinson+Hyperlegible:wght@400;700&family=Fragment+Mono&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- @partial: header (duplicated on every page — keep in sync) -->
+<header class="site-header">
+  <a class="wordmark" href="/">Veyro <span>Run</span></a>
+  <nav class="site-nav" aria-label="Site">
+    <a class="nav-link" href="/#how">How it plays</a>
+    <a class="nav-link" href="/#daily">Daily run</a>
+    <a class="nav-link" href="/support/">Support</a>
+  </nav>
+</header>
+
+<main class="doc">
+  <div class="doc-inner">
+    <span class="stamp pink" id="ch-stamp">Challenge</span>
+
+    <!-- Everything below is filled in by challenge.js from the query string. The static text is
+         the no-JS / no-parameters fallback, and it has to stand on its own: a link that arrives
+         mangled still has to sell the game rather than show an error. -->
+    <h1 class="ghosted-ink" id="ch-title">Somebody challenged you</h1>
+    <p class="doc-meta" id="ch-sub">A Veyro Run player sent you their run. Open it in the game and try to beat it.</p>
+
+    <div class="callout">
+      <p id="ch-line"><strong>Same track, same seed.</strong> Veyro Run builds every track from a
+      number, so the run you play from this link is the exact run they played — not a lookalike.</p>
+    </div>
+
+    <p>
+      <a class="btn" id="ch-open" href="/#how">Open in Veyro</a>
+      <a class="btn secondary" id="ch-store" href="https://play.google.com/store/apps/details?id=com.ferrabled.veyro.run">Get Veyro on Google&nbsp;Play</a>
+    </p>
+
+    <p class="mono" id="ch-hint">Nothing happened? The game isn't installed yet — the Play button above sorts that out.</p>
+
+    <h2>What is Veyro Run?</h2>
+    <p>An endless runner you play by <strong>moving</strong>: stand in front of the front camera and lean, hop and crouch, or just tilt the phone. It plays offline, there are no ads, and camera frames never leave your device — the <a href="/privacy/">privacy policy</a> is the long version.</p>
+
+    <p class="mono" id="ch-seed"></p>
+
+    <!-- On the page itself, not only in the policy: a visitor here may never open the policy
+         (docs/SHARE_COMPLIANCE.md §8.5). -->
+    <p class="mono">This page shows a score and a track seed taken from the link you followed. It sets no cookies and runs no analytics. <a href="/privacy/">Privacy policy</a></p>
+  </div>
+</main>
+
+<!-- @partial: footer (duplicated on every page — keep in sync) -->
+<footer class="site-footer">
+  <div class="cols">
+    <a class="wordmark" href="/">Veyro <span>Run</span></a>
+    <nav aria-label="Legal">
+      <a href="/privacy/">Privacy</a>
+      <a href="/terms/">Terms</a>
+      <a href="/support/">Support</a>
+    </nav>
+  </div>
+  <p class="fine">© 2026 Fernando Rabasco ("ferrabled") · Veyro Run for Android · Google Play is a trademark of Google LLC</p>
+</footer>
+
+<!-- External, not inline: the site's CSP is script-src 'self' (see public/_headers). -->
+<script src="/challenge/challenge.js"></script>
+</body>
+</html>

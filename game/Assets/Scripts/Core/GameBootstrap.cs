@@ -97,10 +97,25 @@ namespace MotionRunner.Core
             session.Hud = hud;
             session.Profile = profile;
 
+            // The result card's two seams back into the game. Wired here rather than in RunFlow
+            // because this is the one place that holds the skins, the session and the HUD at the
+            // same time; both are documented on RunHud.
+            //   * Loadout  - the card renders the player's live outfit, so the runner on the
+            //                screenshot is the runner they just ran with.
+            //   * HoldRun  - SHARE is the only button that stays ON the card, so the release that
+            //                opens the share sheet has to be denied the "tap anywhere" restart.
+            hud.Loadout = () => skins.Effective;
+            hud.HoldRun = held => session.Frozen = held;
+
             // Everything from here is transitions rather than construction: which screen is up,
             // which control scheme the run uses, when the camera is allowed to be on, and whether
             // the track is being driven by a run or by the menu's attract loop.
             RunFlow.Create(session, hud, store, skins, profile, push);
+
+            // Challenge links (T-024). After RunFlow, so a cold-start link is already parked by
+            // the time the menu's first Update looks for one - and warm links keep arriving
+            // through the event this subscribes to.
+            DeepLinks.Begin();
         }
 
         /// Mirrors CreateStore: the Editor exercises the profile tab against a ready fake, a

@@ -52,6 +52,15 @@ namespace MotionRunner.Gameplay
         NotificationPanel _notificationPanel;
         AnalyticsPanel _analyticsPanel;
 
+        /// The challenge link the next run plays, if any (T-024). Held here rather than read
+        /// straight out of PendingChallenge at StartRun, because taking it is what stops one link
+        /// from restarting itself every time the menu comes back.
+        ChallengeLink _challenge;
+        bool _hasChallenge;
+
+        /// The frame the current menu was created on - see TryStartPendingChallenge.
+        int _menuFrame = -1;
+
         public static RunFlow Create(RunSession session, RunHud hud, IStore store, SkinService skins,
             IProfileService profile, IPushService push)
         {
@@ -83,6 +92,7 @@ namespace MotionRunner.Gameplay
 
         void ShowMenu(MenuTab tab)
         {
+            _menuFrame = Time.frameCount;
             _menu = MainMenu.Create(_store, _skins, _profile, tab);
             _menu.Chosen += StartRun;
             _menu.GuideRequested += ShowGuide;
@@ -136,6 +146,26 @@ namespace MotionRunner.Gameplay
             _rig = rig;
             _pause.BeginRun(cameraMode);
             ApplyPhase();
+
+            // Which run this is: a challenge link's track, or the day's. Set on every start, so
+            // the run after a challenge is back to the ordinary Daily Run without anything
+            // having to remember to put Mode back.
+            if (_hasChallenge)
+            {
+                // Always Free, never Daily: today's track is the one thing every player shares,
+                // and a link that could replace it would break the Daily Run for whoever tapped
+                // it. A challenge is a rematch, not a daily attempt - it stamps no day and sets
+                // no daily best.
+                _session.Mode = RunMode.Free;
+                _session.BeginChallenge(_challenge.Seed, _challenge.Score);
+                _hasChallenge = false;
+            }
+            else
+            {
+                _session.Mode = RunMode.Daily;
+            }
+            // The CHALLENGE banner is RunSession.StartRun's: it is set per run from the seed the
+            // run actually uses, so it cannot outlive the challenged track.
 
             // The control scheme travels into the session because the boards split on it
             // (Feature D, owner call: camera and tilt are separate games). It is fixed at
@@ -247,7 +277,7 @@ namespace MotionRunner.Gameplay
             if (!_pause.FinishResume()) return;
             ClosePauseMenu();
             ApplyPhase();
-            _session.StartRun();
+            _session.RestartSameRun();
         }
 
         /// The camera never came back. The run finishes on tilt+touch: the rig goes, the input is
@@ -287,6 +317,10 @@ namespace MotionRunner.Gameplay
             _pause.BeginRun(false);
             ApplyPhase();
             _session.Stop();
+
+            // The challenge banner belongs to the run that was challenged, not to the HUD.
+            if (_hud != null) _hud.SetChallenge(0);
+
             ShowMenu(tab);
         }
 
@@ -313,8 +347,59 @@ namespace MotionRunner.Gameplay
 
         // ---- back button ----
 
+        // ---- challenge links (T-024) ----
+
+        /// A challenge link that arrived from outside the game - at launch or while it was
+        /// already open - starts its run HERE, and only here: at the menu, with nothing else on
+        /// screen. Checked every frame rather than only in ShowMenu, because
+        /// Application.deepLinkActivated can fire at any moment, including while the menu is
+        /// already up (the player tapped the web page's button with the game in the background).
+        ///
+        /// Skipped while the camera picker is staging: that flow ends in a run of its own, and
+        /// two runs starting in the same frame is the one thing RunFlow exists to prevent. The
+        /// link stays pending and is taken on the next visit to the menu.
+        ///
+        /// The run itself is tilt+touch. A challenge is a link tapped from a chat app, so
+        /// starting it must not open with a camera-permission dialog - and camera mode remains
+        /// one tap away from the menu for the rematch.
+        void TryStartPendingChallenge()
+        {
+            if (!PendingChallenge.Has) return;
+            if (_menu == null || _guide != null || _menu.IsStagingCamera || _menu.HasPendingPick) return;
+            // Same rule as the offers below: a modal over the menu owns the screen, so the link
+            // waits for the notification / analytics panel to close rather than starting under it.
+            if (_notificationPanel != null || _analyticsPanel != null) return;
+            // Never on the frame the menu appeared: QuitToMenu runs inside the EventSystem's
+            // dispatch and this runs later in the same frame, which would flash the menu for
+            // one frame and start a run the player did not ask for at that moment. Waiting a
+            // frame also keeps the one-frame deferral every other start path obeys.
+            if (Time.frameCount <= _menuFrame) return;
+            if (!PendingChallenge.TryTake(out _challenge)) return;
+
+            // The link must describe a track THIS build can generate. A different content
+            // version or world would give the same PRNG stream over different chunks - a
+            // lookalike run, not the sender's - so it is refused rather than played unfairly.
+            if (_challenge.Seed.ContentVersion != ChunkLibrary.ContentVersion ||
+                _challenge.Seed.WorldId != _session.WorldId)
+            {
+                Debug.LogWarning("[DeepLink] challenge refused, built for another version: " + _challenge);
+                return;
+            }
+
+            _hasChallenge = true;
+            Debug.Log("[DeepLink] starting challenge run: " + _challenge);
+
+            // The menu is dismissed the way MainMenu.OnChosen dismisses it - hidden now, destroyed
+            // at the end of the frame - because this start does not go through the picker.
+            _menu.gameObject.SetActive(false);
+            Destroy(_menu.gameObject);
+
+            StartRun(false, null);
+        }
+
         void Update()
         {
+            TryStartPendingChallenge();
             TickCameraOutage();
             bool safeForOffer = _menu != null && _menu.Tab == MenuTab.Run &&
                 !_menu.IsStagingCamera && _guide == null && _notificationPanel == null && _analyticsPanel == null;
