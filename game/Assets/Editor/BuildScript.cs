@@ -84,6 +84,11 @@ namespace MotionRunner.EditorTools
             // into the committed ProjectSettings.asset. The finally is the only exit.
             try
             {
+                // Launcher icon from Assets/Art/Icon/, re-applied on every build so a fresh checkout
+                // (or a scratch copy) never ships Unity's default icon. Warns and continues if the
+                // art is missing; it is a persistent setting, so it is deliberately not restored.
+                ProjectSetup.EnsureAppIcon();
+
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, packageName);
                 PlayerSettings.productName = productName;
                 PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;

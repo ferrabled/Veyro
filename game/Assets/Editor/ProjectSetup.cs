@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.Android;
+using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -10,8 +12,65 @@ namespace MotionRunner.EditorTools
 {
     /// One-shot project configuration, invoked headlessly:
     ///   Unity -batchmode -quit -projectPath game -executeMethod MotionRunner.EditorTools.ProjectSetup.SetupUrp
+    ///   Unity -batchmode -quit -projectPath game -executeMethod MotionRunner.EditorTools.ProjectSetup.ApplyAppIcon
     public static class ProjectSetup
     {
+        /// Batchmode entry for the launcher icon alone. Exit code 4 when the art is missing, so a
+        /// CI step cannot pass while the build would ship Unity's default icon.
+        public static void ApplyAppIcon()
+        {
+            bool applied = EnsureAppIcon();
+            AssetDatabase.SaveAssets();
+            if (!applied) EditorApplication.Exit(4);
+        }
+
+        /// Points PlayerSettings at the icon art under Assets/Art/Icon/ (see AppIcon for the
+        /// layers): the flat icon as the default for every platform, and on Android the adaptive
+        /// pair (background, foreground) plus the flat icon for the round and legacy kinds. Idempotent,
+        /// and re-run before every Android build, so a fresh checkout built headlessly carries the
+        /// icon without anyone ever having clicked it into the inspector. A missing texture logs a
+        /// warning and leaves that kind as it was - the icon must never fail a build.
+        /// Returns false when nothing could be applied because the flat art is missing.
+        public static bool EnsureAppIcon()
+        {
+            var flat = AssetDatabase.LoadAssetAtPath<Texture2D>(AppIcon.SourcePath);
+            if (flat == null)
+            {
+                Debug.LogWarning($"[AppIcon] {AppIcon.SourcePath} not found; the build keeps whatever icon PlayerSettings already has.");
+                return false;
+            }
+
+            PlayerSettings.SetIcons(NamedBuildTarget.Unknown, new[] { flat }, IconKind.Any);
+
+            var background = AssetDatabase.LoadAssetAtPath<Texture2D>(AppIcon.BackgroundPath);
+            var foreground = AssetDatabase.LoadAssetAtPath<Texture2D>(AppIcon.ForegroundPath);
+            if (background != null && foreground != null)
+                SetAndroidIcons(AndroidPlatformIconKind.Adaptive, background, foreground);
+            else
+                Debug.LogWarning($"[AppIcon] Adaptive layers missing ({AppIcon.BackgroundPath}, {AppIcon.ForegroundPath}); " +
+                                 "run Veyro/Art/Regenerate app icon layers. Adaptive icon left unchanged.");
+
+            SetAndroidIcons(AndroidPlatformIconKind.Round, flat);
+            SetAndroidIcons(AndroidPlatformIconKind.Legacy, flat);
+            Debug.Log($"[AppIcon] Applied {AppIcon.SourcePath} as default/round/legacy icon" +
+                      (background != null && foreground != null ? " and the adaptive layers." : "."));
+            return true;
+        }
+
+        /// Layers are positional: for the adaptive kind Unity takes [0] as background, [1] as
+        /// foreground; the single-layer kinds read only [0].
+        static void SetAndroidIcons(PlatformIconKind kind, params Texture2D[] layers)
+        {
+            var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.Android, kind);
+            if (icons == null || icons.Length == 0)
+            {
+                Debug.LogWarning($"[AppIcon] No Android icon slots reported for kind {kind}; skipped.");
+                return;
+            }
+            foreach (var icon in icons) icon.SetTextures(layers);
+            PlayerSettings.SetPlatformIcons(NamedBuildTarget.Android, kind, icons);
+        }
+
         public static void SetupUrp()
         {
             Directory.CreateDirectory(Path.Combine(Application.dataPath, "Settings"));
@@ -39,6 +98,7 @@ namespace MotionRunner.EditorTools
             EnsureUrpGlobalSettings();
 
             CreateBaseMaterial();
+            EnsureAppIcon();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
