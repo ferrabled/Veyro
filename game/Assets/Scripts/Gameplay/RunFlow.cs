@@ -388,6 +388,9 @@ namespace MotionRunner.Gameplay
         {
             if (!PendingChallenge.Has) return;
             if (_menu == null || _guide != null || _menu.IsStagingCamera || _menu.HasPendingPick) return;
+            // Same rule as the offers below: a modal over the menu owns the screen, so the link
+            // waits for the notification / analytics / sound panel to close before starting.
+            if (AnyPanelOpen) return;
             // Never on the frame the menu appeared: QuitToMenu runs inside the EventSystem's
             // dispatch and this runs later in the same frame, which would flash the menu for
             // one frame and start a run the player did not ask for at that moment. Waiting a

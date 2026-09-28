@@ -15,8 +15,12 @@ namespace MotionRunner.Growth.Layers
         // The embedded fork kept the SDK's files here via its patch-only
         // PersistenceDirectory. Stock always uses persistentDataPath itself.
         const string LegacyDirectory = "veyro-layers";
+        ILayersSdkOps _sdk = LayersSdkOps.Default;
+        bool _ready;
+        float _retryAt;
         public bool Enabled => PlayerPrefs.GetInt(ChoiceKey, 0) == 1;
-        public bool IsReady => Enabled && LayersSDK.IsInitialized;
+        public bool IsReady => Enabled && _ready && !DisablePending && _sdk.IsInitialized;
+        public bool DisablePending { get; private set; }
         public string SupportId => PlayerPrefs.GetString(SupportKey, string.Empty);
         public event Action Changed;
 
@@ -36,22 +40,55 @@ namespace MotionRunner.Growth.Layers
 
         public void SetEnabled(bool enabled)
         {
+            // Finish the previous opt-out before allowing another opt-in to
+            // bypass its required purge or reuse a half-stopped SDK.
+            if (enabled && DisablePending)
+            {
+                StopSdk();
+                Changed?.Invoke();
+                if (DisablePending) return;
+            }
             PlayerPrefs.SetInt(ChoiceKey, enabled ? 1 : 2);
             if (!enabled) PlayerPrefs.SetInt(PurgeKey, 1);
             PlayerPrefs.Save(); // choice survives a crash even if native shutdown fails
-            try
-            {
-                if (enabled) StartSdk();
-                else if (LayersConsentFlow.Disable())
-                    Debug.Log("[Analytics] Optional analytics disabled; unsent events held until the next enable."); // device-test signature
-            }
-            catch (Exception error) { Unavailable(error); }
+            if (enabled) StartSdk();
+            else StopSdk();
             Changed?.Invoke();
+        }
+
+        void StopSdk()
+        {
+            _ready = false; // gameplay events stop immediately, including during retries
+            DisablePending = true;
+            _retryAt = Time.realtimeSinceStartup + 1f;
+            try { LayersConsentFlow.Disable(_sdk); }
+            catch (Exception error) { Unavailable(error); }
+            // A failed consent call can still be followed by a successful
+            // shutdown. Conversely, never announce OFF while the SDK is alive.
+            DisablePending = _sdk.IsInitialized;
+            if (!DisablePending)
+                Debug.Log("[Analytics] Optional analytics disabled; unsent events held until the next enable.");
+        }
+
+        void Update()
+        {
+            if (DisablePending && Time.realtimeSinceStartup >= _retryAt) RetryDisable();
+        }
+
+        void OnApplicationFocus(bool focused)
+        {
+            if (focused && DisablePending) RetryDisable();
+        }
+
+        void RetryDisable()
+        {
+            StopSdk();
+            if (!DisablePending) Changed?.Invoke();
         }
 
         void StartSdk()
         {
-            if (!Enabled || LayersSDK.IsInitialized) return;
+            if (!Enabled || DisablePending || IsReady) return;
             try
             {
                 if (string.IsNullOrEmpty(SupportId))
@@ -64,7 +101,7 @@ namespace MotionRunner.Growth.Layers
                 // off is discarded before consent is granted again.
                 bool purgePending = PlayerPrefs.GetInt(PurgeKey, 0) == 1;
                 var config = LayersConsentFlow.BuildConfig(AppId, Debug.isDebugBuild);
-                if (!LayersConsentFlow.Enable(config, purgePending, SupportId)) return;
+                if (!LayersConsentFlow.Enable(_sdk, config, purgePending, SupportId)) return;
                 if (purgePending)
                 {
                     // Only cleared once the purge has actually run; a failed
@@ -72,9 +109,19 @@ namespace MotionRunner.Growth.Layers
                     PlayerPrefs.DeleteKey(PurgeKey);
                     PlayerPrefs.Save();
                 }
+                _ready = true;
                 Debug.Log("[Analytics] Optional analytics initialized; advertising disabled.");
             }
-            catch (Exception error) { Unavailable(error); }
+            catch (Exception error)
+            {
+                Unavailable(error);
+                // An incomplete enable may have initialized the SDK with its
+                // default consent. Persist OFF and shut it down just as on opt-out.
+                PlayerPrefs.SetInt(ChoiceKey, 2);
+                PlayerPrefs.SetInt(PurgeKey, 1);
+                PlayerPrefs.Save();
+                StopSdk();
+            }
         }
 
         public void Track(string name, Dictionary<string, object> properties)

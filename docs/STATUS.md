@@ -1,5 +1,39 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Main merged into the game UI branch (feat-game-UI-improvement / main-merge)
+
+Owner committed the audio, illustrated guide, icon and documentation through `d52a8dc`,
+then requested merging main. Fetched `origin/main` at `1da494f` (share-run PR #13 included)
+and merged it into `feat/game-UI-improvement`. The only text conflict was this journal:
+all 13 entries in the conflicting additions were retained, ordered newest first.
+
+The automatic code merge brought in the challenge modal guard but knew only notifications
+and analytics. Switched it to the existing `AnyPanelOpen` check so SOUND also holds an
+incoming challenge. Added three EditMode regressions exercising the actual RunFlow method:
+each panel retains the pending link across repeated checks, and closing it allows processing.
+The tests use a foreign-version link to exercise refusal without starting sensors/services.
+Audio, illustrated guide, icon and the owner's retained slide instructions are preserved.
+
+**Verified:** Unity 6000.5.9f1, **605/605 EditMode tests passed**, including all three new
+panel checks. Both tests and the Android build used `C:\scratch\veyro-audio\game`, with all
+981 Assets/Packages/ProjectSettings files SHA-256 matched to the merge snapshot and no extras
+before execution. Gradle staging was cleared at its checked scratch path. Challenge landing
+JavaScript passes `node --check`. `BuildAndroidDev` completed with exit 0; the ARM64 APK is
+**99,342,700 bytes**, version `1.0.0-dev.20260928-0202.nogit`, versionCode 5, with the same
+permissions as the pre-merge development APK and the UnityPlayerGameActivity launcher.
+SHA-256: `bfcb44632d4ddcc8c6974a16a8da5d0b7db1d0172cc2b6efc3fef894949b08ae`.
+Reports, logs, permission snapshots and APK are under ignored `builds/main-merge-review/`;
+`builds/MotionRunnerDev.apk` was also updated.
+
+**Scope:** verification covers the merge snapshot, before the other pane's concurrent
+profile/guide UI polish. Those edits remain outside the staged merge; the scratch was not
+resynced after that work began. No phone installation, push or deployment in this merge task.
+
+**Needs human device test:** after installing this merged build, open SOUND, deliver a valid
+challenge link and verify the menu/panel remain until SOUND closes, then the challenge starts
+once. Repeat for notifications/analytics. The previous guide animation/legibility, audio mix,
+camera-hop restart, fallback, SHARE-return and two-device challenge checks remain pending.
+
 ## 2026-09-28 — Latest UI worktree built and installed on the Nord 2 (feat-game-UI-improvement / phone-install)
 
 Owner requested the latest app on the phone and a check of the remaining pre-merge work.
@@ -89,6 +123,56 @@ on the phone. Historical 24/25 Sep notes below describe the earlier placeholder-
 intact; re-stage the edited guide files, both PNG folders, runtime metadata and ignore/LFS rules
 before committing. Main now contains all of share-run via PR #13 (`1da494f`); finish the local
 guide/icon/docs commits before merging `origin/main`. No commit or merge was performed here.
+
+## 2026-09-28 — PR #13 (feat-share-run) Copilot review: 8 of 9 findings applied
+
+- **Landing page, Android:** `challenge.js` now opens `intent://challenge?<query>#Intent;scheme=veyro;package=com.ferrabled.veyro.run;S.browser_fallback_url=<Play listing>;end`
+  when the user agent says Android — the app still receives exactly `veyro://challenge?<query>`.
+  The bare scheme made Chrome replace the page with `ERR_UNKNOWN_URL_SCHEME` when the game was
+  missing (SHARE_COMPLIANCE §3.5), which also killed the 1.5 s Play fallback timer. The Android
+  path has no timer: while Chrome shows an "open in app?" prompt the page is still visible, and a
+  timer would send someone who has the game to the Play Store. Non-Android visitors keep the bare
+  scheme + timer.
+- **Landing page disclosure** (SHARE_COMPLIANCE §8.5): the no-cookies / no-analytics line and a
+  privacy-policy link are on the page itself.
+- **Privacy policy:** SHARE_COMPLIANCE §8.1–§8.4 applied to `docs/PRIVACY_POLICY.md` and
+  `site/public/privacy/index.html`, effective date 28 September 2026 in both. Corrected to the
+  shipped build on the way: real `v=greybox-1` example, the personal-best line and the `d` date
+  key are listed, the clipboard fallback is mentioned, and the link paragraph describes today's
+  unverified path (page → button) rather than assuming App Links already verify.
+- Doc fixes: App Links item is OPEN_QUESTIONS **24** (BACKLOG T-024, STATUS 21 Sep said 20);
+  SHARE_COMPLIANCE inventory no longer says "to be written"; the T-024 entry's "known, deliberate"
+  paragraph no longer claims the banner survives RUN AGAIN (the leak fixed in the review-fixes
+  entry); `Quaternius/SOURCES.md` now says `crashWall` = `Death01` ×1.7, matching
+  `RunnerCrashBuild.Final`.
+- **Not applied:** the "high" finding that `filter.Add(new XAttribute(...))` after child elements
+  throws in `AndroidChallengeLinks.cs`. It does not — LINQ to XML keeps attributes and child nodes
+  in separate lists (only XmlWriter has that ordering rule). Checked with a .NET snippet, and the
+  21 Sep device build's manifest already gained both filters, so the postprocessor ran cleanly.
+
+**Verified:** `node --check` on `challenge.js`; sample intent URL inspected (a `#` in a value is
+encoded to `%23`, so it cannot end the data URI early). No game code changed, so no Unity run.
+
+**Second Copilot pass, same day — two "previously missed" findings, both real, both fixed:**
+- **A seed-only (truncated) link was parsed and then thrown away.** `TryParse` left a missing `v`
+  as `""`, and `RunFlow.TryStartPendingChallenge` refuses any version but `ChunkLibrary.ContentVersion`
+  — so `AHalfBrokenLinkStillPlaysIfItHasASeed` promised a run that never started. A missing or empty
+  `v` now means this build's version, the same rule a missing `w` already had. An *oversized* `v`
+  stays `""` and is still refused (present but no version any build ships). Tests: the half-broken
+  link now asserts the version; new `AnEmptyVersionValueCountsAsAbsent`.
+- **The landing page read numbers more loosely than the app.** `parseInt("4210oops")` showed 4210
+  where the app reads 0, and an out-of-range seed showed a challenge the app refuses. `challenge.js`
+  now requires the whole value to be a signed 32-bit integer, takes the last of a repeated key and
+  compares the mode case-insensitively — all three exactly as `ChallengeMessage.TryParse` does.
+  Edge cases checked in node (`4210oops`, `2147483648`, `%2B7`, `+3`, `s=1&s=x`, `007`).
+
+The XAttribute finding was listed again only because its thread was still unresolved — the code is
+unchanged and the reasoning above stands.
+
+**Needs a human device test** (after `npx wrangler deploy` from `site/`, owner-only): on an Android
+phone **without** the game, open a challenge link in Chrome and tap **Open in Veyro** → the Play
+listing must open, not an error page. With the game installed → the game opens on the challenge.
+Repeat once in Samsung Internet if one is to hand.
 
 ## 2026-09-25 — App icon: the approved ticket + V monogram is now the Android launcher icon, applied from code (T-030 icon slice, feat-game-UI-improvement icon session)
 
@@ -538,6 +622,156 @@ Screenshots: `C:\scratch\veyro-audio\p2-{launch,result,result-tap,result-lost,la
     panel nor hint, and only RUN AGAIN restarts.
 12. SHARE on a camera card, come back from the chooser while standing in frame: the card is still
     there (the hold across the round trip).
+
+## 2026-09-24 — Consolidated SDK device notes
+
+Removed the redundant standalone device report and its references at the owner's request.
+The 23 Sep entry below retains the results, restoration incident and evidence location;
+`SDK_PRIVACY_RELEASE.md` retains the remaining checks. Verified reference removal and
+`hob git diff --check`; documentation only.
+
+## 2026-09-24 — Independent validation of PR #12 Copilot corrections
+
+`copilot-pr12-validation` / T-021, T-022. Read the five original GitHub review comments,
+the correcting agent's conversation and the actual working-tree diff. All five findings
+are valid against PR head `52e5201`; no additional implementation defect was found in
+the local corrections. Consent failure now attempts shutdown in a finally path, reports
+and retries incomplete shutdown, prevents re-enable from bypassing the purge, and rolls
+back an exception during partial enable. Confirmed against the pinned SDK that Android
+shutdown stops its uploader before persisting and releasing the core.
+
+The campaign change consumes attribution on the first Daily start while preserving its
+completion context; Free Runs do not consume it. Ready subscribers are excluded from the
+production offer without consuming eligibility, and development verification remains
+once-only. Both stale setup statements were corrected. The new visit counter confines
+Android-thread work to an atomic increment and is read at click/run time, avoiding a
+delayed background-clear callback erasing newer attribution. Checked its proxy override
+against [Unity 6000.5's implementation](https://github.com/Unity-Technologies/UnityCsReference/blob/6000.5/Modules/AndroidJNI/AndroidJava.cs)
+and the pause/stop distinction against [Android's activity lifecycle](https://developer.android.com/guide/components/activities/activity-lifecycle).
+
+Evidence audit, not a new test run: all 44 recorded runtime source hashes match the current
+files, and the development APK hash matches the verification record. Parsed both NUnit
+XMLs independently: the full run had 524 passes and two EditMode harness assertion failures;
+the four-case service rerun passed, leaving all 526 unique cases with passing final results.
+The test harness change uses reflection to invoke the lifecycle method without Unity's
+EditMode SendMessage restriction; it does not suppress the asserted behavior.
+
+Limits remain explicit: activity-stop/permission-dialog callbacks are Android-only and
+are simulated by a counter in the Editor tests, so native device verification remains
+necessary. The 23 Sep phone APK predates these corrections. The PR is still open at
+`52e5201`; the fixes remain local/uncommitted. This validation changed only the task/status
+record, with no runtime changes, rebuild, phone calls, provider actions, commit or push.
+
+## 2026-09-24 — PR #12 Copilot findings validated and corrected
+
+`copilot-pr12` / T-021, T-022. All five findings are valid against the reviewed
+snapshot; each has a corresponding correction:
+
+- [Consent failure](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512235):
+  shutdown is attempted even when consent revocation throws. The pinned Android SDK's
+  Shutdown aborts its HTTP uploader and writes a local disk snapshot; it does not call
+  the HTTP Flush operation. If shutdown itself fails, the saved choice remains OFF,
+  app events stop, the UI shows pending/error instead of OFF, and shutdown is retried
+  on an unscaled timer and focus return. Re-enabling cannot bypass pending shutdown or
+  the next-enable purge. A partially failed enable is rolled back through the same path.
+- [Permission-dialog pause](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512276):
+  Android activity-stop callbacks advance a visit counter. A pause-only dialog preserves
+  attribution; leaving the app (including while a dialog is open) invalidates it. The
+  counter is read when a click/run occurs, so a delayed Unity callback cannot clear a
+  newer notification. This follows Android's [pause versus stop lifecycle](https://developer.android.com/guide/components/activities/activity-lifecycle).
+- [Repeated campaign attribution](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512318):
+  only the next Daily Run consumes the campaign. Its completion keeps the copied fields;
+  restarting or abandoning that run cannot attribute another one. A Free Run does not
+  consume the Daily campaign.
+- [Already-enabled notification offer](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512340):
+  ready subscribers no longer receive the player offer; development verification stays
+  once-only and available.
+- [Stale setup status](https://github.com/ferrabled/Veyro/pull/12#discussion_r4087512369):
+  both setup statements now distinguish implemented Daily routing from outstanding
+  campaign deployment and device/public-build verification.
+
+Verification: **526 unique EditMode tests verified** across the full suite and a focused
+rerun. The first run passed 524/526; two new retry tests hit Unity's EditMode SendMessage
+assertion. After correcting only that test harness, all four service tests passed (including
+both previously failing cases); runtime sources were unchanged between runs. ARM64 Android
+development build **passed**, version `1.0.0-dev.20260924-0013.nogit`, APK **91,915,116 bytes**,
+with permissions identical to the 23 Sep development baseline. APK:
+`builds/MotionRunner-CopilotReviewDev.apk`; test XMLs, build log and source/artifact hashes:
+`builds/copilot-pr12-*`. Build/test inputs were checked for extra source files and all
+819 source/configuration files were hash-matched in the isolated scratch before the build;
+only its Android staging folder was cleared. `hob git diff --check` passes. Existing local
+SDK/device-review edits were retained. The corrections are local and have not been committed,
+pushed or posted to the review threads.
+
+Needs human device test on the resulting build: with analytics enabled, open a labelled
+Daily notification and enter camera mode through the OS permission dialog; verify its
+next start/completion has the campaign and the following Daily Run does not. Repeat with
+Home/app switching during setup: attribution must end. Also check normal analytics OFF,
+relaunch and purge on re-enable. Native persistent shutdown failures are covered by fault
+injection in Editor tests; if a real device cannot finish shutdown, the UI must retain its
+retry warning until success or restart. Existing push-send/permission and dashboard gates
+remain in `SDK_PRIVACY_RELEASE.md`; no phone, provider, campaign or release action is part
+of this review correction.
+
+## 2026-09-23 — Current combined SDK build installed; bounded phone checks complete
+
+`phone-sdk-verification` / T-021, T-022. Built the current `52e5201` runtime snapshot in
+an isolated Unity copy after matching 817 source/configuration files. Fresh focused tests:
+4 Layers consent + 26 growth/push tests passed. ARM64 development APK built and installed
+with `adb install -r`; original installation date/data retained. Version
+`1.0.0-dev.20260923-2324.nogit`, 91,912,748 bytes. Permissions unchanged; no AD_ID/location
+permission, advertising-ID or install-referrer implementation; stock Layers native hash
+unchanged. The concurrent source edit was comment-only. No release guard was bypassed.
+
+On Nord 2: explicit analytics enable, disable, restart while off and purge on re-enable
+worked. Held files stayed byte-identical across restart; Layers native library was absent
+from the restarted process maps. Purge removed the held queue, rotated both SDK identities
+and increased discard count without increasing delivery count. Two real Daily Runs
+completed (183 points, 7 coins, 63 m each); an attempted abort was correctly counted as the
+second completion. Parent then paused/quit a third run with no completion marker.
+Native transport counters advanced while enabled; Layers Events receipt and first-uploaded
+batch fields are still unverified.
+
+The cheaper tapping agent accidentally hit notification TURN OFF instead of Close.
+Parent stopped it, detected both app preference and SDK opt-in changes, restored only
+those two app-owned fields and verified the original values/subscription/token after
+relaunch. Android permission remained false throughout; no permission request, Settings,
+other app, purchase or equipment changes. Completed runs naturally changed history and
+progress. Final game state: menu, analytics off, original reminder choices/equipment.
+Restoration used a game-only force-stop and exact `run-as` edits to the two app-owned fields;
+game reminder preference=1 and SDK opt-in=true were verified after relaunch, with OS
+permission still false. Raw test/build and restoration evidence remains under ignored
+`builds/device/sdk-20260923/`, including `push-choice-restoration.json` and `root-final-off.json`.
+
+Remaining: owner-assisted notification permission/retry and real foreground/warm/cold
+push tests, Layers dashboard/startup-payload confirmation, then final signed Play build
+checks after the production XP-curve and release inputs are resolved. No push, campaign,
+website deployment or Play upload was performed. BACKLOG/OQ21 retain these gates; this
+does not mark sponsor-track/public-release acceptance complete.
+
+## 2026-09-23 — SDK review reconciled with existing device evidence
+
+`sdk-review-validation` / T-021, T-022 documentation follow-up to the forwarded SDK review.
+Reconciled the release checklist and stock-SDK assessment with the 22 Sep stock-build
+device evidence: baseline off, disable/relaunch and queue purge on re-enable were already
+observed; first-uploaded-batch fields, Layers Events receipt and the combined OneSignal
+flow remain open. Added explicit failure/migration checks and retained the production
+XP-curve release guard (OPEN_QUESTIONS 23).
+
+Corrected one overbroad adapter comment after checking the pinned upstream SDK: Initialize
+starts an immediate remote-configuration GET, while the managed periodic event uploader
+waits for its interval. The app gates initialization on the player's accepted analytics
+choice; mocked SDK consent-order tests cannot establish real first-batch payload fields.
+No runtime behavior changed. Verification: pinned upstream/cache source inspection,
+existing build/device evidence cross-check and `hob git diff --check`; no fresh Unity
+test/build run was needed for comments and documentation. The 515-test result belongs
+to the earlier stock-build verification, not this review.
+
+No phone, dashboard, website deployment or Play actions were performed. The existing
+`phone-sdk-verification` BACKLOG claim was preserved. Its 23 Sep handoff reports a
+prepared, syntax-checked harness and action sequence, with no device calls; that is not
+a current-build test result. Next: coordinate and complete the device pass and dashboard checks, then verify
+the final release artifact after the owner resolves the release inputs.
 
 ## 2026-09-23 — Judge access standardized on Google Play promo codes
 
@@ -1031,14 +1265,16 @@ change; the website page must be deployed first (see below) for step 3.
 - **Deploy the site** — `npx wrangler deploy` from `site/` — *before* any build with a SHARE button
   reaches a tester, or shared links 404. Not deployed by this session, deliberately.
 - **`assetlinks.json`** with the Play *app signing* certificate SHA-256, so the https link opens the
-  app directly instead of the browser: **OPEN_QUESTIONS 20**, steps in `PLAY_CONSOLE_SETUP.md` §F.
+  app directly instead of the browser: **OPEN_QUESTIONS 24**, steps in `PLAY_CONSOLE_SETUP.md` §F.
   Shipping without it is safe — the link goes through the web page, which then opens the app via the
   custom scheme.
 - Privacy policy: add the sharing section (`SHARE_COMPLIANCE.md` §8), bump both copies, redeploy.
   Listing may mention "challenge a friend" only in/after the release that ships it.
 
 **Known, deliberate:** RUN AGAIN after a challenge is an ordinary free run with a fresh seed (the
-override is one-shot) while the `CHALLENGE · beat …` line stays up as the goal; the challenge run is
+override is one-shot) and shows **no** `CHALLENGE · beat …` line — `RunSession.StartRun` sets the
+banner from the run's own seed on every start (*corrected 28 Sep: this entry first said the banner
+stayed up, which was the leak fixed in the "review fixes" entry above*); the challenge run is
 always tilt+touch (a link must not open with a camera-permission dialog); a challenge scores on the
 free/all-time board and stamps no day, exactly like any other free run.
 
