@@ -3,7 +3,9 @@ using System.IO;
 using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
+using MotionRunner.Gameplay;
 using MotionRunner.Menu;
+using MotionRunner.Progression;
 using MotionRunner.Social;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -14,10 +16,12 @@ using UnityEngine.UI;
 namespace MotionRunner.EditorTools
 {
     /// Renders the profile tab to builds/profile-review/ at a 1080x2400 phone's proportions, the
-    /// way GuideUiReview does for the guide: the top of the page, the bottom (settings and
-    /// account), and the same bottom with no online profile, which is where the account card
-    /// re-flows. Fakes throughout - FakeStore, FakeProfileService, an in-memory sound store - so
-    /// nothing touches the network or the editor's PlayerPrefs sound levels.
+    /// way GuideUiReview does for the guide: the top of the page (player, podium, runs chart over
+    /// a seeded sample history), the bottom (settings and account), the same with no online
+    /// profile and no runs - where the account card re-flows and the chart is empty - and the
+    /// pause card with its volume rows. Fakes throughout - FakeStore, FakeProfileService, an
+    /// in-memory sound store - so nothing touches the network or the editor's sound levels, and
+    /// the editor's own run history is put back afterwards.
     ///
     /// Batchmode: -executeMethod MotionRunner.EditorTools.ProfileUiReview.Render
     public static class ProfileUiReview
@@ -42,15 +46,26 @@ namespace MotionRunner.EditorTools
             var sound = new SoundSettings(new MemoryStore());
             sound.SetMusicVolume(0.6f);
             GameAudio audio = GameAudio.Instance == null ? GameAudio.Create(sound) : null;
+
+            // A week of runs for the chart, put back afterwards: the editor's own history is
+            // whatever the last play session left, and a review render must not keep this.
+            bool hadRuns = PlayerPrefs.HasKey(RunsKey);
+            string savedRuns = PlayerPrefs.GetString(RunsKey, string.Empty);
+            PlayerPrefs.SetString(RunsKey, RunHistory.Encode(SampleRuns));
             try
             {
                 var ready = new FakeProfileService();
                 ready.BecomeReady(new Profile("ffe5a1f8-8d90-4a63-bdbc-380bb370af4f", "BRAVE-EGRET-74", 0));
                 RenderMenu(canvasSize, ready, folder, "profile", true);
-                RenderMenu(canvasSize, new FakeProfileService(), folder, "profile-offline", false);
+                PlayerPrefs.DeleteKey(RunsKey); // the offline render shows the empty chart
+                RenderMenu(canvasSize, new FakeProfileService(), folder, "profile-offline", true);
+                RenderPause(canvasSize, Path.Combine(folder, "pause.png"));
             }
             finally
             {
+                if (hadRuns) PlayerPrefs.SetString(RunsKey, savedRuns);
+                else PlayerPrefs.DeleteKey(RunsKey);
+                PlayerPrefs.Save();
                 if (audio != null) Object.DestroyImmediate(audio.gameObject);
             }
             Debug.Log("[ProfileUiReview] rendered to " + folder + " (canvas " + canvasSize + ")");
@@ -113,11 +128,75 @@ namespace MotionRunner.EditorTools
             }
         }
 
-        static void Capture(MainMenu menu, Camera cam, RenderTexture target, string path)
+        /// ProgressStore's history key. Private there; a review tool naming it is cheaper than
+        /// widening the store's surface for a render.
+        const string RunsKey = "veyro.runs";
+
+        static readonly RunRecord[] SampleRuns =
         {
-            SetLayer(menu.transform);
+            new RunRecord("2026-09-27", true, 785, 19, 135),
+            new RunRecord("2026-09-27", false, 183, 7, 63),
+            new RunRecord("2026-09-24", true, 1055, 28, 255),
+            new RunRecord("2026-09-24", true, 1805, 37, 255),
+            new RunRecord("2026-09-24", true, 712, 18, 112),
+            new RunRecord("2026-09-23", false, 402, 11, 98)
+        };
+
+        /// The pause card with its volume rows, over nothing: the run is not what is under review.
+        static void RenderPause(Vector2 canvasSize, string path)
+        {
+            PauseMenu pause = null;
+            Camera cam = null;
+            RenderTexture target = null;
+            try
+            {
+                pause = PauseMenu.Show(null);
+                pause.GetComponent<CanvasScaler>().enabled = false;
+                pause.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+                var rect = pause.GetComponent<RectTransform>();
+                rect.sizeDelta = canvasSize;
+                rect.position = Vector3.zero;
+                rect.localScale = Vector3.one;
+
+                cam = ReviewCamera(canvasSize, out target);
+                Capture(pause.transform, cam, target, path);
+            }
+            finally
+            {
+                if (cam != null) { cam.targetTexture = null; Object.DestroyImmediate(cam.gameObject); }
+                if (target != null) Object.DestroyImmediate(target);
+                if (pause != null) Object.DestroyImmediate(pause.gameObject);
+                if (EventSystem.current != null) Object.DestroyImmediate(EventSystem.current.gameObject);
+            }
+        }
+
+        static Camera ReviewCamera(Vector2 canvasSize, out RenderTexture target)
+        {
+            var cam = new GameObject("Profile review camera").AddComponent<Camera>();
+            cam.transform.position = Vector3.back * 10f;
+            cam.orthographic = true;
+            cam.orthographicSize = canvasSize.y * 0.5f;
+            cam.aspect = (float)Width / Height;
+            cam.nearClipPlane = 0.1f;
+            cam.farClipPlane = 20f;
+            cam.cullingMask = 1 << ReviewLayer;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = ParkInk;
+            target = new RenderTexture(Width, Height, 24);
+            cam.targetTexture = target;
+            return cam;
+        }
+
+        static readonly Color ParkInk = Art.ParkTheme.Ink;
+
+        static void Capture(MainMenu menu, Camera cam, RenderTexture target, string path) =>
+            Capture(menu.transform, cam, target, path);
+
+        static void Capture(Transform root, Camera cam, RenderTexture target, string path)
+        {
+            SetLayer(root);
             Canvas.ForceUpdateCanvases();
-            foreach (var graphic in menu.GetComponentsInChildren<Graphic>())
+            foreach (var graphic in root.GetComponentsInChildren<Graphic>())
             {
                 graphic.SetAllDirty();
                 graphic.Rebuild(CanvasUpdate.PreRender);

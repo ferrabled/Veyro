@@ -74,15 +74,22 @@ namespace MotionRunner.Menu
         /// a run (a challenge link) must stand aside for it - see BeginPick / Commit.
         public bool HasPendingPick => !_done && _pending != Pick.None;
 
-        public void Build(RectTransform slot)
+        /// `onGuide` opens how-to-play: the "i" in the card's corner, the quick way back to the
+        /// guide from the one screen where the choice it explains is made.
+        public void Build(RectTransform slot, Action onGuide)
         {
             RuntimeUi.Panel("Card", slot, MenuTheme.Card);
 
+            // Inset symmetrically by the "i" so the centred status line stays centred and clear
+            // of it.
             _status = RuntimeUi.Label("Status", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(MenuTheme.CardPadding, -96f), new Vector2(-MenuTheme.CardPadding, -12f),
+                new Vector2(MenuTheme.CardPadding + InfoReserve, -96f),
+                new Vector2(-MenuTheme.CardPadding - InfoReserve, -12f),
                 30, TextAnchor.UpperCenter, MenuTheme.Dim);
             _status.text = IdleStatus;
+
+            BuildInfoButton(slot, onGuide);
 
             bool lastWasCamera = LastUsed == ControlScheme.Camera;
             _tiltButton = BuildButton(slot, "Tilt", -104f, "TILT & TOUCH",
@@ -94,6 +101,32 @@ namespace MotionRunner.Menu
                 lastWasCamera ? MenuTheme.Accent : MenuTheme.Slot,
                 lastWasCamera ? MenuTheme.OnAccent : MenuTheme.Text,
                 ChooseCamera);
+        }
+
+        const float InfoSize = 60f;
+        const float InfoReserve = InfoSize + 8f;
+
+        /// A round "i" in the card's top-right corner. The whole 60 px disc is the target; the
+        /// letter is drawn in the dim ink of the status line beside it, so it reads as part of the
+        /// card's furniture rather than as a third way to start a run.
+        static void BuildInfoButton(RectTransform slot, Action onGuide)
+        {
+            RuntimeUi.Element("Info", slot, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-MenuTheme.CardPadding, -14f); // flush with the buttons' edge
+            rect.sizeDelta = new Vector2(InfoSize, InfoSize);
+
+            var disc = CosmeticUi.Surface(rect, MenuTheme.Slot, InfoSize * 0.5f);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = disc;
+            button.onClick.AddListener(() => onGuide?.Invoke());
+            RuntimeUi.TapSound(button);
+
+            var letter = RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 38, TextAnchor.MiddleCenter, MenuTheme.Dim);
+            letter.fontStyle = FontStyle.Bold;
+            letter.text = "i";
         }
 
         Button BuildButton(RectTransform slot, string name, float top, string label,

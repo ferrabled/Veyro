@@ -49,7 +49,7 @@ namespace MotionRunner.Menu
             var picker = BuildPickerSlot();
             _modes = new ModePickerCard();
             _modes.Chosen += OnChosen;
-            _modes.Build(picker);
+            _modes.Build(picker, () => Menu.RequestGuide());
         }
 
         /// The picker is anchored to the BOTTOM of the page rather than placed by the stack: it is

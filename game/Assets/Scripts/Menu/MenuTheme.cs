@@ -16,6 +16,11 @@ namespace MotionRunner.Menu
         public static readonly Color Accent = Art.ParkTheme.Pink;
         public static readonly Color Gold = Art.ParkTheme.Hex(0xBD8423);
 
+        /// Second and third place on the leaderboard podium, next to Gold for first: a sage
+        /// silver and a clay bronze, pulled toward the park palette rather than metallic.
+        public static readonly Color Silver = Art.ParkTheme.Hex(0x8FA5A2);
+        public static readonly Color Bronze = Art.ParkTheme.Hex(0xB9744A);
+
         /// Text on top of an accent-filled button.
         public static readonly Color OnAccent = Art.ParkTheme.Paper;
 

@@ -28,17 +28,11 @@ namespace MotionRunner.Menu
     {
         const float TopOffset = 12f;
         const float PlayerHeight = 180f;
-        const float BoardHeight = 520f;
-        const float RunsHeight = 430f;
 
         /// Under the last card, so it can be scrolled clear of the tab bar's edge.
         const float BottomPadding = 28f;
 
         const float AvatarSize = 116f;
-
-        const float RowHeight = 62f;
-        const int BoardRows = 6;
-        const int RunRows = 5;
 
         const string DeleteLabel = "DELETE ONLINE PROFILE";
         const string DeleteHint = "two taps · immediate and permanent";
@@ -56,9 +50,8 @@ namespace MotionRunner.Menu
         Text _headline;
         Text _reroll;
         Text _subline;
-        Text[] _boardRows;
-        Text[] _runRows;
-        Text _runsEmpty;
+        LeaderboardCard _board;
+        RecentRunsCard _runs;
         Text _boardNote;
         Button _scopeDaily;
         Button _scopeAllTime;
@@ -87,8 +80,9 @@ namespace MotionRunner.Menu
             _content = BuildScroll();
             var stack = new MenuStack(_content, TopOffset);
             BuildPlayerCard(stack.Add("Player", PlayerHeight));
-            BuildBoardCard(stack.Add("Board", BoardHeight));
-            BuildRunsCard(stack.Add("Runs", RunsHeight));
+            BuildBoardCard(stack.Add("Board", LeaderboardCard.Height));
+            _runs = new RecentRunsCard();
+            _runs.Build(stack.Add("Runs", RecentRunsCard.Height));
 
             _settings = new ProfileSettingsCard(
                 () => GameAudio.Instance != null ? GameAudio.Instance.Settings : null,
@@ -110,6 +104,7 @@ namespace MotionRunner.Menu
                 Menu.Profile.ProfileChanged -= OnProfileChanged;
             _settings?.Dispose();
             _avatar?.Dispose();
+            _board?.Dispose();
         }
 
         /// The page's scroll view. The viewport paints the scrim itself, so a drag that starts in
@@ -177,15 +172,13 @@ namespace MotionRunner.Menu
             MenuRows.Fit(_subline, 30);
         }
 
+        /// The podium and the list are LeaderboardCard's; the scope tabs and the note's wording
+        /// stay here with the board logic.
         void BuildBoardCard(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
             float pad = MenuTheme.CardPadding;
-
-            RuntimeUi.Label("Title", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -66f), new Vector2(-pad - 360f, -14f),
-                38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "LEADERBOARD";
+            _board = new LeaderboardCard();
+            _board.Build(slot);
 
             // The two scopes of the shared board (D15). The scheme half of the split (tilt vs
             // camera) follows the mode the player last ran with, same as the bests above.
@@ -194,15 +187,10 @@ namespace MotionRunner.Menu
             _scopeAllTime = BuildScopeTab(slot, "ScopeAll", -pad - 176f, -pad, "ALL-TIME",
                 () => SetScope(BoardScope.AllTime));
 
-            _boardRows = BuildRows(slot, BoardRows, -76f);
-
             // One bottom line, two honest states: the sample-data admission or the player's
             // live rank. (The TAP TO JOIN consent ask lived here until 17 Sep - joining is
             // automatic now, owner call; the privacy policy copy describes exactly that.)
-            _boardNote = RuntimeUi.Label("Note", slot,
-                new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(pad, 12f), new Vector2(-pad, 56f),
-                26, TextAnchor.MiddleLeft, MenuTheme.Faint);
+            _boardNote = _board.Note;
         }
 
         Button BuildScopeTab(RectTransform slot, string name, float left, float right,
@@ -226,25 +214,6 @@ namespace MotionRunner.Menu
             if (_scope == scope) return;
             _scope = scope;
             ShowBoard();
-        }
-
-        void BuildRunsCard(RectTransform slot)
-        {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
-            float pad = MenuTheme.CardPadding;
-
-            RuntimeUi.Label("Title", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -66f), new Vector2(-pad, -14f),
-                38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "MY LAST RUNS";
-
-            _runRows = BuildRows(slot, RunRows, -76f);
-
-            _runsEmpty = RuntimeUi.Label("Empty", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -170f), new Vector2(-pad, -100f),
-                30, TextAnchor.UpperLeft, MenuTheme.Faint);
-            _runsEmpty.text = "no runs yet — the first one lands here";
         }
 
         /// Who the player is to the backend, and the way out. Each row keeps a quiet second line
@@ -325,22 +294,6 @@ namespace MotionRunner.Menu
             return y;
         }
 
-        /// A column of single-line rows, built empty and filled by Refresh. Rows are text rather
-        /// than three aligned columns on purpose: one string per row is one thing to get right,
-        /// and the numbers here are short enough that a tab stop buys nothing.
-        Text[] BuildRows(RectTransform slot, int count, float top)
-        {
-            var rows = new Text[count];
-            for (int i = 0; i < count; i++)
-            {
-                rows[i] = RuntimeUi.Label("Row" + i, slot,
-                    new Vector2(0f, 1f), new Vector2(1f, 1f),
-                    new Vector2(MenuTheme.CardPadding, top - (i + 1) * RowHeight),
-                    new Vector2(-MenuTheme.CardPadding, top - i * RowHeight),
-                    30, TextAnchor.MiddleLeft, MenuTheme.Text);
-            }
-            return rows;
-        }
 
         public override void OnShown()
         {
@@ -383,7 +336,7 @@ namespace MotionRunner.Menu
                             "   ·   streak " + streak;
 
             ShowBoard();
-            FillRuns();
+            _runs.Show(ProgressStore.History);
         }
 
         void RefreshHeadline()
@@ -491,7 +444,7 @@ namespace MotionRunner.Menu
             StyleScope(_scopeAllTime, _scope == BoardScope.AllTime);
 
             _live.Show(new BoardQuery(_scope, DailySeed.LabelForDate(DateTime.UtcNow),
-                ChunkLibrary.ContentVersion, RunSeed.DefaultWorldId, group, BoardRows));
+                ChunkLibrary.ContentVersion, RunSeed.DefaultWorldId, group, LeaderboardCard.Rows));
 
             FillBoard();
         }
@@ -512,28 +465,17 @@ namespace MotionRunner.Menu
         void FillBoard()
         {
             ILeaderboardSource source = _live.IsLive ? _live : _mock;
-            var entries = source.Top(_boardRows.Length, _allTimeBestShown);
+            var entries = source.Top(LeaderboardCard.Rows, _allTimeBestShown);
 
-            for (int i = 0; i < _boardRows.Length; i++)
-            {
-                if (i >= entries.Count)
-                {
-                    _boardRows[i].text = i == 0 && _live.IsLive ? "nobody yet — set the first score" : string.Empty;
-                    _boardRows[i].color = MenuTheme.Faint;
-                    continue;
-                }
-
-                var entry = entries[i];
-                _boardRows[i].text = entry.Rank + ".   " + entry.Name + "        " + entry.Score;
-                _boardRows[i].color = entry.IsYou ? MenuTheme.Accent : MenuTheme.Text;
-            }
-
-            RefreshBoardNote();
+            // The player's own critter on their row, whatever name the board gives them (the
+            // sample board calls them "YOU"): the same face as the player card above.
+            _board.Show(entries, _headline.text);
+            RefreshBoardNote(entries.Count);
         }
 
         /// The bottom line of the board card: no live board → say the rows are samples;
         /// live → the player's rank, or a nudge to finish a run.
-        void RefreshBoardNote()
+        void RefreshBoardNote(int rows)
         {
             if (!_live.IsLive)
             {
@@ -544,8 +486,8 @@ namespace MotionRunner.Menu
                 return;
             }
 
-            _boardNote.text = _live.MyRank > 0
-                ? "you are #" + _live.MyRank + " on this board"
+            _boardNote.text = rows == 0 ? "nobody yet — set the first score"
+                : _live.MyRank > 0 ? "you are #" + _live.MyRank + " on this board"
                 : "finish a run to land on this board";
             _boardNote.color = MenuTheme.Faint;
         }
@@ -604,26 +546,5 @@ namespace MotionRunner.Menu
 
         static string SchemeName(ControlScheme scheme) =>
             scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
-
-        void FillRuns()
-        {
-            IReadOnlyList<RunRecord> runs = ProgressStore.History;
-            _runsEmpty.gameObject.SetActive(runs.Count == 0);
-
-            for (int i = 0; i < _runRows.Length; i++)
-            {
-                if (i >= runs.Count)
-                {
-                    _runRows[i].text = string.Empty;
-                    continue;
-                }
-
-                var run = runs[i];
-                _runRows[i].text = run.DayLabel + "   " + (run.Daily ? "daily" : "free") +
-                                   "        " + run.Score + "   " + run.Distance + "m   " +
-                                   run.Coins + "c";
-                _runRows[i].color = i == 0 ? MenuTheme.Text : MenuTheme.Dim;
-            }
-        }
     }
 }

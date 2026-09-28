@@ -73,11 +73,20 @@ namespace MotionRunner.Menu
             _critter.texture = _texture;
         }
 
+        /// An unclaimed spot - a leaderboard place nobody holds yet: a blank tile, no critter.
+        public void ShowEmpty()
+        {
+            _shown = null;
+            _tile.color = MenuTheme.Empty;
+            _critter.enabled = false;
+        }
+
         /// Repaints for a handle. Cheap to call on every refresh: the same name is a no-op.
         public void Show(string handle)
         {
             if (_shown == handle && _shown != null) return;
             _shown = handle ?? string.Empty;
+            _critter.enabled = true;
 
             var pattern = PlayerAvatar.For(handle);
             int palette = pattern.Palette % Tiles.Length;
