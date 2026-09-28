@@ -53,7 +53,6 @@ namespace MotionRunner.Notifications.OneSignal
                 Sdk.Notifications.PermissionChanged += OnPermissionChanged;
                 Sdk.Notifications.ForegroundWillDisplay += OnForegroundNotification;
                 Sdk.Notifications.Clicked += OnNotificationClicked;
-                Sdk.Location.IsShared = false;
                 // Campaign UI must never cover a run or the camera staging screen.
                 Sdk.InAppMessages.Paused = true;
 

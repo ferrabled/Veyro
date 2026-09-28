@@ -1,5 +1,40 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — OneSignal 5.1.15 → 5.4.0, location module off (feat/iOS-implementation, Step A)
+
+First step of `docs/IOS_HANDOFF.md` (owner decisions 5a/6). Upgraded OneSignal Unity core/android
+5.1.15 → 5.4.0 and added `com.onesignal.unity.ios` 5.4.0 (native Android 5.1.37 → 5.10.2; iOS
+`OneSignalXCFramework` 5.7.0). Location module disabled by the committed
+`ProjectSettings/OneSignalSettings.json` (`{"disableLocation": true}`, the SDK's own `JsonUtility`
+shape); no env var needed. The SDK's generated `Assets/OneSignal/Editor/OneSignal{Android,iOS}Dependencies.xml`
+are committed: Android `core`/`notifications`/`in-app-messages` 5.10.2, iOS `OneSignal` +
+`OneSignalInAppMessages` 5.7.0, no location on either. `link.xml` preserves `OneSignal.iOS`
+(`ignoreIfMissing`). The C# wrapper compiled unchanged.
+
+**Verified** (scratch `C:\scratch\veyro-ios-android`, audited byte-identical to the worktree before
+each run; `audit.sh` there is the reusable sync check). EditMode **637/637**. Release APK
+(`BuildAndroid`) 83,323,172 → 83,481,201 bytes (+158,029); `aapt2` permissions and badging
+**identical**; OneSignal location classes gone from the dex; only `api.onesignal.com` is contacted.
+OneSignal's own manifest components became `exported=false` (NotificationOpened activities,
+Boot/Upgrade/Dismiss receivers), `BootUpReceiver` drops `QUICKBOOT_POWERON`, `SyncJobService` added.
+Dev APK 99,578,265 bytes installed `-r` on the OnePlus 6T (A6013, Android 13): the same
+subscription `50f76e73…` survived the upgrade (`sdk` 050137 → 051002), NOTIFICATIONS ON, copy
+support ID, TURN OFF / ENABLE, and deny (`pm revoke` → OS prompt → Don't allow → "blocked" copy,
+no hang) all behave; permission restored afterwards; no managed exceptions. The androidlib
+migration only re-serialised `build.gradle` line endings; `ic_stat_onesignal_default.xml` and
+`raw/notification.wav` survive.
+
+**Known:** `Sdk.Location.IsShared = false` now logs `[OneSignal] location module is not available`
+once per launch (caught inside the SDK; dev builds show it in the Development Console) — Phase 2a
+removes the line. The committed `mainTemplate.gradle` still shows the old `OneSignal:5.1.37`
+resolver line; EDM4U rewrites it on every build (`AutoResolveOnBuild`), so the APK is right, but a
+build that skipped resolution would pull the full 5.1.37 SDK. `com.unity.test-framework.performance`
+writes two small `Resources` files during every player build (pre-existing, ~3.4 KB in the APK).
+
+**Needs owner:** one test push (app backgrounded, then closed) to subscription `50f76e73-9403-43d6-8548-26fb0a332e1e`,
+tap opens the game — required before any Android release, not blocking iOS. **Next:** Step B
+(hop-twice resume, BlazePose removed) in the same scratch.
+
 ## 2026-09-28 — Settings sheets rounded, menu header on the page colour (feat-game-UI-improvement / profile-guide-polish, fourth pass)
 
 Owner: round the notifications and gameplay-analytics panels like the rest; the home title
