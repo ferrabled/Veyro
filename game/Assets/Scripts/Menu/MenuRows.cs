@@ -74,11 +74,14 @@ namespace MotionRunner.Menu
         /// tapped button stays "selected" until something else is, which would leave the row lit.
         public static Button Tap(RectTransform row, Action onTap, Sfx sound = Sfx.UiTap)
         {
+            // Inset from the card's rounded edge and rounded itself, so the pressed row reads as a
+            // lit pill inside the card rather than a slab poking out of its corners.
             var hit = RuntimeUi.Element("Hit", row, out var hitRect);
             hit.transform.SetAsFirstSibling();
-            RuntimeUi.Stretch(hitRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var image = hit.AddComponent<Image>();
+            RuntimeUi.Stretch(hitRect, Vector2.zero, Vector2.one, new Vector2(10f, 4f), new Vector2(-10f, -4f));
+            var image = hit.AddComponent<CosmeticPanel>();
             image.color = MenuTheme.Slot;
+            image.Radius = 18f;
 
             var button = row.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
@@ -122,28 +125,15 @@ namespace MotionRunner.Menu
             return sub;
         }
 
-        /// ">" drawn as two rotated strokes rather than a glyph: the legacy runtime font's
-        /// chevrons sit on the baseline and read as a greater-than sign.
+        /// ">" drawn as two rotated strokes rather than a glyph (MenuIcons): the legacy runtime
+        /// font's chevrons sit on the baseline and read as a greater-than sign.
         public static void Chevron(RectTransform row)
         {
-            var box = RuntimeUi.Element("Chevron", row, out var boxRect);
+            RuntimeUi.Element("Chevron", row, out var boxRect);
             boxRect.anchorMin = boxRect.anchorMax = new Vector2(1f, 0.5f);
             boxRect.anchoredPosition = new Vector2(-MenuTheme.CardPadding - 14f, 0f);
             boxRect.sizeDelta = new Vector2(28f, 28f);
-            Stroke(boxRect, 45f, 6f);
-            Stroke(boxRect, -45f, -6f);
-        }
-
-        static void Stroke(RectTransform box, float angle, float y)
-        {
-            var go = RuntimeUi.Element("Stroke", box, out var rect);
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(0f, y);
-            rect.sizeDelta = new Vector2(20f, 4f);
-            rect.localRotation = Quaternion.Euler(0f, 0f, -angle);
-            var image = go.AddComponent<Image>();
-            image.color = MenuTheme.Dim;
-            image.raycastTarget = false;
+            MenuIcons.Chevron(boxRect, MenuTheme.Dim);
         }
 
         /// A rounded pill on the right edge saying what a tap on the row does ("COPY"). Visual

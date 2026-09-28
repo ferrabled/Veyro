@@ -139,8 +139,8 @@ namespace MotionRunner.Gameplay
             return guide;
         }
 
-        /// The skip link and the Android back button. Both count as seen - a guide that reappears
-        /// every launch because it was skipped is not help, it is a nag.
+        /// The X, a tap outside the card, and the Android back button. All count as seen - a guide
+        /// that reappears every launch because it was closed early is not help, it is a nag.
         public void Dismiss() => Close(GuideExit.Skipped);
 
         void Build()
@@ -150,24 +150,29 @@ namespace MotionRunner.Gameplay
             // never underneath it.
             RuntimeUi.PortraitCanvas(gameObject, 120);
 
-            RuntimeUi.FullScreenPanel("Dim", transform, DimColor);
+            // A tap on the dim around the card closes the guide, like any sheet: it is the same
+            // exit as the X (and the Android back button), so it marks the guide seen too.
+            var dim = RuntimeUi.FullScreenPanel("Dim", transform, DimColor);
+            var outside = dim.AddComponent<Button>();
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(Dismiss);
+            RuntimeUi.TapSound(outside, Sfx.UiBack);
 
             // Named "Card" and parent of "Primary" and "Illustration": GuideUiReview finds them
-            // by those paths.
+            // by those paths. The card's own surface takes the taps that land on it, so only the
+            // dim around it closes.
             RuntimeUi.Element("Card", transform, out _card);
             _card.anchorMin = _card.anchorMax = new Vector2(0.5f, 0.5f);
             _card.sizeDelta = new Vector2(CardWidth, CardHeight);
             CosmeticUi.Surface(_card, PanelColor, CardRadius);
 
-            _backLink = BuildLink("Back", _card,
-                new Vector2(0f, 1f), new Vector2(0.35f, 1f),
-                new Vector2(Margin - 8f, -92f), new Vector2(0f, -32f),
-                TextAnchor.MiddleLeft, "< back", () => Page(-1));
+            _backLink = IconButton("Back", _card, new Vector2(0f, 1f), new Vector2(Margin - 10f, -28f),
+                box => MenuIcons.Chevron(box, StatusColor, left: true, length: 24f, thickness: 5f),
+                () => Page(-1));
 
-            BuildLink("Skip", _card,
-                new Vector2(0.65f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -92f), new Vector2(-Margin + 8f, -32f),
-                TextAnchor.MiddleRight, "skip", Dismiss);
+            IconButton("Close", _card, new Vector2(1f, 1f), new Vector2(-Margin + 10f, -28f),
+                box => MenuIcons.Cross(box, StatusColor, length: 30f, thickness: 5f),
+                Dismiss);
 
             _title = RuntimeUi.Label("Title", _card,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -295,21 +300,34 @@ namespace MotionRunner.Gameplay
             return panel;
         }
 
-        /// A dim tappable line, the same shape as the mode picker's privacy link, so the guide's
-        /// secondary affordances read like the screen it opens over.
-        GameObject BuildLink(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax,
-            Vector2 offsetMin, Vector2 offsetMax, TextAnchor alignment, string label, Action onTap)
-        {
-            var text = RuntimeUi.Label(name, parent, anchorMin, anchorMax, offsetMin, offsetMax,
-                30, alignment, LinkColor);
-            text.text = label;
-            text.raycastTarget = true;
+        const float IconSize = 72f;
 
-            var button = text.gameObject.AddComponent<Button>();
-            button.targetGraphic = text;
+        /// A round icon button in a corner of the card - the back arrow and the X. Icons instead
+        /// of "< back" / "skip": two words competing with the title for a corner, where a shape
+        /// every app uses says the same thing without being read. The disc is the whole target
+        /// (72 px), well past the 48 dp minimum.
+        static GameObject IconButton(string name, Transform card, Vector2 corner, Vector2 position,
+            Action<RectTransform> drawIcon, Action onTap)
+        {
+            RuntimeUi.Element(name, card, out var rect);
+            rect.anchorMin = rect.anchorMax = corner;
+            rect.pivot = corner;
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(IconSize, IconSize);
+
+            var disc = CosmeticUi.Surface(rect, MenuTheme.Slot, IconSize * 0.5f);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = disc;
+            var colors = button.colors;
+            colors.selectedColor = colors.normalColor; // no lingering tint after a tap on touch
+            button.colors = colors;
             button.onClick.AddListener(() => onTap());
-            RuntimeUi.TapSound(button, Sfx.UiBack); // both links here step backwards or out
-            return text.gameObject;
+            RuntimeUi.TapSound(button, Sfx.UiBack); // both step backwards or out
+
+            RuntimeUi.Element("Icon", rect, out var icon);
+            RuntimeUi.Stretch(icon, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            drawIcon(icon);
+            return rect.gameObject;
         }
 
         /// The big button: forward while there is a page left, out at the end.
