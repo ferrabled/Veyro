@@ -52,11 +52,11 @@ namespace MotionRunner.Gameplay
         PushPromptPolicy _pushPrompt;
         NotificationPanel _notificationPanel;
         AnalyticsPanel _analyticsPanel;
-        SoundPanel _soundPanel;
 
-        /// The three settings panels are mutually exclusive and all close on back; this is the
-        /// one question the guards below keep asking.
-        bool AnyPanelOpen => _notificationPanel != null || _analyticsPanel != null || _soundPanel != null;
+        /// The settings panels are mutually exclusive and all close on back; this is the one
+        /// question the guards below keep asking. (Sound had a panel too until its levels moved
+        /// onto the profile tab itself - ProfileSettingsCard.)
+        bool AnyPanelOpen => _notificationPanel != null || _analyticsPanel != null;
 
         /// The challenge link the next run plays, if any (T-024). Held here rather than read
         /// straight out of PendingChallenge at StartRun, because taking it is what stops one link
@@ -104,7 +104,6 @@ namespace MotionRunner.Gameplay
             _menu.GuideRequested += ShowGuide;
             _menu.NotificationsRequested += () => ShowNotifications(false);
             _menu.AnalyticsRequested += ShowAnalytics;
-            _menu.SoundRequested += ShowSound;
 
             // The menu loop (T-045). Coming back from a run this crossfades over the run track
             // the crash faded down; at launch it is simply the first thing heard.
@@ -389,7 +388,7 @@ namespace MotionRunner.Gameplay
             if (!PendingChallenge.Has) return;
             if (_menu == null || _guide != null || _menu.IsStagingCamera || _menu.HasPendingPick) return;
             // Same rule as the offers below: a modal over the menu owns the screen, so the link
-            // waits for the notification / analytics / sound panel to close before starting.
+            // waits for the notification / analytics panel to close before starting.
             if (AnyPanelOpen) return;
             // Never on the frame the menu appeared: QuitToMenu runs inside the EventSystem's
             // dispatch and this runs later in the same frame, which would flash the menu for
@@ -449,7 +448,6 @@ namespace MotionRunner.Gameplay
             // that used to live here would have made back fall through the guide whenever it was
             // opened from the menu.
             if (!UnityEngine.Input.GetKeyDown(KeyCode.Escape)) return;
-            if (_soundPanel != null) { _soundPanel.Close(); return; }
             if (_analyticsPanel != null) { _analyticsPanel.Close(); return; }
             if (_notificationPanel != null)
             {
@@ -496,15 +494,6 @@ namespace MotionRunner.Gameplay
             if (AnyPanelOpen || _menu == null ||
                 _menu.IsStagingCamera || _guide != null || GrowthRuntime.Analytics == null) return;
             _analyticsPanel = AnalyticsPanel.Show(GrowthRuntime.Analytics, () => _analyticsPanel = null);
-        }
-
-        /// The SOUND link on the profile tab (T-045). Same guards and the same lifetime shape as
-        /// the two panels above; without an audio instance there is nothing to set.
-        void ShowSound()
-        {
-            if (AnyPanelOpen || _menu == null || _menu.IsStagingCamera || _guide != null ||
-                GameAudio.Instance == null) return;
-            _soundPanel = SoundPanel.Show(GameAudio.Instance.Settings, () => _soundPanel = null);
         }
 
         /// A camera-mode run whose camera has stopped answering PAUSES ITSELF, and the pause menu
@@ -655,7 +644,6 @@ namespace MotionRunner.Gameplay
         {
             if (_notificationPanel != null) _notificationPanel.Close();
             if (_analyticsPanel != null) _analyticsPanel.Close();
-            if (_soundPanel != null) _soundPanel.Close();
             DismissOverlay();
             StopAttract();
             if (_hud != null)

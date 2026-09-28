@@ -18,7 +18,6 @@ namespace MotionRunner.Tests
 
         [TestCase("_notificationPanel", "NotificationPanel")]
         [TestCase("_analyticsPanel", "AnalyticsPanel")]
-        [TestCase("_soundPanel", "SoundPanel")]
         public void ChallengeWaitsForTheOpenPanelBeforeItIsProcessed(string field, string panelName)
         {
             bool hadPending = PendingChallenge.Has;
