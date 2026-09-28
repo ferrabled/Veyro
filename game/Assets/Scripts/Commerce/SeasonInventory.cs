@@ -12,7 +12,7 @@ namespace MotionRunner.Commerce
         public const int Levels = 10;
         public static SeasonCurve Testing => new SeasonCurve("test-v1", new[]{0,1,2,3,4,5,6,7,8,9});
         public static SeasonCurve Production => new SeasonCurve("season1-v1", new[]{0,10,25,50,100,180,300,450,650,900});
-        public static bool ProductionApproved => false;
+        public static bool ProductionApproved => true;
         public SeasonCurve(string id, int[] thresholds)
         {
             if (thresholds == null || thresholds.Length != Levels || thresholds[0] != 0)

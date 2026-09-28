@@ -1,5 +1,19 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Season 1 XP curve approved; release-build gate lifted (T-025, feat-game-UI-improvement iOS session)
+
+Owner approved the suggested production curve as-is (D20, closes OPEN_QUESTIONS 23):
+0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP. `SeasonCurve.ProductionApproved` flipped to
+true, so `SeasonArtBuild` no longer fails non-development builds of `com.ferrabled.veyro.run` —
+done now so the iOS release build is not blocked. Curve values and storage ids are unchanged;
+development builds still use the 0–9 test curve. Also trimmed the RevenueCat DX notes in
+`DEVPOST_ANSWERS.md` §4b to the stale product-page observation (owner: the other two are
+expected behaviour).
+
+**Verified:** code read only — the flag has no other readers than `SeasonArtBuild`'s guard, and no
+EditMode test asserts its value. **No Unity run** (EditMode suite not re-run for this one-line
+change); the next batchmode run should confirm it compiles and stays green.
+
 ## 2026-09-28 — Profile tab redesigned, sound set inline, generated avatar; guide restyled (feat-game-UI-improvement / profile-guide-polish)
 
 Owner feedback on device screenshots: the how-to-play card's copy did not fill it and looked

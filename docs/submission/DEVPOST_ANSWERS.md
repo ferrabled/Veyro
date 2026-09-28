@@ -236,6 +236,17 @@ The redemption field belongs to Google's billing sheet. Full setup, tests and su
 
 ---
 
+## 4b. RevenueCat developer-experience notes
+
+Collected while wiring the stores, for a feedback field if the form has one, a line in "Honest
+status", or a note to RevenueCat support. Facts only; keep each to what was actually observed.
+
+- **Dashboard view went stale after attaching an entitlement (28 Sep 2026, iOS setup).** Attaching
+  an entitlement to a product from *Product catalog → Products* showed it on the list, but opening
+  the product's own page (e.g. Frost Skin) did not list that entitlement until a full browser
+  refresh. Dashboard display only — the attachment itself had saved. Worth a reload before
+  concluding a configuration is missing.
+
 ## 5. Sources
 
 - **[S1]** Shipaton 2026 overview — https://revenuecat-shipaton-2026.devpost.com/
