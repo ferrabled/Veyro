@@ -40,7 +40,7 @@ namespace MotionRunner.Menu
 
         public void Build(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
             MenuRows.Title(slot, "SETTINGS");
 
             float y = MenuRows.TitleHeight;

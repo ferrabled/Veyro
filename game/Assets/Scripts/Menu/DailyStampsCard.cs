@@ -19,12 +19,9 @@ namespace MotionRunner.Menu
     /// (T-021) - reads the same StreakRecord, so nothing here has to change when it lands.
     public sealed class DailyStampsCard
     {
-        public const float Height = 218f;
+        public const float Height = 236f;
 
-        /// Gap between two stamps. The stamps themselves take whatever is left, so the row fits
-        /// any card width without a layout group.
-        const float StampGap = 14f;
-        const float StampSize = 92f;
+        const float StampSize = 84f;
 
         readonly Func<DateTime> _utcNow;
 
@@ -38,8 +35,11 @@ namespace MotionRunner.Menu
         static int _celebratedDay = int.MinValue;
 
         Text _streak;
+        CosmeticPanel _streakPill;
         Text _note;
-        Image[] _stamps;
+        CosmeticPanel[] _stamps;
+        CosmeticPanel[] _stampRims;
+        GameObject[] _ticks;
         Text[] _dayLabels;
 
         /// The clock arrives as a function, like everywhere else that has a date in it: it makes
@@ -52,7 +52,7 @@ namespace MotionRunner.Menu
 
         public void Build(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
 
             float pad = MenuTheme.CardPadding;
 
@@ -61,16 +61,24 @@ namespace MotionRunner.Menu
                 new Vector2(pad, -56f), new Vector2(0f, -8f),
                 38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "DAILY STREAK";
 
-            _streak = RuntimeUi.Label("Streak", slot,
-                new Vector2(0.4f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -56f), new Vector2(-pad, -8f),
-                32, TextAnchor.MiddleRight, MenuTheme.Accent);
+            // The streak as a pill: pink and filled while there is one to keep, a quiet grey
+            // "NO STREAK" when there is not.
+            RuntimeUi.Element("Streak", slot, out var pill);
+            pill.anchorMin = pill.anchorMax = new Vector2(1f, 1f);
+            pill.pivot = new Vector2(1f, 1f);
+            pill.anchoredPosition = new Vector2(-pad, -12f);
+            pill.sizeDelta = new Vector2(200f, 44f);
+            _streakPill = CosmeticUi.Surface(pill, MenuTheme.Accent, 22f);
+            _streakPill.raycastTarget = false;
+            _streak = RuntimeUi.Label("Label", pill, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 24, TextAnchor.MiddleCenter, MenuTheme.OnAccent);
+            _streak.fontStyle = FontStyle.Bold;
 
             BuildStampRow(slot, pad);
 
             _note = RuntimeUi.Label("Note", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -214f), new Vector2(-pad, -186f),
+                new Vector2(pad, -224f), new Vector2(-pad, -192f),
                 26, TextAnchor.MiddleLeft, MenuTheme.Faint);
 
             Refresh();
@@ -79,31 +87,49 @@ namespace MotionRunner.Menu
         void BuildStampRow(RectTransform slot, float pad)
         {
             int days = DailyStreak.WindowDays;
-            _stamps = new Image[days];
+            _stamps = new CosmeticPanel[days];
+            _stampRims = new CosmeticPanel[days];
+            _ticks = new GameObject[days];
             _dayLabels = new Text[days];
 
-            // One row inset by the card padding, then cells that split it evenly in anchor space.
-            // Insetting the row rather than each cell is what keeps the seven columns equal: a
-            // pixel padding applied per cell would only shorten the two on the ends.
+            // One row inset by the card padding, the stamps spread across it edge to edge: the
+            // first sits on the title's left edge and the last under the streak pill's right
+            // edge, whatever the card's width. Each cell is anchored at its share of the row with
+            // a matching pivot, which is what lands the ends exactly on the row's edges.
             var row = RuntimeUi.Element("Stamps", slot, out var rowRect);
             RuntimeUi.Stretch(rowRect,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -186f), new Vector2(-pad, -62f));
+                new Vector2(pad, -186f), new Vector2(-pad, -66f));
 
-            float cellWidth = 1f / days;
             for (int i = 0; i < days; i++)
             {
+                float t = days > 1 ? i / (float)(days - 1) : 0.5f;
                 var cell = RuntimeUi.Element("Day" + i, row.transform, out var cellRect);
-                RuntimeUi.Stretch(cellRect,
-                    new Vector2(i * cellWidth, 0f), new Vector2((i + 1) * cellWidth, 1f),
-                    new Vector2(StampGap * 0.5f, 0f), new Vector2(-StampGap * 0.5f, 0f));
+                cellRect.anchorMin = new Vector2(t, 0f);
+                cellRect.anchorMax = new Vector2(t, 1f);
+                cellRect.pivot = new Vector2(t, 0.5f);
+                cellRect.anchoredPosition = Vector2.zero;
+                cellRect.sizeDelta = new Vector2(StampSize, 0f);
 
-                var stamp = RuntimeUi.Element("Stamp", cell.transform, out var stampRect);
+                // A rounded stamp: a rim (pink on today, so today reads as "this one" before it
+                // is earned), the fill inside it, and a paper tick once the day is stamped.
+                RuntimeUi.Element("Stamp", cell.transform, out var stampRect);
                 stampRect.anchorMin = new Vector2(0.5f, 1f);
                 stampRect.anchorMax = new Vector2(0.5f, 1f);
                 stampRect.anchoredPosition = new Vector2(0f, -StampSize * 0.5f);
                 stampRect.sizeDelta = new Vector2(StampSize, StampSize);
-                _stamps[i] = stamp.AddComponent<Image>();
+                _stampRims[i] = CosmeticUi.Surface(stampRect, MenuTheme.Empty, 20f);
+                _stampRims[i].raycastTarget = false;
+
+                RuntimeUi.Element("Fill", stampRect, out var fillRect);
+                RuntimeUi.Stretch(fillRect, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+                _stamps[i] = CosmeticUi.Surface(fillRect, MenuTheme.Empty, 16f);
+                _stamps[i].raycastTarget = false;
+
+                var tick = RuntimeUi.Element("Tick", stampRect, out var tickRect);
+                RuntimeUi.Stretch(tickRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                MenuIcons.Tick(tickRect, MenuTheme.OnAccent, 38f, 7f);
+                _ticks[i] = tick;
 
                 _dayLabels[i] = RuntimeUi.Label("Letter", cell.transform,
                     new Vector2(0f, 0f), new Vector2(1f, 0f),
@@ -126,18 +152,23 @@ namespace MotionRunner.Menu
             for (int i = 0; i < days; i++)
             {
                 bool isToday = i == days - 1;
-                _stamps[i].color = stamps[i]
+                Color fill = stamps[i]
                     ? (isToday ? MenuTheme.Accent : MenuTheme.Gold)
-                    : MenuTheme.Empty;
+                    : isToday ? MenuTheme.Card : MenuTheme.Empty;
+                _stamps[i].color = fill;
+                _stampRims[i].color = isToday ? MenuTheme.Accent : fill;
+                _ticks[i].SetActive(stamps[i]);
 
                 var day = utcNow.Date.AddDays(-(days - 1 - i));
                 _dayLabels[i].text = DayLetter(day);
                 _dayLabels[i].color = isToday ? MenuTheme.Text : MenuTheme.Faint;
+                _dayLabels[i].fontStyle = isToday ? FontStyle.Bold : FontStyle.Normal;
             }
 
             int length = DailyStreak.LengthOn(record, today);
             _streak.text = length == 0 ? "NO STREAK" : length + (length == 1 ? " DAY" : " DAYS");
-            _streak.color = length == 0 ? MenuTheme.Faint : MenuTheme.Accent;
+            _streak.color = length == 0 ? MenuTheme.Faint : MenuTheme.OnAccent;
+            _streakPill.color = length == 0 ? MenuTheme.Empty : MenuTheme.Accent;
 
             bool stampedToday = DailyStreak.PlayedOn(record, today);
             CelebrateNewStamp(stampedToday, today);

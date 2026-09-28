@@ -136,7 +136,7 @@ namespace MotionRunner.Menu
 
         void BuildPlayerCard(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
             float pad = MenuTheme.CardPadding;
 
             // The avatar is generated from the handle (PlayerAvatar): a critter on a colour tile,
@@ -221,7 +221,7 @@ namespace MotionRunner.Menu
         /// summary) - MenuRows.Fit shrinks a long message rather than letting it leave the card.
         void BuildAccountCard(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
             MenuRows.Title(slot, "ACCOUNT");
 
             // The support identifier (18 Sep review R3): deletion/support requests without the

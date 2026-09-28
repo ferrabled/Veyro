@@ -9,10 +9,10 @@ namespace MotionRunner.Menu
     /// The banner at the top of the home screen: Season 1, the level ladder, and the XP bar
     /// towards the next level (COSMETICS_CATALOG §3).
     ///
-    /// XP is not earned yet - that is T-025 - and the card says so rather than drawing a zero
-    /// that reads like a bug or a bar that reads like progress. Everything else on it is already
-    /// true: the pass entitlement is live, so OWNED vs LOCKED is real, and tapping the card is a
-    /// real route to the thing that sells it.
+    /// Dressed as the shop's own season-pass card - the ink-to-teal wash with paper type, gold for
+    /// progress - so the banner on the home tab and the product in the shop read as the same
+    /// thing. Everything on it is true: the pass entitlement is live, so OWNED vs VIEW REWARDS is
+    /// real, and tapping the card is a real route to the thing that sells it.
     ///
     /// The whole card is one tap target. It is the biggest thing on the home screen and it is an
     /// advertisement; making the player find a button on it would be pretending otherwise.
@@ -20,10 +20,16 @@ namespace MotionRunner.Menu
     {
         public const float Height = 200f;
 
+        const float PillWidth = 236f;
+
+        /// The XP track on the dark wash: paper at low opacity, so it reads as an empty groove.
+        static readonly Color Track = new Color(1f, 1f, 1f, 0.16f);
+
         readonly ISeasonProgress _progress;
         readonly Func<bool> _passOwned;
 
         Text _state;
+        CosmeticPanel _statePill;
         Text _level;
         Text _note;
         RectTransform _fill;
@@ -36,7 +42,9 @@ namespace MotionRunner.Menu
 
         public void Build(RectTransform slot, Action onTap)
         {
-            var background = RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            var background = CosmeticUi.Card(slot, MenuTheme.Text);
+            background.Gradient = true;
+            background.Bottom = MenuTheme.PassGradient;
             var button = background.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
             button.onClick.AddListener(() => onTap());
@@ -44,30 +52,45 @@ namespace MotionRunner.Menu
 
             float pad = MenuTheme.CardPadding;
 
-            RuntimeUi.Label("Title", slot,
-                new Vector2(0f, 1f), new Vector2(0.6f, 1f),
-                new Vector2(pad, -56f), new Vector2(0f, -8f),
-                38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "SEASON 1 PASS";
+            var title = RuntimeUi.Label("Title", slot,
+                new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(pad, -72f), new Vector2(-pad - PillWidth - 12f, -18f),
+                36, TextAnchor.MiddleLeft, MenuTheme.OnAccent);
+            title.fontStyle = FontStyle.Bold;
+            title.text = "SEASON 1 PASS";
 
-            _state = RuntimeUi.Label("State", slot,
-                new Vector2(0.4f, 1f), new Vector2(1f, 1f),
-                new Vector2(0f, -56f), new Vector2(-pad, -8f),
-                30, TextAnchor.MiddleRight, MenuTheme.Dim);
+            // The state as a pill on the title row: the one piece of the banner that changes when
+            // the pass is bought, so it gets the contrast.
+            RuntimeUi.Element("State", slot, out var pill);
+            pill.anchorMin = pill.anchorMax = new Vector2(1f, 1f);
+            pill.pivot = new Vector2(1f, 1f);
+            pill.anchoredPosition = new Vector2(-pad, -22f);
+            pill.sizeDelta = new Vector2(PillWidth, 48f);
+            _statePill = CosmeticUi.Surface(pill, MenuTheme.ItemCard, 24f);
+            _statePill.raycastTarget = false;
+            _state = RuntimeUi.Label("Label", pill, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 22, TextAnchor.MiddleCenter, MenuTheme.Text);
+            _state.fontStyle = FontStyle.Bold;
 
             _level = RuntimeUi.Label("Level", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -102f), new Vector2(-pad, -60f),
-                30, TextAnchor.MiddleLeft, MenuTheme.Dim);
+                new Vector2(pad, -112f), new Vector2(-pad, -76f),
+                28, TextAnchor.MiddleLeft, MenuTheme.PreviewTop);
 
-            _fill = RuntimeUi.Bar("Xp", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -142f), new Vector2(-pad, -112f),
-                MenuTheme.Empty, MenuTheme.Gold);
+            // A rounded groove and a rounded gold fill, moved by anchor like RuntimeUi.Bar so it
+            // stays aligned with its track at any canvas scale.
+            RuntimeUi.Element("Xp", slot, out var track);
+            RuntimeUi.Stretch(track, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(pad, -146f), new Vector2(-pad, -124f));
+            CosmeticUi.Surface(track, Track, 11f).raycastTarget = false;
+            RuntimeUi.Element("Fill", track, out _fill);
+            RuntimeUi.Stretch(_fill, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
+            CosmeticUi.Surface(_fill, MenuTheme.Gold, 11f).raycastTarget = false;
 
             _note = RuntimeUi.Label("Note", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -192f), new Vector2(-pad, -150f),
-                26, TextAnchor.MiddleLeft, MenuTheme.Faint);
+                new Vector2(pad, -190f), new Vector2(-pad, -154f),
+                24, TextAnchor.MiddleLeft, MenuTheme.Owned);
 
             Refresh();
         }
@@ -79,8 +102,8 @@ namespace MotionRunner.Menu
             bool owned = _passOwned != null && _passOwned();
             var snapshot = _progress.Read(owned);
 
-            _state.text = owned ? "PASS OWNED · VIEW" : "VIEW REWARDS";
-            _state.color = owned ? MenuTheme.Accent : MenuTheme.Dim;
+            _state.text = owned ? "PASS OWNED" : "VIEW REWARDS";
+            _statePill.color = owned ? MenuTheme.Premium : MenuTheme.ItemCard;
 
             _level.text = "LEVEL " + snapshot.Level + " / " + SeasonProgress.MaxLevel;
 

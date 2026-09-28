@@ -168,7 +168,7 @@ HOW TO PLAY
 Hold the phone upright (portrait). Tilt left/right to change lanes and tap the screen to jump. Swipe and tap controls work alongside tilt, so the game is fully playable without tilting.
 
 CAMERA MODE (BETA, optional)
-Choose CAMERA (BETA) in the mode picker. The front camera is used on-device only to follow the player; no images are stored or transmitted. The camera permission is requested only when the player picks this mode. Tilt remains available if permission is declined.
+Choose CAMERA (the button tagged BETA) in the mode picker. The front camera is used on-device only to follow the player; no images are stored or transmitted. The camera permission is requested only when the player picks this mode. Tilt remains available if permission is declined.
 
 IN-APP PURCHASES (non-consumable, cosmetic only)
 Open the SHOP tab in the bottom bar: Ember Skin, Frost Skin and Season 1 Pass. RESTORE PURCHASES is at the bottom of the SHOP screen.

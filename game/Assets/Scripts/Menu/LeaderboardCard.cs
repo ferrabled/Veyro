@@ -46,7 +46,7 @@ namespace MotionRunner.Menu
 
         public void Build(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
             float pad = MenuTheme.CardPadding;
 
             RuntimeUi.Label("Title", slot,

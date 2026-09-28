@@ -3,6 +3,7 @@ using MotionRunner.CameraInput;
 using MotionRunner.Core;
 using MotionRunner.Progression;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MotionRunner.Menu
 {
@@ -28,6 +29,10 @@ namespace MotionRunner.Menu
 
         protected override void Build()
         {
+            // The profile's page colour, so the home cards read as cards on it - the same paper
+            // on sage the other two tabs use.
+            RuntimeUi.Panel("Scrim", Root, MenuTheme.Scrim).raycastTarget = false;
+
             var stack = new MenuStack(Root, TopOffset);
 
             _seasonPass = new SeasonPassCard(Menu.Season, Menu.IsPassOwned);
@@ -36,20 +41,58 @@ namespace MotionRunner.Menu
             _stamps = new DailyStampsCard(() => DateTime.UtcNow);
             _stamps.Build(stack.Add("Stamps", DailyStampsCard.Height));
 
-            // The character fills the space between the fixed cards and the mode picker.
-            RuntimeUi.Element("CharacterLocker",Root,out var character);
-            RuntimeUi.Stretch(character,Vector2.zero,Vector2.one,
-                new Vector2(MenuTheme.SidePadding,ModePickerCard.Height+14),new Vector2(-MenuTheme.SidePadding,stack.Y-14));
-            _preview=RunnerPreview.Create(character);
-            var target=RuntimeUi.Panel("OpenLocker",character,new Color(0,0,0,0));
-            var open=target.gameObject.AddComponent<UnityEngine.UI.Button>();open.targetGraphic=target;
-            open.onClick.AddListener(Menu.ShowCosmetics);RuntimeUi.TapSound(open);
-            RuntimeUi.Label("LockerHint",character,Vector2.zero,new Vector2(1,0),new Vector2(12,8),new Vector2(-12,62),
-                32,TextAnchor.MiddleCenter,MenuTheme.Text).text="YOUR LOOK  ·  TAP TO CUSTOMIZE";
+            BuildLocker(stack.Y);
             var picker = BuildPickerSlot();
             _modes = new ModePickerCard();
             _modes.Chosen += OnChosen;
             _modes.Build(picker, () => Menu.RequestGuide());
+        }
+
+        /// The character fills the space between the fixed cards and the mode picker, standing on
+        /// the locker's own teal-to-cream stage - the wash the result card and the locker use -
+        /// so the runner the player dresses looks the same in all three places. The whole stage
+        /// opens the locker; the pill at its foot says so.
+        void BuildLocker(float stackBottom)
+        {
+            RuntimeUi.Element("CharacterLocker", Root, out var character);
+            RuntimeUi.Stretch(character, Vector2.zero, Vector2.one,
+                new Vector2(MenuTheme.SidePadding, ModePickerCard.Height + 2f * MenuTheme.CardGap),
+                new Vector2(-MenuTheme.SidePadding, stackBottom - MenuTheme.CardGap));
+            // Teal to cream: the locker's wash, ending on the item-card cream rather than the
+            // wash's own pale sage, which is the page colour and lost the stage's bottom edge.
+            var wash = CosmeticUi.Card(character, MenuTheme.PreviewTop);
+            wash.Gradient = true;
+            wash.Bottom = MenuTheme.ItemCard;
+
+            _preview = RunnerPreview.Create(character);
+
+            var target = RuntimeUi.Panel("OpenLocker", character, new Color(0, 0, 0, 0));
+            var open = target.gameObject.AddComponent<Button>();
+            open.targetGraphic = target;
+            open.transition = Selectable.Transition.None;
+            open.onClick.AddListener(Menu.ShowCosmetics);
+            RuntimeUi.TapSound(open);
+
+            RuntimeUi.Label("YourLook", character, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(MenuTheme.CardPadding, -64f), new Vector2(-MenuTheme.CardPadding, -18f),
+                26, TextAnchor.MiddleLeft, MenuTheme.Dim).text = "YOUR LOOK";
+
+            // Visual only - the stage is the button.
+            RuntimeUi.Element("Customize", character, out var pill);
+            pill.anchorMin = pill.anchorMax = new Vector2(0.5f, 0f);
+            pill.pivot = new Vector2(0.5f, 0f);
+            pill.anchoredPosition = new Vector2(0f, 20f);
+            pill.sizeDelta = new Vector2(300f, 64f);
+            CosmeticUi.Surface(pill, MenuTheme.ItemCard, 32f).raycastTarget = false;
+            var label = RuntimeUi.Label("Label", pill, Vector2.zero, Vector2.one,
+                new Vector2(0f, 0f), new Vector2(-30f, 0f), 26, TextAnchor.MiddleCenter, MenuTheme.Text);
+            label.fontStyle = FontStyle.Bold;
+            label.text = "CUSTOMIZE";
+            RuntimeUi.Element("Chevron", pill, out var chevron);
+            chevron.anchorMin = chevron.anchorMax = new Vector2(1f, 0.5f);
+            chevron.anchoredPosition = new Vector2(-44f, 0f);
+            chevron.sizeDelta = new Vector2(24f, 24f);
+            MenuIcons.Chevron(chevron, MenuTheme.Text, length: 16f, thickness: 4f);
         }
 
         /// The picker is anchored to the BOTTOM of the page rather than placed by the stack: it is
@@ -58,10 +101,12 @@ namespace MotionRunner.Menu
         RectTransform BuildPickerSlot()
         {
             RuntimeUi.Element("ModePicker", Root, out var rect);
+            // A card gap above the tab bar, like every gap between two cards: flush, the card's
+            // rounded bottom sat on the bar's paper and read as cut off.
             RuntimeUi.Stretch(rect,
                 new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(MenuTheme.SidePadding, 0f),
-                new Vector2(-MenuTheme.SidePadding, ModePickerCard.Height));
+                new Vector2(MenuTheme.SidePadding, MenuTheme.CardGap),
+                new Vector2(-MenuTheme.SidePadding, MenuTheme.CardGap + ModePickerCard.Height));
             return rect;
         }
 

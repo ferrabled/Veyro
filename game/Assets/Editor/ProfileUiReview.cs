@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using MotionRunner.Art;
 using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
@@ -57,12 +58,22 @@ namespace MotionRunner.EditorTools
                 var ready = new FakeProfileService();
                 ready.BecomeReady(new Profile("ffe5a1f8-8d90-4a63-bdbc-380bb370af4f", "BRAVE-EGRET-74", 0));
                 RenderMenu(canvasSize, ready, folder, "profile", true);
+                RenderHome(canvasSize, ready, Path.Combine(folder, "home.png"), false);
+
+                // The same home screen on a phone with a centred teardrop and a gesture bar: the
+                // safe area is simulated (SafeAreaFitter.Simulated) and the notch drawn in black,
+                // so the render shows the title clearing it.
+                SafeAreaFitter.Simulated = Rect.MinMaxRect(0f, 0.02f, 1f, 0.955f);
+                RenderHome(canvasSize, ready, Path.Combine(folder, "home-cutout.png"), true);
+                SafeAreaFitter.Simulated = null;
+
                 PlayerPrefs.DeleteKey(RunsKey); // the offline render shows the empty chart
                 RenderMenu(canvasSize, new FakeProfileService(), folder, "profile-offline", true);
                 RenderPause(canvasSize, Path.Combine(folder, "pause.png"));
             }
             finally
             {
+                SafeAreaFitter.Simulated = null;
                 if (hadRuns) PlayerPrefs.SetString(RunsKey, savedRuns);
                 else PlayerPrefs.DeleteKey(RunsKey);
                 PlayerPrefs.Save();
@@ -120,6 +131,75 @@ namespace MotionRunner.EditorTools
                 }
                 finally
                 {
+                    if (cam != null) { cam.targetTexture = null; Object.DestroyImmediate(cam.gameObject); }
+                    if (target != null) Object.DestroyImmediate(target);
+                    if (menu != null) Object.DestroyImmediate(menu.gameObject);
+                    if (EventSystem.current != null) Object.DestroyImmediate(EventSystem.current.gameObject);
+                }
+            }
+        }
+
+        /// The RUN tab, with the runner rendered into its stage the way CosmeticUiReview does it
+        /// (a preview camera does not render by itself outside Play mode). `notch` draws a black
+        /// teardrop where a 6T's camera sits, over the simulated safe area.
+        static void RenderHome(Vector2 canvasSize, IProfileService profile, string path, bool notch)
+        {
+            var store = FakeStore.WithDefaultCatalog();
+            store.IsReady = true;
+            MainMenu menu = null;
+            Camera cam = null;
+            RenderTexture target = null;
+            Light sun = null;
+            using (var season = new SeasonService(store, profile, SeasonCurve.Testing))
+            using (var skins = new SkinService(store, season, _ => { }))
+            {
+                try
+                {
+                    // The empty review scene has no light; the runner needs one (CosmeticUiReview's).
+                    RenderSettings.fog = false;
+                    sun = new GameObject("Review sun").AddComponent<Light>();
+                    sun.type = LightType.Directional;
+                    sun.intensity = 0.8f;
+                    sun.transform.rotation = Quaternion.Euler(35f, -25f, 0f);
+
+                    menu = MainMenu.Create(store, skins, profile, MenuTab.Run);
+                    menu.GetComponent<CanvasScaler>().enabled = false;
+                    menu.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+                    var rect = menu.GetComponent<RectTransform>();
+                    rect.sizeDelta = canvasSize;
+                    rect.position = Vector3.zero;
+                    rect.localScale = Vector3.one;
+
+                    if (notch)
+                    {
+                        RuntimeUi.Element("Simulated notch", menu.transform, out var drop);
+                        drop.anchorMin = drop.anchorMax = new Vector2(0.5f, 1f);
+                        drop.pivot = new Vector2(0.5f, 1f);
+                        drop.sizeDelta = new Vector2(96f, 70f);
+                        var shape = drop.gameObject.AddComponent<CosmeticPanel>(); // CosmeticUi is internal
+                        shape.color = Color.black;
+                        shape.Radius = 35f;
+                    }
+
+                    cam = ReviewCamera(canvasSize, out target);
+                    foreach (var preview in menu.GetComponentsInChildren<RunnerPreview>(true))
+                    {
+                        typeof(RunnerPreview).GetMethod(preview.gameObject.activeInHierarchy ? "OnEnable" : "OnDisable",
+                            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                            ?.Invoke(preview, null);
+                    }
+                    RunnerCosmetics.SetLayerRecursively(menu.gameObject, ReviewLayer);
+                    Canvas.ForceUpdateCanvases();
+                    foreach (var preview in menu.GetComponentsInChildren<RunnerPreview>())
+                    {
+                        preview.Focus(preview.FocusedSlot, true);
+                        preview.PreviewCamera.Render();
+                    }
+                    Capture(menu, cam, target, path);
+                }
+                finally
+                {
+                    if (sun != null) Object.DestroyImmediate(sun.gameObject);
                     if (cam != null) { cam.targetTexture = null; Object.DestroyImmediate(cam.gameObject); }
                     if (target != null) Object.DestroyImmediate(target);
                     if (menu != null) Object.DestroyImmediate(menu.gameObject);
@@ -187,7 +267,7 @@ namespace MotionRunner.EditorTools
             return cam;
         }
 
-        static readonly Color ParkInk = Art.ParkTheme.Ink;
+        static readonly Color ParkInk = ParkTheme.Ink;
 
         static void Capture(MainMenu menu, Camera cam, RenderTexture target, string path) =>
             Capture(menu.transform, cam, target, path);
