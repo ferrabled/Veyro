@@ -17,14 +17,30 @@ namespace MotionRunner.Tests
         [TestCase("ember", "ember", "everything you own is already unlocked")]
         [TestCase("ember", "", "nothing to restore on this account")]
         [TestCase("", "frost", "purchases restored")]
+        // A lapsed entitlement dropping out is not a restoration (PR #14 review).
+        [TestCase("season1,skin", "skin", "everything you own is already unlocked")]
+        [TestCase("season1,skin", "skin,frost", "purchases restored")]
         public void RestoreReportsEntitlementMembershipChanges(string before, string after, string expected)
         {
             var method = MenuType("StoreCatalogView").GetMethod("DescribeRestore", BindingFlags.NonPublic | BindingFlags.Static);
-            var previous = new HashSet<string>();
-            if (before.Length > 0) previous.Add(before);
-            var current = after.Length > 0 ? new[] { after } : Array.Empty<string>();
+            var previous = new HashSet<string>(Split(before));
+            var current = Split(after);
             Assert.AreEqual(expected, method.Invoke(null, new object[] { previous, current }));
         }
+
+        [TestCase("season1,skin", "skin", false)]
+        [TestCase("season1,skin", "season1,skin", false)]
+        [TestCase("", "", false)]
+        [TestCase("skin", "skin,season1", true)]
+        [TestCase("ember", "frost", true)]
+        public void TheRestoreCue_OnlyPlaysForSomethingNew(string before, string after, bool expected)
+        {
+            var method = MenuType("StoreCatalogView").GetMethod("GainedAny", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.AreEqual(expected, method.Invoke(null, new object[] { new HashSet<string>(Split(before)), Split(after) }));
+        }
+
+        static string[] Split(string list) =>
+            list.Length == 0 ? Array.Empty<string>() : list.Split(',');
 
         [Test]
         public void FailedBoardFetchFinishesLoadingAndNotifiesView()

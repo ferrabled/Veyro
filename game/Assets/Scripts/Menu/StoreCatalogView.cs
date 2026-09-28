@@ -190,10 +190,10 @@ namespace MotionRunner.Menu
             _store.Restore(outcome =>
             {
                 // A restore that found nothing is a success with nothing to celebrate: confirm
-                // only when the entitlement set actually grew.
+                // only when something the player did not have before came back.
                 if (outcome.Succeeded)
                 {
-                    if (_store.ActiveEntitlements.Count > 0 && !before.SetEquals(_store.ActiveEntitlements))
+                    if (GainedAny(before, _store.ActiveEntitlements))
                         GameAudio.Confirm();
                 }
                 else Cue(outcome);
@@ -212,9 +212,19 @@ namespace MotionRunner.Menu
         /// restoration either.
         static string DescribeRestore(HashSet<string> before, IReadOnlyCollection<string> after)
         {
-            if (after.Count > 0 && !before.SetEquals(after)) return "purchases restored";
+            if (GainedAny(before, after)) return "purchases restored";
             if (after.Count > 0) return "everything you own is already unlocked";
             return "nothing to restore on this account";
+        }
+
+        /// Whether the restore brought back at least one entitlement that was not active before
+        /// it. Not set inequality: a restore can also DROP an entitlement that has lapsed
+        /// (`{season1, skin}` -> `{skin}`), and a shrinking set is not a restoration.
+        static bool GainedAny(HashSet<string> before, IReadOnlyCollection<string> after)
+        {
+            foreach (string entitlement in after)
+                if (!before.Contains(entitlement)) return true;
+            return false;
         }
 
         static string Describe(PurchaseOutcome outcome, string what)

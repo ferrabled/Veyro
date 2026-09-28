@@ -72,6 +72,22 @@ avatar changes, same name after relaunch → same avatar; (4) COPY/PASTE/DELETE 
 before. The 28 Sep merge entry's "open SOUND, deliver a challenge link" step no longer applies
 (no SOUND modal); notifications/analytics still do.
 
+**Follow-up, same day — PR #14 Copilot finding + device pass.** Copilot flagged that the store's
+restore feedback confirmed (cue + "purchases restored") whenever the entitlement set merely
+*changed*, including a restore that only drops a lapsed entitlement (`{season1, skin}` →
+`{skin}`). Fixed in `StoreCatalogView` with one `GainedAny(before, after)` check used by both the
+cue and `DescribeRestore`; `ProfileMenuReviewTests` gained the removal cases (14 cases). **627/627
+EditMode** in the scratch. `BuildAndroidDev` (`1.0.0-dev.20260928-1302.nogit`, 99,360,136 bytes,
+permissions unchanged) installed over the previous dev build on the **OnePlus 6T** (1080×2340).
+On device: home, profile top/bottom, settings and account cards, swipe starting on the volume
+bars scrolls without changing the level, bar taps and ON/OFF, notifications/analytics panels,
+privacy link, all four guide pages (frames animate, chips one line, back/skip), tab re-tap to
+top, relaunch persistence — all PASS; logcat has no managed exceptions (only Unity's usual
+`AssetPackManager` ClassNotFound line at launch). **The phone was offline** (no reachable
+network), so the online-profile rows (PLAYER ID / RECOVERY CODE / IMPORT), "re-roll name" and
+the avatar-per-handle were not exercised on device; re-roll was deliberately not tapped (it
+permanently renames the owner's profile). Those remain for the owner, online.
+
 ## 2026-09-28 — Main merged into the game UI branch (feat-game-UI-improvement / main-merge)
 
 Owner committed the audio, illustrated guide, icon and documentation through `d52a8dc`,
