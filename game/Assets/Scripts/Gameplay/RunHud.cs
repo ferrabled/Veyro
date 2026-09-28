@@ -167,6 +167,15 @@ namespace MotionRunner.Gameplay
 
         float _shareHoldUntil;
 
+#if UNITY_IOS
+        /// SHARE's own label and its "COPIED" beat. iOS only: SHARE copies to the clipboard there
+        /// (decision 4), and a silent copy reads as a dead button. The Android card has none of
+        /// this. _shareLabel is null until BuildButtons runs.
+        Text _shareLabel;
+        string _shareIdleLabel;
+        readonly CopiedFlash _shareFlash = new CopiedFlash();
+#endif
+
         int _shownScore = -1;
         int _shownCoins = -1;
         int _shownCombo = -1;
@@ -329,6 +338,9 @@ namespace MotionRunner.Gameplay
         void Update()
         {
             TickShareHold();
+#if UNITY_IOS
+            TickShareLabel();
+#endif
             if (_resultCanvas == null || !_resultPanel.activeSelf) return;
 
             // The card's stinger, on the frame it starts to show - after the crash pose, on the
@@ -385,7 +397,14 @@ namespace MotionRunner.Gameplay
             // and the frame this runs on is the one that must not reach the restart check.
             _shareHoldUntil = Time.unscaledTime + ShareHoldSeconds;
             HoldRun?.Invoke(true);
+#if UNITY_IOS
+            // No sheet on iOS: false means the text is on the clipboard, and the button says so
+            // for CopiedFlash.Seconds, starting on this frame.
+            _shareFlash.Report(RunShare.Share(_summary), Time.unscaledTime);
+            TickShareLabel();
+#else
             RunShare.Share(_summary);
+#endif
         }
 
         void TickShareHold()
@@ -408,9 +427,25 @@ namespace MotionRunner.Gameplay
             if (focused && _shareHoldUntil > 0f) _shareHoldUntil = Time.unscaledTime + ShareHoldSeconds;
         }
 
+#if UNITY_IOS
+        /// Writes SHARE's label only on the frames the flash starts or ends (CopiedFlash.Poll).
+        /// It runs before Update's hidden-card early return, so a flash that outlives its card
+        /// is reverted too.
+        void TickShareLabel()
+        {
+            if (_shareLabel == null || !_shareFlash.Poll(Time.unscaledTime, out bool copied)) return;
+            _shareLabel.text = copied ? CopiedFlash.Label : _shareIdleLabel;
+        }
+#endif
+
         public void HideResult()
         {
             ReleaseShareHold();
+#if UNITY_IOS
+            // The next card starts on SHARE, not on a "COPIED" left over from this one.
+            _shareFlash.Clear();
+            TickShareLabel();
+#endif
             _resultMusicAt = 0f; // a loop still pending must not start over the next run
             _resultCanvas.alpha=1;_resultCanvas.interactable=true;
             _resultPanel.SetActive(false);
@@ -648,6 +683,13 @@ namespace MotionRunner.Gameplay
             // needs the run held - see HoldRun.
             CardButton("Share", card, new Vector2(266f, 200f), new Vector2(268f, 120f),
                 MenuTheme.Slot, "SHARE", 40, MenuTheme.Text, ShareTapped);
+#if UNITY_IOS
+            // The label TickShareLabel swaps to "COPIED" and back. The idle text is read back from
+            // the button, so "SHARE" stays spelled once, in the call above.
+            var share = card.Find("Share");
+            _shareLabel = share != null ? share.GetComponentInChildren<Text>() : null;
+            _shareIdleLabel = _shareLabel != null ? _shareLabel.text : null;
+#endif
 
             // Secondary on purpose: the store stays one visible tap away from every crash - which
             // is what a judge needs (§6.3) - without competing with the next run.

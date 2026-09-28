@@ -1,8 +1,8 @@
 # Share & challenge-link compliance (T-024) — Google Play
 
-Research date: **21 September 2026**. Scope: Android only (iOS out of scope). Companion to
-`docs/STORE_COMPLIANCE.md` — the flip table there stays the register of record; this file is the
-evidence behind the T-024 row.
+Research date: **21 September 2026**. Scope: Android. **iOS / App Store: see §12, the addendum
+added 28 September 2026.** Companion to `docs/STORE_COMPLIANCE.md` — the flip table there stays
+the register of record; this file is the evidence behind the T-024 row.
 
 Feature under review, as implemented on `feat/share-run`:
 
@@ -577,3 +577,90 @@ Ordered. Nothing here can be done by an agent.
 - [Behavior changes: all apps (Android 12)](https://developer.android.com/about/versions/12/behavior-changes-all) — unverified web intents resolve to the default browser
 - [`<activity>` manifest element](https://developer.android.com/guide/topics/manifest/activity-element) — `android:exported`
 - [Unity Manual: Deep linking on Android](https://docs.unity3d.com/6000.1/Documentation/Manual/deep-linking-android.html) and [`Application.deepLinkActivated`](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Application-deepLinkActivated.html)
+
+---
+
+## 12. iOS / App Store addendum (28 September 2026)
+
+Written for the iOS build (`feat/iOS-implementation`, `docs/IOS_HANDOFF.md` Phase 2c). The
+Android sections above are unchanged and still describe the Android build.
+
+### 12.1 What ships on iPhone
+
+| Piece | iOS behaviour | Evidence |
+|---|---|---|
+| SHARE button | **Clipboard only.** `ShareSheet.Send` takes its `#else` branch and writes the text to `GUIUtility.systemCopyBuffer`, then returns `false`. There is no `UIActivityViewController` and no native plugin (owner decision 4, 28 Sep) | `game/Assets/Scripts/Core/ShareSheet.cs` |
+| Share text | The same text as on Android: `ChallengeMessage.Build` with the same https link (`GameLinks.ChallengeBaseUrl`) | `Core/RunShare.cs` |
+| `veyro://challenge?…` | Registered as `CFBundleURLTypes`: `BuildScript.BuildIOS` sets `PlayerSettings.iOS.iOSUrlSchemes = ["veyro"]` (the constant is `AndroidChallengeLinks.Scheme`), and `IosBuildPostProcess` **fails the build** if the exported Info.plist lacks it | `game/Assets/Editor/BuildScript.cs`, `IosBuildPostProcess.cs` |
+| Cold and warm start | **No code change.** `DeepLinks.Begin()` reads `Application.absoluteURL` for the cold start and subscribes to `Application.deepLinkActivated` for the warm one. Unity's iOS app controller fills both ([Unity: deep linking on iOS](https://docs.unity3d.com/6000.0/Documentation/Manual/deep-linking-ios.html)). `DeepLinks`, the `GameBootstrap` call site and `RunFlow.TryStartPendingChallenge` (polled from `Update`) have no platform guard. The Android `singleTop` concern (§2.2) does not exist, because an iOS app is always a single instance | `Core/DeepLinks.cs`, `Core/GameBootstrap.cs:126`, `Gameplay/RunFlow.cs:404–441` |
+| Parser | `ChallengeMessage.TryParse` is engine-free and platform-free. It accepts `veyro://challenge?…` and `https://veyro.ferrabled.com/challenge/?…`, and `ChallengeMessageTests` pin both shapes | `Track/ChallengeMessage.cs` |
+| https challenge link | **The app does not handle it on iPhone.** There are no Universal Links: no Associated Domains entitlement and no `apple-app-site-association`. A tap on the shared https link opens Safari and the landing page | deferred, §12.3 |
+| Landing page on iPhone | `challenge.js` treats an iPhone like any other non-Android visitor (L113–134). OPEN sets `location = veyro://challenge?<query>` with a 1.5 s timer that goes to the **Play listing** if the page is still visible. The "get the game" link (`ch-store`, L139) also goes to the Play listing | deferred, §12.3 |
+
+### 12.2 App Store privacy and review
+
+- **App Privacy ("nutrition label"): no row.** Apple's definition:
+
+  > "Collect" refers to transmitting data off the device in a way that allows you and/or your
+  > third-party partners to access it for a period longer than what is necessary to service the
+  > transmitted request in real time. … Data that is processed only on device is not "collected"
+  > and does not need to be disclosed in your answers.
+  > — [App privacy details on the App Store](https://developer.apple.com/app-store/app-privacy-details/)
+
+  A clipboard write never leaves the device through us. Whatever the player pastes afterwards
+  goes out through the app they paste into. The received link is parsed on the device. This
+  matches `docs/store-kit/APP_STORE_LISTING.md` (age-rating row: "challenge links go out through
+  the system share sheet (or clipboard), not an in-app feed"). That file belongs to the Layers /
+  privacy track, and nothing in it changes.
+- **No permission, no purpose string, no privacy-manifest entry.** Writing to the general
+  pasteboard needs no entitlement and shows no prompt. SHARE never *reads* the pasteboard, so
+  Apple's paste prompt never appears for SHARE. (IMPORT PROFILE does read it; see
+  `PROFILE_LEADERBOARD_PLAN.md` "iOS storage".) The pasteboard is not a required-reason API
+  category. A custom URL scheme needs no entitlement.
+- **Guideline 2.3.10 (no other platforms named).** The iOS build never names Android or Google in
+  the shop (`Menu/StoreCatalogView.cs`, split with `#if UNITY_IOS`). The notification panel is
+  split by the OneSignal track, and the camera strings by the camera track. The landing page is a
+  website, not app metadata. It still sends iPhones to Google Play, though, which is one more
+  reason to fix it once the app is live (§12.3).
+- **Link-payload rule (§1.3) is unchanged:** the text and URL carry no handle, Player ID,
+  RevenueCat ID or recovery code on either platform.
+
+### 12.3 Deferred, and why
+
+1. **Universal Links.** They need the `applinks:veyro.ferrabled.com` Associated Domains
+   capability on the App ID and in the entitlements, plus
+   `site/public/.well-known/apple-app-site-association` (appID
+   `69J7W5URX7.com.ferrabled.veyro.run`, paths `/challenge*`, served as JSON with no redirects,
+   the same hosting rules as §3.2). They are not built for v1.0: they need owner console work and
+   a device to verify, and the custom scheme already covers "the game is installed" via the page.
+2. **The landing page's App Store fallback.** `challenge.js` sends every non-Android visitor,
+   iPhones included, to `PLAY_URL` (L22, L132, L139), and its own comment (L114–115) says an iOS
+   build will want a Universal Link and an App Store fallback. No App Store URL
+   (`https://apps.apple.com/app/id<Apple ID>`) exists until the app is live. **Owner call: do not
+   change it before then.** It lands together with the site's App Store button
+   (`IOS_HANDOFF.md` §10), with a site deploy.
+3. **Known iPhone risk on the page (unverified; needs the device).** Safari asks "Open in
+   'Veyro Run'?" before it hands a custom scheme to an app, and the page stays visible while it
+   asks. Chrome has the same trait, which is why the Android branch has no timer (L108–111). The
+   1.5 s timer may therefore move a player who *has* the game to the Play listing while the
+   prompt is up. Without the game, Safari shows an "address is invalid" alert and then the timer
+   goes to Play. That is accepted until item 2. If the device shows the first case, fix it in the
+   same change as item 2: no timer on iOS, the scheme as a plain href, and the store behind its
+   own link.
+4. **A native share sheet** (owner decision 4). It would need an iOS plugin and a TestFlight
+   loop. Data-wise it is the same user-initiated hand-off as Android's chooser (§1.2), so
+   building it later changes no privacy answer.
+
+### 12.4 Device checks (TestFlight; `IOS_HANDOFF.md` §9 items 7–8)
+
+- [ ] SHARE on the result card: the button reads **COPIED** for about 2 s, then SHARE again
+      (`RunShare.Share` returns `ShareSheet.Send`'s result; `RunHud` + `Track/CopiedFlash`, iOS
+      only). Paste into Notes or Messages: the full line and the https link arrive intact. RUN
+      AGAIN → the next card starts on SHARE.
+- [ ] Take a `veyro://challenge?…` link from a real share (take the query from a SHARE on the
+      same build, so `v`/`w` match; otherwise RunFlow refuses the challenge, by design) and open
+      it from Notes or Safari **cold** (app swiped away) and **warm** (app in the background). The
+      challenge run starts from the menu both times.
+- [ ] Tap an https challenge link in Messages: Safari opens the page, and OPEN opens the game on
+      that track. Record whether the 1.5 s timer jumps to the Play listing while Safari's prompt
+      is showing (§12.3 item 3).

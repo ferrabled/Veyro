@@ -12,6 +12,27 @@ namespace MotionRunner.Core
     /// a UGUI onClick, and a share that fails must cost the player nothing but a log line.
     public static class RunShare
     {
+#if UNITY_IOS
+        /// iOS returns ShareSheet.Send's answer: false, because the text went to the clipboard
+        /// (always on iOS, decision 4), and also false in the practically unreachable case where
+        /// the text could not be built. RunHud uses the false to say "COPIED". Every other
+        /// platform keeps the void signature below, so the Android build stays byte-identical
+        /// (IOS_HANDOFF §3).
+        public static bool Share(in RunSummary summary)
+        {
+            try
+            {
+                string text = ChallengeMessage.Build(summary, GameLinks.ChallengeBaseUrl);
+                Debug.Log("[Share] " + text);
+                return ShareSheet.Send(text);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[Share] could not build the challenge: " + e.Message);
+                return false;
+            }
+        }
+#else
         public static void Share(in RunSummary summary)
         {
             try
@@ -25,5 +46,6 @@ namespace MotionRunner.Core
                 Debug.LogWarning("[Share] could not build the challenge: " + e.Message);
             }
         }
+#endif
     }
 }

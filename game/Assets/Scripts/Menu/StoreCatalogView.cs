@@ -117,8 +117,8 @@ namespace MotionRunner.Menu
             OpenPaywall();
         }
 
-        /// Skins go straight to the Google Play sheet. Only ever called for something the player
-        /// does not own - that is the whole gate.
+        /// Skins go straight to the store's own purchase sheet (Google Play; the App Store on
+        /// iOS). Only ever called for something the player does not own - that is the whole gate.
         void BuySkin(string itemId, string packageId)
         {
             if (packageId == null)
@@ -130,7 +130,13 @@ namespace MotionRunner.Menu
             }
 
             _busy = true;
+            // Store names are per platform: App Review guideline 2.3.10 rejects an iOS build
+            // that names another platform, so the iOS player never sees "Google".
+#if UNITY_IOS
+            _status.text = "opening the App Store…";
+#else
             _status.text = "opening Google Play…";
+#endif
             _store.Purchase(packageId, outcome =>
             {
                 // The tap said "I want this skin", so a purchase that lands wears it - even if the
@@ -237,7 +243,12 @@ namespace MotionRunner.Menu
                 // Backing out of the Play sheet says nothing - the rows are already right.
                 case PurchaseStatus.Cancelled: return string.Empty;
                 case PurchaseStatus.Pending:
+#if UNITY_IOS
+                    // Ask to Buy or a bank check: approved later, outside the app.
+                    return "payment pending with Apple\nit unlocks by itself once it is approved";
+#else
                     return "payment pending with Google\nit unlocks by itself once they confirm";
+#endif
                 default:
                     return what + " failed - you can keep playing\n" +
                            (outcome.Error != null ? outcome.Error.Message : string.Empty);
