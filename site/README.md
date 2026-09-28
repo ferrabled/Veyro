@@ -17,10 +17,26 @@ page-wide grain, glossy effects or invented runner drawings.
 - Named tokens in `public/styles.css` cover the owner's core, supporting and UI
   colours. Reading text uses `--ink` or `--secondary`; pink/gold are accents.
 - Artwork is never cropped, stretched, recoloured or used behind reading text.
-- Guide frames change only when a visitor chooses a step; no autoplay, timers or
-  cross-fades. Reduced motion disables smooth scrolling and button transitions.
-- Cosmetics use honest product labels; approved skin-specific web artwork is a
-  future optional addition, not replaced with fabricated renderings.
+- The how-to-play guide cards change only when a visitor chooses a step.
+- The hero starts on Camera Mode (BETA). Two native pill buttons select the mode;
+  only the selected mode rotates through four approved frames every three seconds:
+  camera standing/left/right/hop, or phone hold/left/right/tap. Captions and image
+  descriptions change with the artwork. Frames switch after decoding, without
+  cross-fades, duplicate silhouettes or layout shifts.
+- The hero has Pause/Play and Next controls. Next pauses the sequence; changing
+  modes starts that mode at its first frame and preserves the paused state.
+  Hovering, an offscreen card or a hidden tab suspend rotation. Keyboard focus on
+  mode/Next controls stops it until Play is activated. Automatic changes are not
+  live announcements. Both scenes and all captions reserve their layout space;
+  inactive content is hidden from assistive technology.
+- Reduced motion starts the hero paused; visitors can step manually or explicitly
+  press Play. Changing the motion preference stops playback. Reduced motion also
+  disables smooth scrolling and button transitions. Without JavaScript, the camera
+  still and caption remain visible and enhancement controls stay hidden.
+- Cosmetics show the existing in-game Ember, Frost and Prism character thumbnails,
+  with appearance-only labels. Prism is identified as a level-10 pass reward.
+- The hero headline scales with its container and wraps only between words;
+  "controller" stays intact at narrow widths and enlarged text settings.
 
 Primary references (read-only): `docs/GUIDE_ILLUSTRATIONS.md`, `screenshots/guide/`,
 `ParkTheme.cs`, `MenuTheme.cs`, `docs/GAME_ART.md`, and the approved ticket/V icon in
@@ -34,9 +50,11 @@ Primary references (read-only): `docs/GUIDE_ILLUSTRATIONS.md`, `screenshots/guid
   developer contact.
 - `public/styles.css`: named tokens, shared components, section-specific rules,
   supporting-page styles, responsive and reduced-motion rules.
-- `public/site.js`: UTC ticket date and manual guide-frame selection. The date
-  refreshes after midnight UTC. It does not invent or claim to compute a game seed.
-- `public/art/`: optimized derivatives of all ten approved guide PNGs.
+- `public/site.js`: hero rotation/playback controls, manual mode/guide selection and
+  UTC ticket date. The date refreshes after midnight UTC. It does not invent or
+  claim to compute a game seed.
+- `public/art/`: optimized derivatives of all ten approved guide PNGs plus three
+  existing in-game character thumbnails.
 - `public/favicon.svg`, `favicon-32.png`, `favicon-64.png`, `apple-touch-icon.png`:
   resized approved V/ticket identity (the SVG embeds the 64px PNG).
 - `public/challenge/`: existing shared-run landing page and unmodified deep-link JS.
@@ -78,13 +96,23 @@ python site/tools/prepare_assets.py PATH_TO_REFERENCE_REPO
 ```
 
 All ten frames have a 793×496 WebP derivative (exactly half the original dimensions).
-Hero `tilt_02` and Daily Run `run_01` also have 1586×992 versions for responsive
-`srcset`. Quality 84, Lanczos downsampling, WebP method 6; no crop or colour edits.
-The twelve WebPs total **274,462 bytes**. Only images that are used are requested;
-additional guide frames load on interaction. Explicit dimensions reserve layout
-space, and a failed frame load leaves the preceding image and selection intact.
+All eight hero frames (`camera_02`–`camera_05`, `tilt_01`–`tilt_04`) and Daily Run
+`run_01` also have 1586×992 versions for responsive `srcset`. Quality 84, Lanczos
+downsampling, WebP method 6; no crop or colour edits. The nineteen guide WebPs total
+**592,976 bytes**. Additional frames load as the selected sequence advances or on
+manual interaction; the entire sequence is not preloaded. Explicit dimensions
+reserve layout space. A failed hero frame leaves the preceding image, caption and
+selection intact and pauses rotation; Play or Next retries.
 The source illustration set was supplied by the owner and documented as AI-generated;
 this website pass creates no new AI art.
+
+The three character previews are lossless 512×512 WebPs with their original alpha,
+converted from `game/Assets/Resources/Art/CosmeticThumbnails/{ember,frost,prism}.png`.
+Their combined size is **93,230 bytes**; all twenty-two WebPs total **686,206 bytes**.
+No Unity rendering or asset changes are needed. Ember/Frost originate from the
+project's CC0 KayKit Adventurers models; Prism uses the existing runner/reward render.
+The game retains model/license records; `art-manifest.json` records the exact PNG
+source hashes. Web previews preserve the existing poses, colours and proportions.
 
 ## Content and route contracts
 

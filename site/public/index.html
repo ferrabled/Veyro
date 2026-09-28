@@ -37,18 +37,50 @@
     <div class="hero-copy">
       <span class="eyebrow"><span class="accent-dot" aria-hidden="true"></span>A little movement. A lot of play.</span>
       <h1 id="hero-title">The controller<br>is <span class="emphasis">you.</span></h1>
-      <p class="hero-sub">Your next run starts with a tilt. Dodge planters, hop for gold and find your rhythm in a sunny garden.</p>
+      <p class="hero-sub">Move your body or tilt your phone. Dodge planters, hop for gold and find your rhythm in a sunny garden.</p>
       <div class="cta-row">
         <a class="btn" href="mailto:ferrabled+veyro@gmail.com?subject=Veyro%20Run%20closed%20test">Join the closed test <span aria-hidden="true">↗</span></a>
         <a class="text-link" href="#how">See how to play <span aria-hidden="true">↓</span></a>
       </div>
       <p class="cta-note">For Android · Free to play · No ads</p>
     </div>
-    <figure class="hero-art">
-      <div class="art-label"><span class="mono">MOVE YOUR PHONE.</span><span class="mono">FIND YOUR FLOW.</span></div>
-      <img src="/art/tilt_02-793.webp" srcset="/art/tilt_02-793.webp 793w, /art/tilt_02-1586.webp 1586w" sizes="(max-width: 800px) 100vw, 55vw" width="1586" height="992" fetchpriority="high" alt="Hands tilt a phone to move a pink-shirted runner along a garden path lined with gold coins.">
-      <figcaption><span class="pill">Tilt. Tap. Go.</span><span>A garden run, in your hands.</span></figcaption>
-    </figure>
+    <div class="hero-art">
+      <div class="hero-mode-controls" role="group" aria-label="Choose a control mode to preview" hidden>
+        <button type="button" data-hero-mode="camera" aria-controls="hero-camera" aria-pressed="true">Camera Mode <span class="mode-beta">BETA</span></button>
+        <button type="button" data-hero-mode="tilt" aria-controls="hero-tilt" aria-pressed="false">Tilt &amp; Touch</button>
+      </div>
+      <div class="hero-scenes" id="hero-scenes" aria-live="off">
+        <figure class="hero-scene" id="hero-camera" data-hero-panel="camera" aria-hidden="false">
+          <img src="/art/camera_02-793.webp" srcset="/art/camera_02-793.webp 793w, /art/camera_02-1586.webp 1586w" sizes="(max-width: 800px) 100vw, 55vw" width="1586" height="992" fetchpriority="high" alt="A person faces a phone on a table, standing in the front camera's view.">
+          <figcaption>
+            <div class="hero-frame-captions">
+              <strong data-hero-frame="camera_02" aria-hidden="false">Stand in your phone’s view.</strong>
+              <strong data-hero-frame="camera_03" aria-hidden="true">Step left to steer.</strong>
+              <strong data-hero-frame="camera_04" aria-hidden="true">Step right to steer.</strong>
+              <strong data-hero-frame="camera_05" aria-hidden="true">Hop to jump.</strong>
+            </div>
+            <span>Camera Mode (BETA) · On-device processing.</span>
+          </figcaption>
+        </figure>
+        <figure class="hero-scene" id="hero-tilt" data-hero-panel="tilt" aria-hidden="true" inert>
+          <img src="/art/tilt_01-793.webp" srcset="/art/tilt_01-793.webp 793w, /art/tilt_01-1586.webp 1586w" sizes="(max-width: 800px) 100vw, 55vw" width="1586" height="992" loading="lazy" alt="Two hands hold a phone upright, with the garden runner on its screen.">
+          <figcaption>
+            <div class="hero-frame-captions">
+              <strong data-hero-frame="tilt_01" aria-hidden="false">Hold your phone upright.</strong>
+              <strong data-hero-frame="tilt_02" aria-hidden="true">Tilt left to steer.</strong>
+              <strong data-hero-frame="tilt_03" aria-hidden="true">Tilt right to steer.</strong>
+              <strong data-hero-frame="tilt_04" aria-hidden="true">Tap the screen to jump.</strong>
+            </div>
+            <span>Tilt &amp; Touch · A garden run, in your hands.</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div class="hero-playback" role="group" aria-label="Illustration playback" hidden>
+        <span class="hero-step">Step <span data-hero-step>1 / 4</span></span>
+        <button type="button" data-hero-playback aria-controls="hero-scenes" aria-label="Pause illustrations">Pause</button>
+        <button type="button" data-hero-next aria-controls="hero-scenes" aria-label="Show next illustration">Next <span aria-hidden="true">→</span></button>
+      </div>
+    </div>
   </div>
   <div class="section-inner feature-strip" aria-label="Game features">
     <span><b>02</b> ways to play</span><span><b>01</b> fresh Daily Run</span><span><span class="small-star" aria-hidden="true">✳</span> Your movement makes it happen</span>
@@ -100,9 +132,21 @@
   <div class="section-inner">
     <div class="section-heading"><div><span class="eyebrow">A little more you</span><h2 id="cosmetics-title">Fresh look.<br>Same playing field.</h2></div><p>The full game is free to play. Optional skins and Season 1 rewards change your look. Never your chances.</p></div>
     <div class="cosmetic-grid">
-      <article class="cosmetic-card ember"><span class="eyebrow">Optional skin</span><h3>Ember</h3><p>A warmer look for your next run.</p><span class="cosmetic-tag">Appearance only</span></article>
-      <article class="cosmetic-card frost"><span class="eyebrow">Optional skin</span><h3>Frost</h3><p>A cooler take on the same runner.</p><span class="cosmetic-tag">Appearance only</span></article>
-      <article class="cosmetic-card season"><span class="eyebrow">Season 1</span><h3>Play. Unlock.<br>Make it yours.</h3><p>Cosmetic rewards on free and paid tracks.</p><span class="cosmetic-tag">No gameplay advantage</span></article>
+      <article class="cosmetic-card ember">
+        <span class="eyebrow">Optional skin</span><h3>Ember</h3>
+        <figure class="cosmetic-preview"><img src="/art/skin-ember.webp" width="512" height="512" loading="lazy" alt="Ember's in-game character: a bearded explorer wearing a bear headdress and warm leather accents."><figcaption>In-game preview</figcaption></figure>
+        <p>A bold explorer with warm accents.</p><span class="cosmetic-tag">Appearance only</span>
+      </article>
+      <article class="cosmetic-card frost">
+        <span class="eyebrow">Optional skin</span><h3>Frost</h3>
+        <figure class="cosmetic-preview"><img src="/art/skin-frost.webp" width="512" height="512" loading="lazy" alt="Frost's in-game character: a mage in icy blue robes, a pointed hat and a cape."><figcaption>In-game preview</figcaption></figure>
+        <p>A robed wanderer with an icy finish.</p><span class="cosmetic-tag">Appearance only</span>
+      </article>
+      <article class="cosmetic-card season">
+        <span class="eyebrow">Season 1</span><h3>Make it yours.</h3>
+        <figure class="cosmetic-preview"><img src="/art/skin-prism.webp" width="512" height="512" loading="lazy" alt="The Prism reward's in-game preview: the runner wearing a gold crown and shimmering outfit."><figcaption>Prism · Level 10 pass reward</figcaption></figure>
+        <p>Cosmetic rewards on free and paid tracks.</p><span class="cosmetic-tag">No gameplay advantage</span>
+      </article>
     </div>
     <div class="pledge-line"><span class="small-star" aria-hidden="true">✳</span><p>No boosts. No extra lives for sale. Just a look you like.</p></div>
   </div>
