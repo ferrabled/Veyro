@@ -1,5 +1,56 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Podium leaderboard, runs chart, drag-and-tap volume in the pause menu, guide "i" (feat-game-UI-improvement / profile-guide-polish, second pass)
+
+Owner feedback on the first pass: the leaderboard and "my last runs" were boring; the volume
+bars should also drag (and reach 0 by drag or by a tap); the sound rows belong in the pause
+menu; the RUN tab should have an "i" to reach the guide.
+
+- **Leaderboard** (`Menu/LeaderboardCard.cs`, engine-free `Progression/Podium.cs`): top three
+  on a podium — 2nd / 1st (raised) / 3rd on silver / gold / bronze blocks (`MenuTheme.Silver`,
+  `Bronze` added), each with that player's generated critter, name and score — then five
+  ranked rows with the score in a right-aligned column; the player's row tinted pink.
+  Unclaimed places and rows draw as grey empty spots. The board query now asks for 8 rows.
+- **My last runs** (`Menu/RecentRunsCard.cs`, engine-free `Progression/RunDigest.cs`): a bar
+  per kept run, newest on the right in pink ("latest"), best in gold, score over each bar,
+  empty slots as stubs; BEST / AVERAGE / DISTANCE tiles in the result card's tile style; a
+  "latest · date · mode · pts · m · coins" line.
+- **Volume** (`Menu/VolumeControl.cs`, replaces the private row in `ProfileSettingsCard`): a
+  flat zero mark + ten bars, 11 positions (`VolumeSteps.PositionAt/LevelAt`); tap any bar or
+  the zero mark, or drag — the level follows the finger, silence past the left edge. Nothing
+  happens on pointer-down; a mostly-vertical drag is re-routed to the enclosing `ScrollRect`
+  (so scrolling the profile never nudges a level), a sideways drag scrubs, a tap sets on
+  release. One save + one click per gesture. **Pause menu**: the MUSIC/SOUNDS ON/OFF text
+  links are replaced by the same two rows; the card and its buttons are now rounded like the
+  result card, on the park-ink scrim, and grow by exactly the rows so RESUME keeps its place
+  under the status line. The profile keeps its rows as well.
+- **RUN tab**: a round "i" in the mode card's corner opens how-to-play (`ModePickerCard.Build`
+  takes the callback; the status line is inset symmetrically to stay clear).
+
+**Verified:** 637/637 EditMode in the SHA-256-matched scratch (new `ProfileCardsTests` 8,
+`VolumeStepsTests` 7); `ProfileUiReview` renders profile top/bottom, offline and a new
+`pause.png`, checked. `BuildAndroidDev` `1.0.0-dev.20260928-1350.nogit` (99,370,232 bytes,
+permissions unchanged) on the **OnePlus 6T**, online via the Nord 2 hotspot: "i" → guide →
+skip; sample and live boards (TODAY with empty spots, ALL-TIME live); runs chart numbers
+checked against the bars; bar tap, zero-mark tap, drag up/down/past the edge, vertical swipe
+from the bars scrolls without changing the level, ON/OFF; pause rows tap/drag/mute with the
+run frozen, RESUME, QUIT; levels set in pause shown on the profile; levels restored and
+persisted across relaunch; logcat clean. After the pass, the "i" was moved flush with the
+buttons' edge and the ON/OFF pill no longer keeps the "selected" tint after a tap
+(re-checked: 637/637 EditMode; not re-installed on the phone).
+
+**Device-test side effect (agent error, cannot be undone):** the pause test resumed a tilt run
+and it crashed 1.6 s later (tilt RESUME has no countdown). That run — Daily, score 89 — was
+recorded on the 6T's profile (QUIET-XERUS-33): today's daily stamp and streak 1, the 89 in
+"my last runs" (the oldest, 959, dropped out of the 8), and a submission to today's online
+board. The second test run ended with QUIT TO MENU and was not recorded.
+
+**Open for the owner:** (1) "TILT best 959" on the player card vs "BEST 1856" on the runs chart
+— the chart mixes camera and tilt runs and `RunRecord` does not store the scheme; showing a
+mode per bar needs a `RunHistory` encoding change. (2) The pause card's status box keeps
+~200 px for the multi-line camera prompts, which reads as empty space on a tilt pause.
+(3) Rows stay on the profile as well as the pause menu unless the owner wants pause-only.
+
 ## 2026-09-28 — Season 1 XP curve approved; release-build gate lifted (T-025, feat-game-UI-improvement iOS session)
 
 Owner approved the suggested production curve as-is (D20, closes OPEN_QUESTIONS 23):
