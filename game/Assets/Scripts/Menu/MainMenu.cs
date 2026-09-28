@@ -107,9 +107,10 @@ namespace MotionRunner.Menu
             // never cut by a teardrop notch and the tab bar never sits under a gesture bar. The
             // strip the safe area leaves at the top and bottom shows the backdrop, which is the
             // header's and the tab bar's own paper - the bars simply look taller.
-            // Opaque paper: the header and tab bar are the same paper, so the strips the safe
-            // area leaves above and below them match exactly (a 98% Card over the world did not).
-            RuntimeUi.Panel("MenuBackdrop", transform, Art.ParkTheme.Paper);
+            // Opaque sage, the pages' own colour: the header sits on it too, so a tab reads as one
+            // surface from the top of the screen - through the strip a camera cutout leaves above
+            // the safe area - down to the tab bar, whose paper bleeds on down past the bottom inset.
+            RuntimeUi.Panel("MenuBackdrop", transform, MenuTheme.Page);
             var safe = RuntimeUi.SafeRoot(transform);
             BuildHeader(safe);
 #if VEYRO_COSMETIC_QA && DEVELOPMENT_BUILD
@@ -149,7 +150,7 @@ namespace MotionRunner.Menu
             _header=header.gameObject;
             RuntimeUi.Stretch(header, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -MenuTheme.HeaderHeight), Vector2.zero);
-            RuntimeUi.Panel("Backdrop", header, MenuTheme.Bar);
+            RuntimeUi.Panel("Backdrop", header, MenuTheme.Page);
 
             RuntimeUi.Label("Title", header,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),

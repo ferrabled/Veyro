@@ -52,7 +52,10 @@ namespace MotionRunner.Menu
 
         void Build(RectTransform rect)
         {
-            RuntimeUi.Panel("Backdrop", rect, MenuTheme.Bar);
+            // Bleeds down past the bar, so the strip a gesture bar or iOS home indicator leaves
+            // under the safe area is the bar's paper rather than the page's sage.
+            var backdrop = RuntimeUi.Panel("Backdrop", rect, MenuTheme.Bar);
+            backdrop.rectTransform.offsetMin = new Vector2(0f, -400f);
 
             float width = 1f / Tabs.Length;
             for (int i = 0; i < Tabs.Length; i++)

@@ -62,6 +62,10 @@ namespace MotionRunner.Menu
         /// on device it very much was: the track was legible through both pages.
         public static readonly Color Scrim = new Color(0.91f, 0.93f, 0.86f, 0.98f);
 
+        /// The same sage, opaque: the menu's own backdrop and its header, so the title sits on the
+        /// page colour every tab uses instead of on a paper band of its own (owner, 28 Sep).
+        public static readonly Color Page = new Color(0.91f, 0.93f, 0.86f, 1f);
+
         // ---- layout (1080x1920 design space, RuntimeUi.ReferenceResolution) ----
 
         /// The title block at the top, shared by every tab.

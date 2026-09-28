@@ -1,5 +1,33 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Settings sheets rounded, menu header on the page colour (feat-game-UI-improvement / profile-guide-polish, fourth pass)
+
+Owner: round the notifications and gameplay-analytics panels like the rest; the home title
+sat on a white band while the page is sage.
+
+- **`Menu/MenuSheet.cs`** — the shared modal: park-ink dim that closes on tap, rounded paper
+  card (radius 44, width 900), round X (`IconButton`, also used by the guide now), bold title,
+  best-fit body, `Primary` (pink) / `Secondary` (plain) / `Link` (text) actions, no lingering
+  selected tint. **NotificationPanel** and **AnalyticsPanel** rebuilt on it: X, tap outside and
+  Android back all close (Close still cancels a permission request in flight); the CLOSE slab
+  is gone; support-id and privacy actions are links. **Analytics ENABLE and KEEP OFF are the
+  same Secondary style on purpose** — a consent choice must not dress the default-off answer as
+  the lesser one; notifications keep ENABLE as the pink primary.
+- **Header colour** — `MenuTheme.Page` (opaque sage): the menu backdrop and header now use it,
+  so the title sits on the page colour every tab uses, including the strip behind a cutout;
+  the tab bar stays paper and its backdrop bleeds down past the bottom inset.
+- `ProfileUiReview` also renders `notifications.png` / `analytics.png` with the fake services.
+
+**Verified:** 637/637 EditMode; renders checked (sage sampled at y=20/60 beside the title and
+between cards, paper tab bar and bottom strip). **OnePlus 6T** `1.0.0-dev.20260928-1546.nogit`
+(permissions unchanged): header sage from y=0 to the first card; both sheets open from
+PROFILE → SETTINGS, close with X / tap outside / back, stay open on a tap on the card; the
+analytics body fully readable; ENABLE / KEEP OFF pixel-identical in size and style; logcat
+clean. No consent, notification, volume or profile state was changed. Afterwards the two
+sheets were tightened to their copy (equal width, less empty card) — re-verified with
+`1.0.0-dev.20260928-1602.nogit` (637/637): both 994 px wide on the 6T, title→body→buttons
+gaps down from ~220 px to ~95–160 px, body type size unchanged and fully readable.
+
 ## 2026-09-28 — Guide X / tap-outside, home redesign, safe area for cutouts and notches (feat-game-UI-improvement / profile-guide-polish, third pass)
 
 Owner feedback: the guide should close with an arrow/X rather than "skip"/"back" and on a
