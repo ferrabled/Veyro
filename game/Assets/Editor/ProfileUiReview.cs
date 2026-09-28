@@ -70,6 +70,7 @@ namespace MotionRunner.EditorTools
                 PlayerPrefs.DeleteKey(RunsKey); // the offline render shows the empty chart
                 RenderMenu(canvasSize, new FakeProfileService(), folder, "profile-offline", true);
                 RenderPause(canvasSize, Path.Combine(folder, "pause.png"));
+                RenderSheets(canvasSize, folder);
             }
             finally
             {
@@ -223,29 +224,43 @@ namespace MotionRunner.EditorTools
         };
 
         /// The pause card with its volume rows, over nothing: the run is not what is under review.
-        static void RenderPause(Vector2 canvasSize, string path)
+        static void RenderPause(Vector2 canvasSize, string path) =>
+            RenderOverlay(canvasSize, path, () => PauseMenu.Show(null).gameObject);
+
+        /// The two settings sheets, with fakes behind them: the notification one in its
+        /// "not registered" state and the analytics consent in its default OFF.
+        static void RenderSheets(Vector2 canvasSize, string folder)
         {
-            PauseMenu pause = null;
+            RenderOverlay(canvasSize, Path.Combine(folder, "notifications.png"),
+                () => NotificationPanel.Show(new MotionRunner.Notifications.FakePushService(), false, null).gameObject);
+            RenderOverlay(canvasSize, Path.Combine(folder, "analytics.png"),
+                () => AnalyticsPanel.Show(new MotionRunner.Growth.FakeAnalyticsService(), null).gameObject);
+        }
+
+        /// Any single-canvas screen, laid out as the phone would and photographed.
+        static void RenderOverlay(Vector2 canvasSize, string path, System.Func<GameObject> make)
+        {
+            GameObject host = null;
             Camera cam = null;
             RenderTexture target = null;
             try
             {
-                pause = PauseMenu.Show(null);
-                pause.GetComponent<CanvasScaler>().enabled = false;
-                pause.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
-                var rect = pause.GetComponent<RectTransform>();
+                host = make();
+                host.GetComponent<CanvasScaler>().enabled = false;
+                host.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+                var rect = host.GetComponent<RectTransform>();
                 rect.sizeDelta = canvasSize;
                 rect.position = Vector3.zero;
                 rect.localScale = Vector3.one;
 
                 cam = ReviewCamera(canvasSize, out target);
-                Capture(pause.transform, cam, target, path);
+                Capture(host.transform, cam, target, path);
             }
             finally
             {
                 if (cam != null) { cam.targetTexture = null; Object.DestroyImmediate(cam.gameObject); }
                 if (target != null) Object.DestroyImmediate(target);
-                if (pause != null) Object.DestroyImmediate(pause.gameObject);
+                if (host != null) Object.DestroyImmediate(host);
                 if (EventSystem.current != null) Object.DestroyImmediate(EventSystem.current.gameObject);
             }
         }

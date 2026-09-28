@@ -166,11 +166,13 @@ namespace MotionRunner.Gameplay
             _card.sizeDelta = new Vector2(CardWidth, CardHeight);
             CosmeticUi.Surface(_card, PanelColor, CardRadius);
 
-            _backLink = IconButton("Back", _card, new Vector2(0f, 1f), new Vector2(Margin - 10f, -28f),
+            // Icons instead of "< back" / "skip": two words competing with the title for a corner,
+            // where a shape every app uses says the same thing without being read.
+            _backLink = MenuSheet.IconButton("Back", _card, new Vector2(0f, 1f), new Vector2(Margin - 10f, -28f),
                 box => MenuIcons.Chevron(box, StatusColor, left: true, length: 24f, thickness: 5f),
                 () => Page(-1));
 
-            IconButton("Close", _card, new Vector2(1f, 1f), new Vector2(-Margin + 10f, -28f),
+            MenuSheet.IconButton("Close", _card, new Vector2(1f, 1f), new Vector2(-Margin + 10f, -28f),
                 box => MenuIcons.Cross(box, StatusColor, length: 30f, thickness: 5f),
                 Dismiss);
 
@@ -300,35 +302,6 @@ namespace MotionRunner.Gameplay
             return panel;
         }
 
-        const float IconSize = 72f;
-
-        /// A round icon button in a corner of the card - the back arrow and the X. Icons instead
-        /// of "< back" / "skip": two words competing with the title for a corner, where a shape
-        /// every app uses says the same thing without being read. The disc is the whole target
-        /// (72 px), well past the 48 dp minimum.
-        static GameObject IconButton(string name, Transform card, Vector2 corner, Vector2 position,
-            Action<RectTransform> drawIcon, Action onTap)
-        {
-            RuntimeUi.Element(name, card, out var rect);
-            rect.anchorMin = rect.anchorMax = corner;
-            rect.pivot = corner;
-            rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(IconSize, IconSize);
-
-            var disc = CosmeticUi.Surface(rect, MenuTheme.Slot, IconSize * 0.5f);
-            var button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = disc;
-            var colors = button.colors;
-            colors.selectedColor = colors.normalColor; // no lingering tint after a tap on touch
-            button.colors = colors;
-            button.onClick.AddListener(() => onTap());
-            RuntimeUi.TapSound(button, Sfx.UiBack); // both step backwards or out
-
-            RuntimeUi.Element("Icon", rect, out var icon);
-            RuntimeUi.Stretch(icon, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            drawIcon(icon);
-            return rect.gameObject;
-        }
 
         /// The big button: forward while there is a page left, out at the end.
         void Advance()
