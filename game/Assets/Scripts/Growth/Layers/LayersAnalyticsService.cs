@@ -24,9 +24,15 @@ namespace MotionRunner.Growth.Layers
         public string SupportId => PlayerPrefs.GetString(SupportKey, string.Empty);
         public event Action Changed;
 
+        /// The real SDK on Android and on iOS, unless BuildIOS compiled the VEYRO_NO_LAYERS kill
+        /// switch in (env VEYRO_IOS_NO_LAYERS=1); the Fake everywhere else. Either way it starts
+        /// only after the player's opt-in (off by default). On iOS the export's ATT bridge is
+        /// replaced by IosPrivacyPostProcess's stub, so the SDK reads no IDFA or IDFV and can
+        /// show no tracking prompt: never call LayersSDK.RequestTrackingPermission - the build
+        /// carries no NSUserTrackingUsageDescription.
         public static IAnalyticsService Create()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if !UNITY_EDITOR && (UNITY_ANDROID || (UNITY_IOS && !VEYRO_NO_LAYERS))
             var host = new GameObject("Optional analytics");
             DontDestroyOnLoad(host);
             var service = host.AddComponent<LayersAnalyticsService>();

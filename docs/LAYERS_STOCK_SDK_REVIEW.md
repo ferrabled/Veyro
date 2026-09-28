@@ -143,3 +143,58 @@ the combined OneSignal-to-Daily loop, final release-artifact checks, and owner c
 that no advertising or CAPI destinations are connected in Layers. See
 `SDK_PRIVACY_RELEASE.md` for the current matrix rather than repeating the completed
 22 Sep phone lifecycle test as wholly untested.
+
+## iOS addendum — 28 September 2026 (feat/iOS-implementation, Phase 2b)
+
+**The package stays the unmodified v3.3.2 at the same pinned commit on iOS.** Nothing in
+`Library/PackageCache` is edited. The change happens in the *exported Xcode project*, at
+build time, by `game/Assets/Editor/IosPrivacyPostProcess.cs` (IOS_HANDOFF decision 5b).
+
+**Wrapper.** `LayersAnalyticsService.Create()` is now real on iOS too, unless BuildIOS
+compiled the `VEYRO_NO_LAYERS` kill switch in (env `VEYRO_IOS_NO_LAYERS=1`). The Android
+branch compiles to the same code as before. The opt-in is unchanged: off by default,
+nothing is initialized before the player enables GAMEPLAY ANALYTICS, and the same
+purge-on-re-enable sequence applies. The game never calls
+`LayersSDK.RequestTrackingPermission`.
+
+**What the stock package brings to an iOS export** (read from the package source and the
+28 Sep export):
+
+| Native piece | What it does | In our build |
+| --- | --- | --- |
+| `Plugins/iOS/LayersATTBridge.m` | ATT status and prompt, IDFA, IDFV; imports AppTrackingTransparency + AdSupport, the only Layers file that does | **removed at export**, replaced by a pure-C stub exporting the same six `layers_att_*` symbols: not available, status 0, `request_tracking(cb)` → `cb(0)`, IDFA/IDFV NULL, `free_string` → `free` |
+| `LayersAdServicesBridge.m` | AdServices attribution token | linked (AdServices weak on UnityFramework), never called: the token is read only when `AutoTrackAppOpen` is true, and `LayersConsentFlow.BuildConfig` sets it false |
+| `LayersSKANBridge.m` | SKAdNetwork registration / conversion values | linked (StoreKit weak), armed **only** by the Layers dashboard's remote config (`SKANModule.ConfigureFromRemoteConfig`). Keep SKAN off there (OPEN_QUESTIONS 22a). The export forbids `SKAdNetworkItems` and `NSAdvertisingAttributionReportEndpoint` |
+| `LayersDeviceInfoBridge.m` | OS version, model, app version/build | used; no identifier, no purpose string |
+| `LayersInstallTimeBridge.m` | Documents-folder creation date (install time) | used; a file-timestamp read inside the container, declared as C617.1 |
+| `LayersBackgroundFlush.mm` | BGTaskScheduler flush | compiled, never registered: the game never calls `EnableBackgroundFlush()` |
+| `liblayers_core.a` (62.6 MB, arm64 device only) | the Rust core | `llvm-nm -u` re-checked 28 Sep: no ATTracking / ASIdentifier / CLLocation symbols (only `sysctlbyname` for the model) |
+| `PrivacyInfo.xcprivacy` | UserDefaults CA92.1, FileTimestamp C617.1, SystemBootTime 35F9.1; empty collected types | merged by Unity into `UnityFramework/PrivacyInfo.xcprivacy`, then rewritten by the post-process (de-duplicated, tracking false, collected types = the listing's App Privacy rows, which include Layers') |
+| `Editor/LayersPostBuildProcessor.cs` (order 100) | ATT string, SKAdNetwork IDs, tracking frameworks, associated domains, from a `LayersSettings` asset | inert: there is no `LayersSettings` asset, and the export fails if one appears |
+
+**Behaviour this changes on iOS, compared with the stock bridge.** `InitIOSModules` merges
+no `idfv` into the device context: `GetVendorId()` gets NULL and skips it. So Layers sends
+**no Apple identifier at all**. Its device identity is its own random SDK device ID plus the
+game's `veyro-…` support ID. `ATTModule.GetStatus()` reads "not determined" and
+`IsAvailable()` false. A stray `RequestTrackingPermission` call would answer
+`NotDetermined` synchronously and show nothing. The ATT bridge was also the only
+IDFV source in the package, so the App Privacy "Device ID" row now rests on installation IDs
+only (listing §3).
+
+**Storage.** As on Android, the SDK keeps its files under `Application.persistentDataPath`,
+which on iOS is the app's sandboxed `Documents` folder. Other apps cannot read it. Like the rest
+of `Documents`, it is included in the device's iCloud/computer backups. Uninstalling deletes it.
+
+**SDK drift.** `LayersAttStubTests` (EditMode) parses the package's
+`Runtime/Platform/iOS/ATTModule.cs` out of the package cache and asserts that the stub exports
+exactly its `layers_att_*` externs, with the same ABI shape. The same test covers the Input
+System's `iOSStepCounter.cs` and its stub. The export also fails if `LayersATTBridge.m` is
+missing or duplicated. **When bumping Layers:** run EditMode, read the new ATT and SKAN
+bridges, re-run the stub syntax check (`clang --target=arm64-apple-ios15.0 -fsyntax-only
+-ffreestanding`), and redo the `llvm-nm -u` scan of `liblayers_core.a` for ATTracking /
+ASIdentifier / CLLocation.
+
+**Still open (unchanged by iOS):** dashboard receipt of iOS events, and the owner's
+confirmation that no advertising, CAPI or SKAN destination is connected in Layers
+(OPEN_QUESTIONS 22a). Add the iOS device check "enable → events arrive; disable; no ATT
+prompt, ever" (IOS_HANDOFF §9 item 6).
