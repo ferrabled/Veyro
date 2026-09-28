@@ -372,7 +372,10 @@ namespace MotionRunner.Gameplay
             // sizes and a number tuned at one size means the same thing at the other.
             float k = size.y / HudSize.y;
 
-            GameObject panel = RuntimeUi.Element("Panel", transform, out RectTransform panelRect);
+            // Placed inside the safe area, like the HUD rows it sits under: the top-anchored HUD
+            // position moves down with them on a phone with a cutout.
+            var safe = RuntimeUi.SafeRoot(transform);
+            GameObject panel = RuntimeUi.Element("Panel", safe, out RectTransform panelRect);
             panelRect.anchorMin = anchor;
             panelRect.anchorMax = anchor;
             panelRect.anchoredPosition = position;

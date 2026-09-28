@@ -22,7 +22,7 @@ namespace MotionRunner.Menu
         bool _listening,_onlyOwned;
         protected override void Build()
         {
-            var background=CosmeticUi.Surface(CosmeticUi.Area("Backdrop",Root,Vector2.zero,Vector2.one),MenuTheme.PreviewTop,0);
+            var background=CosmeticUi.Backdrop(Root,MenuTheme.PreviewTop);
             background.Gradient=true;background.Bottom=MenuTheme.PreviewBottom;
             _preview=RunnerPreview.Create(CosmeticUi.Area("Preview",Root,new Vector2(0,0.43f),new Vector2(1,0.94f)));
             CosmeticUi.Pill(CosmeticUi.Rect("Back",Root,0.025f,0.21f,44,70),"< BACK",Menu.GoHome,MenuTheme.ItemCard,26,Sfx.UiBack);

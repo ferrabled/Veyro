@@ -447,32 +447,37 @@ namespace MotionRunner.Gameplay
         void BuildCanvas()
         {
             RuntimeUi.PortraitCanvas(gameObject);
-            var backing = RuntimeUi.Panel("Score backing", transform, MenuTheme.Card);
+
+            // The live readout and the pause button stay inside the safe area (a camera cutout
+            // must not eat the score); the backing band is measured from the safe top but runs
+            // up past the screen edge, so the strip above it is paper too, not the track.
+            var safe = RuntimeUi.SafeRoot(transform);
+            var backing = RuntimeUi.Panel("Score backing", safe, MenuTheme.Card);
             RuntimeUi.Stretch(backing.rectTransform, new Vector2(0,1), Vector2.one,
-                new Vector2(0,-216), Vector2.zero);
+                new Vector2(0,-216), new Vector2(0, 400f));
             backing.raycastTarget = false;
 
-            _score = RuntimeUi.Label("Score", transform,
+            _score = RuntimeUi.Label("Score", safe,
                 new Vector2(0f, 1f), new Vector2(0.55f, 1f),
                 new Vector2(32f, -140f), new Vector2(0f, -24f),
                 84, TextAnchor.UpperLeft, TextColor);
 
-            _coins = RuntimeUi.Label("Coins", transform,
+            _coins = RuntimeUi.Label("Coins", safe,
                 new Vector2(0.45f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -104f), new Vector2(-32f, -32f),
                 40, TextAnchor.UpperRight, TextColor);
 
-            _combo = RuntimeUi.Label("Combo", transform,
+            _combo = RuntimeUi.Label("Combo", safe,
                 new Vector2(0.45f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -156f), new Vector2(-32f, -104f),
                 40, TextAnchor.UpperRight, ComboColor);
 
-            _mode = RuntimeUi.Label("Mode", transform,
+            _mode = RuntimeUi.Label("Mode", safe,
                 new Vector2(0f, 1f), new Vector2(0.6f, 1f),
                 new Vector2(36f, -198f), new Vector2(0f, -148f),
                 34, TextAnchor.UpperLeft, ModeColor);
 
-            BuildPauseButton();
+            BuildPauseButton(safe);
             BuildResultCard();
             _resultPanel.SetActive(false);
         }
@@ -481,9 +486,9 @@ namespace MotionRunner.Gameplay
         /// that is not already holding the phone up is the one a player can reach without
         /// covering the track. RunSession runs after the EventSystem (its DefaultExecutionOrder),
         /// so the tap that lands here is frozen before it can also be read as a jump.
-        void BuildPauseButton()
+        void BuildPauseButton(Transform safe)
         {
-            _pauseButton = RuntimeUi.TextButton("Pause", transform,
+            _pauseButton = RuntimeUi.TextButton("Pause", safe,
                 new Vector2(0f, 0f), new Vector2(120f, 120f), new Vector2(140f, 140f),
                 MenuTheme.Card,
                 "II", 52, TextColor,

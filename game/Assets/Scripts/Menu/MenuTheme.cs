@@ -78,5 +78,9 @@ namespace MotionRunner.Menu
 
         /// Margin inside a card, between its edge and its contents.
         public const float CardPadding = 28f;
+
+        /// Corner radius of a menu card (CosmeticUi.Card) - the home and profile cards, a step
+        /// under the 44 of the full-screen cards (result, guide, pause) that sit alone.
+        public const float CardRadius = 28f;
     }
 }

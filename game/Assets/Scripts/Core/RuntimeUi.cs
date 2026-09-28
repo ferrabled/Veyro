@@ -67,6 +67,19 @@ namespace MotionRunner.Core
             return canvas;
         }
 
+        /// A full-screen child of a canvas that shrinks itself to the device's safe area
+        /// (SafeAreaFitter): build what must stay readable and tappable under it, and leave
+        /// backdrops on the canvas so they still reach the screen's edges. The same call does the
+        /// right thing on a notched iPhone, a punch-hole Android and a plain 16:9 phone (where it
+        /// is simply the whole screen).
+        public static RectTransform SafeRoot(Transform canvas, string name = "Safe area")
+        {
+            var go = Element(name, canvas, out var rect);
+            Stretch(rect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            go.AddComponent<SafeAreaFitter>();
+            return rect;
+        }
+
         /// A full-screen backdrop: opaque for a menu, translucent for something laid over the run.
         public static GameObject FullScreenPanel(string name, Transform parent, Color color)
         {
