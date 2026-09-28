@@ -13,8 +13,9 @@ namespace MotionRunner.EditorTools
 {
     /// Renders every how-to-play page to builds/guide-review/guide-page-N.png at a 1080x2400
     /// phone's proportions, without a device, the way CosmeticUiReview does for the shop. Meant
-    /// for two moments: a copy or layout change (does the body still clear the button?) and the
-    /// day the illustrations land (do the frames sit in the slot?).
+    /// for two moments: a copy or layout change (does the copy still clear the button? - a
+    /// measured overflow fails the render) and the day the illustrations land (do the frames sit
+    /// in the slot?).
     ///
     /// Batchmode: -executeMethod MotionRunner.EditorTools.GuideUiReview.Render
     public static class GuideUiReview
@@ -70,9 +71,14 @@ namespace MotionRunner.EditorTools
                 {
                     Capture(guide, cam, target, Path.Combine(folder, "guide-page-" + page + ".png"));
                     var content = GuideState.Pages[page - 1];
+                    // The copy is stacked by measured height; anything past the band would sit
+                    // on the button on device. The render is where that gets caught.
+                    if (guide.Overflow > 0.5f)
+                        throw new System.InvalidOperationException(content.Title + " overflows its copy band by " +
+                                                                   guide.Overflow.ToString("0") + " px.");
                     if (content.HasIllustration)
                     {
-                        var frame = guide.transform.Find("Card/Illustration/Frame").GetComponent<Image>();
+                        var frame = guide.transform.Find("Card/Illustration/Frame/Window/Art").GetComponent<Image>();
                         if (!frame.gameObject.activeInHierarchy || frame.sprite == null)
                             throw new System.InvalidOperationException(content.Title + " is showing the fallback instead of art.");
                         for (int index = 1; index <= content.FrameCount; index++)

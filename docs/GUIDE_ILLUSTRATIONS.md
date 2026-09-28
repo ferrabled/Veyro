@@ -48,9 +48,12 @@ content-addressed LFS objects. Preserve the approved masters when updating the g
 | DURING A RUN | `run` | 1 | `run_01.png` | runner, a coin row, the pause button |
 
 - **Size:** approximately 16:10, between 1024 and 1600 px wide (the supplied 1586 × 992 set is
-  used unchanged), PNG, opaque. The slot is 804 × 502 at reference resolution and
+  used unchanged), PNG, opaque. The slot is 784 × 490 at reference resolution and
   Unity caps the texture at 1024 wide on Android, so do not go bigger. The frame is drawn with
   `preserveAspect`, so only the ratio matters.
+- **Frame 1 doubles as a thumbnail.** The choice page (TWO WAYS TO PLAY) shows `tilt_01` and
+  `camera_01` in its two tiles, cropped to the **centre square** (the middle ~62% of the width).
+  Keep the subject of frame 1 inside that square.
 - **Background:** flat paper `#FBF5E9`, edge to edge. **No border, no drop shadow, no rounded
   corners.** The guide card is the same opaque paper colour, so the image blends into it.
 - **No text, no numbers, no labelled arrows, no logos, no watermark.** The game renders all the

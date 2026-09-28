@@ -12,14 +12,6 @@ namespace MotionRunner.Tests
     /// the screen on device and nowhere else.
     public sealed class GuideStateTests
     {
-        /// FirstRunGuide's body band under an illustration holds this many 34 px lines, and a
-        /// hand-wrapped line longer than this wraps again and steals one of them.
-        const int MaxIllustratedLines = 9;
-        const int MaxLineLength = 40;
-
-        /// A page with no picture gets the illustration's height as well.
-        const int MaxFullHeightLines = 20;
-
         GuideState _guide;
 
         [SetUp]
@@ -122,7 +114,12 @@ namespace MotionRunner.Tests
             for (int i = 0; i < GuideState.Pages.Length; i++)
             {
                 Assert.IsFalse(string.IsNullOrEmpty(GuideState.Pages[i].Title), "page " + i + " has no title");
-                Assert.IsFalse(string.IsNullOrEmpty(GuideState.Pages[i].Body), "page " + i + " has no body");
+                Assert.Greater(GuideState.Pages[i].Rows.Length, 0, "page " + i + " has no rows");
+                foreach (GuideRow row in GuideState.Pages[i].Rows)
+                {
+                    Assert.IsFalse(string.IsNullOrWhiteSpace(row.Key), "page " + i + " has a row with no key");
+                    Assert.IsFalse(string.IsNullOrWhiteSpace(row.Text), "page " + i + ": " + row.Key + " has no text");
+                }
             }
         }
 
@@ -149,7 +146,7 @@ namespace MotionRunner.Tests
         public void TheGuideIsTheChoice_ThenOnePagePerMode_ThenTheRun()
         {
             // The order is the argument: what the two modes are, how each one is played, then
-            // what happens once the track is moving. The counter reads "1 / 4".
+            // what happens once the track is moving. Four pages, four progress dots.
             CollectionAssert.AreEqual(
                 new[] { "TWO WAYS TO PLAY", "TILT & TOUCH", "CAMERA MODE", "DURING A RUN" },
                 Array.ConvertAll(GuideState.Pages, p => p.Title));
@@ -160,10 +157,37 @@ namespace MotionRunner.Tests
         [Test]
         public void EachModePage_CarriesItsOwnIllustration()
         {
-            Assert.IsFalse(GuideState.Pages[0].HasIllustration, "the choice page gets the height for its copy");
+            Assert.IsFalse(GuideState.Pages[0].HasIllustration, "the choice page gets the height for its tiles");
             Assert.AreEqual(GuideState.TiltIllustration, GuideState.Pages[1].Illustration);
             Assert.AreEqual(GuideState.CameraIllustration, GuideState.Pages[2].Illustration);
             Assert.AreEqual(GuideState.RunIllustration, GuideState.Pages[3].Illustration);
+        }
+
+        [Test]
+        public void TheChoicePage_ShowsEachModeWithItsOwnPagesPicture()
+        {
+            // Met on the choice page, met again on that mode's page: the tile's thumbnail is the
+            // first frame of the same sequence, so the two are one picture, not two.
+            var tiles = GuideState.Pages[0].Rows;
+            Assert.AreEqual(2, tiles.Length);
+            Assert.IsTrue(tiles[0].IsTile && tiles[1].IsTile, "both choices are tiles");
+            Assert.AreEqual(GuideState.Pages[1].Illustration, tiles[0].Thumbnail);
+            Assert.AreEqual(GuideState.Pages[2].Illustration, tiles[1].Thumbnail);
+            Assert.AreEqual("BETA", tiles[1].Tag, "camera mode is still labelled beta where it is chosen");
+        }
+
+        [Test]
+        public void EveryThumbnail_NamesASequenceAPageShips()
+        {
+            var shipped = new System.Collections.Generic.HashSet<string>();
+            foreach (GuidePage page in GuideState.Pages)
+                if (page.HasIllustration) shipped.Add(page.Illustration);
+
+            foreach (GuidePage page in GuideState.Pages)
+                foreach (GuideRow row in page.Rows)
+                    if (row.IsTile)
+                        Assert.IsTrue(shipped.Contains(row.Thumbnail),
+                            row.Key + "'s thumbnail '" + row.Thumbnail + "' has no frames to borrow");
         }
 
         [Test]
@@ -242,18 +266,51 @@ namespace MotionRunner.Tests
         // ---- the copy fits the card ----
 
         [Test]
-        public void BodyCopy_FitsUnderTheIllustration()
+        public void EveryPageIsOneShape()
+        {
+            // Steps sit under a picture, tiles take a page without one. A mixed page would put a
+            // 470 px tile into the 530 px band under an illustration.
+            foreach (GuidePage page in GuideState.Pages)
+                foreach (GuideRow row in page.Rows)
+                    Assert.AreEqual(!page.HasIllustration, row.IsTile,
+                        page.Title + ": " + row.Key + " is the wrong shape for its page");
+        }
+
+        [Test]
+        public void TheCopy_StaysInsideItsBudgets()
         {
             foreach (GuidePage page in GuideState.Pages)
             {
-                string[] lines = page.Body.Split('\n');
-                int budget = page.HasIllustration ? MaxIllustratedLines : MaxFullHeightLines;
-                Assert.LessOrEqual(lines.Length, budget,
-                    page.Title + " has " + lines.Length + " lines; the body band under the picture holds " + budget);
+                int budget = page.HasIllustration ? GuideState.MaxSteps : GuideState.MaxTiles;
+                Assert.LessOrEqual(page.Rows.Length, budget, page.Title + " has more rows than its band holds");
 
-                foreach (string line in lines)
-                    Assert.LessOrEqual(line.Length, MaxLineLength,
-                        page.Title + ": '" + line + "' would wrap a second time and steal a line");
+                if (page.Lead != null)
+                    Assert.LessOrEqual(page.Lead.Length, GuideState.MaxLeadLength, page.Title + "'s lead");
+                if (page.Note != null)
+                    Assert.LessOrEqual(page.Note.Length, GuideState.MaxNoteLength, page.Title + "'s note");
+
+                foreach (GuideRow row in page.Rows)
+                {
+                    int textBudget = row.IsTile ? GuideState.MaxTileTextLength : GuideState.MaxStepTextLength;
+                    Assert.LessOrEqual(row.Text.Length, textBudget, page.Title + ": '" + row.Text + "'");
+                    if (!row.IsTile)
+                        Assert.LessOrEqual(row.Key.Length, GuideState.MaxKeyLength,
+                            page.Title + ": chip '" + row.Key + "' is wider than the chip");
+                }
+            }
+        }
+
+        [Test]
+        public void TheCopy_IsWrappedByTheCardNotByHand()
+        {
+            // Newlines were how the old body fixed its line count; now they would fight the
+            // measured layout and leave the ragged right edge this layout exists to remove.
+            foreach (GuidePage page in GuideState.Pages)
+            {
+                StringAssert.DoesNotContain("\n", page.Lead ?? string.Empty, page.Title);
+                StringAssert.DoesNotContain("\n", page.Note ?? string.Empty, page.Title);
+                foreach (GuideRow row in page.Rows)
+                    StringAssert.DoesNotContain("\n", row.Text, page.Title + ": " + row.Key);
             }
         }
     }
