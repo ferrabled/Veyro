@@ -44,7 +44,10 @@ namespace MotionRunner.Pose
         /// needed to display the raw texture upright. Must be a multiple of 90.</param>
         /// <param name="verticallyMirrored">WebCamTexture.videoVerticallyMirrored — the raw
         /// texture is already flipped top-to-bottom. A property of the source, so it is corrected
-        /// in source space, before rotation is considered.</param>
+        /// in source space, before rotation is considered. Which is why, across a quarter turn
+        /// (a portrait phone), getting this flag wrong does not turn the picture upside down: it
+        /// mirrors it left-right, a mistake a face detector cannot see and steering can
+        /// (FrameOrientationTests, OrientationProbe.ChallengerMargin).</param>
         /// <param name="mirrorHorizontally">Show the player a mirror, as a selfie camera should.
         /// Cosmetic for the model — BlazePose reads a mirrored body fine — but it flips which side
         /// of the frame the subject's left arm appears on, so T-012 must steer by frame position

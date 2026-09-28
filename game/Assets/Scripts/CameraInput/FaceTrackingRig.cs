@@ -33,6 +33,17 @@ namespace MotionRunner.CameraInput
 
         public RigState State { get; private set; } = RigState.Idle;
         public string FailReason { get; private set; } = string.Empty;
+
+#if UNITY_IOS
+        /// What a denied camera fails with on iOS. iOS asks once per install and answers every
+        /// later request itself, so tapping CAMERA again cannot undo it - only Settings can, which
+        /// is the advice the mode picker gives for this one failure (ModePickerCard.Tick).
+        public const string PermissionDeniedReason = "camera access is off";
+
+        public bool PermissionDenied =>
+            State == RigState.Failed && FailReason == PermissionDeniedReason;
+#endif
+
         public double GateMedianMs { get; private set; }
         public FaceObservation Latest { get; private set; }
 
@@ -145,6 +156,26 @@ namespace MotionRunner.CameraInput
                 // ---- 2. Permission + camera ----
                 State = RigState.RequestingPermission;
                 _feed = new CameraFeed();
+#if UNITY_IOS && !UNITY_EDITOR
+                // iOS hands back an answer rather than a dialog to poll through: the request
+                // completes on Allow / Don't Allow, and instantly on every later ask (iOS prompts
+                // once per install). So a denial, the first or the tenth, fails right here instead
+                // of timing out - and without this step at all the alert would come up inside
+                // WebCamTexture.Play() and a denial would read as "no frames" ten seconds later.
+                // A rig destroyed mid-wait ends it in the OperationCanceledException catch below.
+                if (!CameraFeed.HasPermission())
+                {
+                    await Awaitable.FromAsyncOperation(CameraFeed.RequestPermissionAsync(),
+                        destroyCancellationToken);
+                    if (Stale()) return;
+                }
+
+                if (!CameraFeed.HasPermission())
+                {
+                    Fail(PermissionDeniedReason);
+                    return;
+                }
+#else
                 if (!CameraFeed.HasPermission())
                 {
                     CameraFeed.RequestPermission();
@@ -161,6 +192,7 @@ namespace MotionRunner.CameraInput
                     Fail("camera permission denied");
                     return;
                 }
+#endif
 
                 State = RigState.StartingCamera;
                 for (int i = 0; i < 600 && !_feed.TryStart(); i++)
@@ -242,7 +274,11 @@ namespace MotionRunner.CameraInput
                 // camera that broke, and must not surface as a failure the player reads.
                 if (Stale()) return;
                 Debug.LogError("[CAM] rig failed: " + e);
+#if UNITY_IOS
+                Fail("camera mode hit an error");
+#else
                 Fail("camera mode hit an error — see logcat");
+#endif
             }
         }
 
@@ -294,15 +330,17 @@ namespace MotionRunner.CameraInput
         /// probing again.
         ///
         /// Re-probing on resume is what made the second half of a run steer backwards. Every
-        /// candidate has a twin at (rotation + 180, !flip) that is upright but horizontally
-        /// MIRRORED, and BlazeFace scores a face and its mirror within noise of each other. The
-        /// launch probe runs under the conditions the staging text asks for — phone propped up,
-        /// player stepped back — so the true candidate clears GoodEnoughScore and the probe stops
-        /// on the device's own report before the twin is ever tried. A resume probe runs with the
-        /// player leaning over the phone they just tapped RESUME on: every candidate lands in the
-        /// contested band, all eight get compared, and the twin wins about half the time. x is
-        /// then inverted for the rest of the run while y survives, so jump and slide keep working
-        /// — which is exactly how it was reported from the device.
+        /// candidate has a twin that is upright but horizontally MIRRORED - at the quarter turn a
+        /// portrait phone's camera sits at, (rotation, !flip), the very next candidate the probe
+        /// tries (FrameOrientationTests pins the geometry) - and BlazeFace scores a face and its
+        /// mirror within noise of each other. The launch probe runs under the conditions the
+        /// staging text asks for — phone propped up, player stepped back — so the true candidate
+        /// clears GoodEnoughScore and the probe stops on the device's own report before the twin
+        /// is ever tried. A resume probe runs with the player leaning over the phone they just
+        /// tapped RESUME on: every candidate lands in the contested band, all eight get compared,
+        /// and the twin wins about half the time. x is then inverted for the rest of the run while
+        /// y survives, so jump and slide keep working — which is exactly how it was reported from
+        /// the device.
         ///
         /// Keeping the answer across a pause is safe because the only input to it that could
         /// move is the device-reported rotation, and the app is portrait-locked (BuildScript

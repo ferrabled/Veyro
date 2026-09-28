@@ -143,6 +143,18 @@ hops=N restarts=N` (`restarts` = times a stray sent it back to Settling).
   `CompositeInput` takes the largest-magnitude axis camera-first, so a frozen full-deflection
   camera axis beats keyboard (Editor-only in practice); 2.5 cm dead zone vs box jitter at 2 m+.
 
+## iOS (2026-09-28, not yet run on an iPhone)
+
+- **Permission:** the rig asks through `Application.RequestUserAuthorization(WebCam)` after the
+  speed gate and awaits the answer (no poll). iOS asks once per install: a denial, first or
+  later, fails at once with `camera access is off`, and the picker reads
+  `camera access is off` / `— allow it in Settings, or play with tilt` with TILT & TOUCH
+  re-enabled. Android is unchanged (`camera permission denied` / `— pick a mode to play`).
+- **Mirror:** in portrait the other flip flag is the same picture mirrored left-right
+  (`FrameOrientationTests`), which the probe cannot tell from the truth. Decision 2: trust what
+  iOS reports. If the device shows step left → lane right, set
+  `CameraFeed.InvertReportedFlip = true` (iOS player only). That is the whole fix.
+
 ## Device-loop notes (Nord 2)
 
 `pm clear` blocked by OxygenOS · `svc power stayon` / `settings put system screen_off_timeout`

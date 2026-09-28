@@ -67,7 +67,9 @@ namespace MotionRunner.Tests
         [Test]
         public void AVerticalFlipIsTheSecondThingTried()
         {
-            // The UAV-origin case: right rotation, upside down. Must not cost a full sweep.
+            // Right rotation, wrong source flip. Must not cost a full sweep. (At this quarter
+            // turn the two differ by a left-right mirror, not by being upside down - which a real
+            // detector scores within noise; this fake one scores only the truth.)
             var truth = new OrientationProbe.Candidate(90, false);
             var probe = RunAgainst(truth, 90, true);
 
@@ -114,8 +116,9 @@ namespace MotionRunner.Tests
         [Test]
         public void TheMirrorTwinCannotUnseatTheDeviceReportOnNoise()
         {
-            // Every candidate has a twin at (rotation + 180, !flip) that is upright but
-            // horizontally MIRRORED, and a face is symmetric enough that the detector scores the
+            // Every candidate has a twin that is upright but horizontally MIRRORED - at this
+            // quarter turn (rotation, !flip), the second candidate tried; FrameOrientationTests
+            // pins the geometry - and a face is symmetric enough that the detector scores the
             // two within a hundredth of each other. Which of them wins decides whether leaning
             // left steers left, so a coin flip is not an acceptable answer: the reported
             // orientation is tried first and keeps its place unless something is genuinely better.
@@ -124,7 +127,7 @@ namespace MotionRunner.Tests
             // player leaning over the phone they just unpaused puts every candidate in this
             // contested band, and all eight then get compared.
             var reported = new OrientationProbe.Candidate(90, false);
-            var twin = new OrientationProbe.Candidate(270, true);
+            var twin = new OrientationProbe.Candidate(90, true);
             var probe = new OrientationProbe(90, false, 2);
             int guard = 0;
 
@@ -140,6 +143,39 @@ namespace MotionRunner.Tests
 
             Assert.AreEqual(reported, probe.Best, "the mirror twin won on noise");
             Assert.IsTrue(probe.IsConfident, "0.72 is a real sighting, not a contest between noise");
+        }
+
+        [Test]
+        public void AWrongReportedFlipInPortraitIsKept()
+        {
+            // The same margin seen from the other side, and the reason the iPhone check is "step
+            // left -> lane left" (IOS_HANDOFF decision 2). If the device reports the wrong flip at
+            // a quarter turn, the report IS the mirror and the truth is its twin: on a clean
+            // launch the report clears GoodEnoughScore and the truth is never tried, and in the
+            // contested band the truth only ties it. Either way the mirror is kept and steering
+            // runs backwards, and only the device check can show it
+            // (CameraFeed.ReportedVerticallyMirrored is the fix).
+            var reportedMirror = new OrientationProbe.Candidate(270, true);
+            var truth = new OrientationProbe.Candidate(270, false);
+
+            var clean = new OrientationProbe(270, true, 2);
+            clean.Submit(0.93f);
+            clean.Submit(0.93f);
+            Assert.IsTrue(clean.IsComplete);
+            Assert.AreEqual(reportedMirror, clean.Best, "a clean launch stops on the report");
+
+            var contested = new OrientationProbe(270, true, 2);
+            int guard = 0;
+            while (!contested.IsComplete)
+            {
+                float score = 0.05f;
+                if (contested.Current.Equals(reportedMirror)) score = 0.72f;
+                else if (contested.Current.Equals(truth)) score = 0.76f;
+                contested.Submit(score);
+                contested.Submit(score);
+                if (++guard > 100) Assert.Fail("probe never completed");
+            }
+            Assert.AreEqual(reportedMirror, contested.Best, "the truth cannot clear the margin");
         }
 
         [Test]

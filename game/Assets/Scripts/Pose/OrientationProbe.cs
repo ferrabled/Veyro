@@ -55,17 +55,27 @@ namespace MotionRunner.Pose
         public const float MinimumConfidence = 0.5f;
 
         /// How much better than the standing leader a later candidate has to score before it
-        /// takes over. Not cosmetic: every candidate has a twin at (rotation + 180, !flip) that
-        /// is upright but horizontally MIRRORED, and a face is symmetric enough that BlazeFace
-        /// scores the two within a few hundredths of each other. Without a margin the twin wins
-        /// on a coin flip whenever conditions are middling, and a mirrored frame steers the
-        /// player the wrong way (x inverted; y, so jump and slide, unaffected).
+        /// takes over. Not cosmetic: every candidate has a twin that is upright but horizontally
+        /// MIRRORED, and a face is symmetric enough that BlazeFace scores the two within a few
+        /// hundredths of each other. Without a margin the twin wins on a coin flip whenever
+        /// conditions are middling, and a mirrored frame steers the player the wrong way
+        /// (x inverted; y, so jump and slide, unaffected).
+        ///
+        /// Which candidate the twin is depends on the rotation (FrameOrientationTests pins it):
+        /// at a quarter turn - a portrait phone, the case that ships - it is (rotation, !flip),
+        /// because a source flip across a quarter turn lands as a left-right flip; at 0 or 180
+        /// it is (rotation + 180, !flip). (At a quarter turn that second one is upside down, so
+        /// it scores like any other wrong orientation.)
         ///
         /// 0.08 is well above that noise and far below the gap between an upright face and a
         /// sideways or upside-down one (~0.9 vs ~0.1 in the T-010 sweep), so a genuinely wrong
         /// device report is still overruled. The tie it cannot break — truth and twin both in
         /// the contested band — now resolves toward whichever was tried first, and the reported
         /// orientation is deliberately tried first, so "believe the device" is the tiebreak.
+        /// The flip side: a device that reports the wrong flip in portrait hands the probe the
+        /// mirror first, and the truth can only tie it. Nothing here can see that; a person
+        /// stepping left and watching the lane can, which is why that is a device check
+        /// (IOS_HANDOFF §9) and why CameraFeed.ReportedVerticallyMirrored is where it is fixed.
         public const float ChallengerMargin = 0.08f;
 
         readonly Candidate[] _candidates;
@@ -135,8 +145,9 @@ namespace MotionRunner.Pose
         }
 
         /// The reported orientation first — it is usually right, and being right on the first try
-        /// is what keeps the probe cheap. Then its vertical mirror, which is the single most
-        /// likely correction, then the remaining quarter turns.
+        /// is what keeps the probe cheap. Then the same rotation with the source's vertical flip
+        /// toggled, which is the single most likely correction (at a quarter turn that is the
+        /// left-right mirror twin — see ChallengerMargin), then the remaining quarter turns.
         static Candidate[] BuildCandidates(int reportedRotation, bool reportedFlip)
         {
             int baseRotation = Normalize(reportedRotation);
