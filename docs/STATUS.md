@@ -1,5 +1,53 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Guide X / tap-outside, home redesign, safe area for cutouts and notches (feat-game-UI-improvement / profile-guide-polish, third pass)
+
+Owner feedback: the guide should close with an arrow/X rather than "skip"/"back" and on a
+tap outside it; the home tab should follow the new design; the phone's camera cutout (the
+6T's centred teardrop, the Nord 2's corner hole) cuts through "VEYRO RUN" — fix it in a
+modular way that also covers iOS.
+
+- **Guide**: round X (top right) and round back arrow (top left, pages 2–4) drawn as strokes
+  (`Menu/MenuIcons.cs`: chevron, cross, tick — no glyphs, gotcha #7); the dim around the card
+  is a button that dismisses (a tap on the card itself does not). Every exit still marks it
+  seen.
+- **Home** (`HomePage`, `SeasonPassCard`, `DailyStampsCard`, `ModePickerCard`): sage page like
+  the profile; rounded cards (`CosmeticUi.Card`, `MenuTheme.CardRadius` 28 — also applied to
+  every profile card, and pressed rows light as a rounded pill); SEASON 1 PASS as the shop's
+  ink-to-teal banner with a state pill and a rounded gold XP bar; stamps as rounded squares
+  with a stroke tick, today rimmed pink, spread edge to edge under the title, streak as a pill;
+  the runner on the locker's teal-to-cream stage with YOUR LOOK and a CUSTOMIZE pill; mode
+  buttons rounded and bold, CAMERA with a gold BETA tag (group centred); a card gap above the
+  tab bar. App Store review note updated for the label.
+- **Safe area** (`Core/SafeArea.cs`): `SafeAreaFitter` anchors a full-screen child of a canvas
+  to `Screen.safeArea` — Unity reports it from Android's display-cutout insets and from iOS's
+  safe-area insets (notch / Dynamic Island / home indicator) alike, so there is no per-device
+  table — re-checked each frame, degenerate rects fall back to full screen, and a `Simulated`
+  rect lets the desk renders show a cutout. `RuntimeUi.SafeRoot(canvas)` is the one call: the
+  menu (header, pages, tab bar), the run HUD (score rows, pause button; its paper band bleeds
+  up to the screen edge) and the face overlay build inside it; backdrops stay edge to edge
+  (menu backdrop now opaque paper so the cutout strip matches the header; full-screen pages use
+  `CosmeticUi.Backdrop`, which bleeds past the page). Dev builds log `[SafeArea]` per change.
+  Centred cards (guide, pause, result, notification/analytics panels) are unaffected.
+  `androidRenderOutsideSafeArea` stays 1: the world keeps drawing under the cutout.
+
+**Verified:** 637/637 EditMode (SeasonIntegrationTests' header lookup follows the new
+`Safe area/Header` path); `ProfileUiReview` adds `home.png` and `home-cutout.png` (simulated
+teardrop: title 78 px clear, strip colour identical to the header). **OnePlus 6T**,
+`1.0.0-dev.20260928-1452.nogit`: dumpsys cutout `insets=Rect(0, 79 - 0, 0)`, bounding rect
+`(455,0)-(625,79)`; `[SafeArea] safeArea=(0,0,1080,2261) screen=1080x2340` → safe top at 79 =
+cutout bottom, title letters at y=130; header paper seamless to the top. Guide X, back arrow,
+tap-outside closes, tap-on-card does not; home as designed; profile rounded cards and pill
+highlight; shop and season pass clear of the cutout. The season pass page showed a paper band
+under the cutout over its mint → `CosmeticUi.Backdrop` (bleeding backdrop) for it and the
+locker — re-verified on the 6T with `1.0.0-dev.20260928-1510.nogit` (637/637 EditMode): the
+cutout band on both pages is the page's mint (#BFE6DB), no paper band; 60 FPS on home and the
+season page. No runs were started; nothing on the profile changed.
+
+**Needs a human look:** the Nord 2 (corner punch-hole) and, when there is one, an iPhone with a
+notch/Dynamic Island — the same code path, but only a device proves the insets. Notification /
+analytics panels are still square-cornered (not part of this pass).
+
 ## 2026-09-28 — Podium leaderboard, runs chart, drag-and-tap volume in the pause menu, guide "i" (feat-game-UI-improvement / profile-guide-polish, second pass)
 
 Owner feedback on the first pass: the leaderboard and "my last runs" were boring; the volume
