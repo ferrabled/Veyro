@@ -4,8 +4,9 @@ namespace MotionRunner.Commerce.RevenueCat
     /// by design and are safe to commit; the SECRET (sk_) keys must never appear in this repo.
     ///
     /// Key selection is compile-time: BuildScript defines VEYRO_STORE_BUILD for .aab (store)
-    /// builds only, and build guards fail any wrong pairing - so the Test Store key cannot
-    /// ship to Play (COSMETICS_CATALOG §6: "The test key must never ship in a store build").
+    /// builds and the iOS App Store export only, and build guards fail any wrong pairing - so
+    /// the Test Store key cannot ship to either store (COSMETICS_CATALOG §6: "The test key must
+    /// never ship in a store build").
     ///
     /// Empty keys are fail-open, not fatal, for dev builds: the store stays disabled and the
     /// game fully playable. A store (.aab) build REQUIRES a valid Play key and will not build
@@ -18,19 +19,31 @@ namespace MotionRunner.Commerce.RevenueCat
         /// RevenueCat -> Veyro Run -> API keys -> Play Store app. Starts with "goog_".
         public const string PlayStoreKey = "goog_EFrxXlNiBEnmurJnEilutfuyGRo";
 
+#if UNITY_IOS
+        /// RevenueCat -> Veyro Run -> API keys -> App Store app. Starts with "appl_".
+        /// Compiled only for iOS, so the Android build's compiled output stays byte-identical.
+        public const string AppStoreKey = "appl_pSpOOqpDGiiopgJbnffUtBHRjyd";
+#endif
+
         /// Which key this build ships, decided by BuildScript-set defines:
         ///   VEYRO_STORE_BUILD (BuildAndroidBundle, .aab)     -> Play key
+        ///   VEYRO_STORE_BUILD on iOS (BuildIOS, App Store)   -> App Store key
         ///   VEYRO_DEV_STORE   (BuildAndroidDev, debuggable)  -> Test Store key
         ///   neither (release APKs, camera dev flavour)       -> none: store disabled, fail-open
         /// The Test Store key deliberately never reaches a release artifact: RevenueCat
         /// enforces it too - a non-debuggable build using a test key shows "Wrong API Key"
-        /// and closes itself (seen on device, 27 Aug).
+        /// and closes itself (seen on device, 27 Aug). iOS has one flavour only, the App Store
+        /// export, and StoreBuildGuard rejects VEYRO_DEV_STORE there.
+#if UNITY_IOS && VEYRO_STORE_BUILD
+        public const string ActiveKey = AppStoreKey;
+#else
 #if VEYRO_STORE_BUILD
         public const string ActiveKey = PlayStoreKey;
 #elif VEYRO_DEV_STORE
         public const string ActiveKey = TestStoreKey;
 #else
         public const string ActiveKey = "";
+#endif
 #endif
     }
 }
