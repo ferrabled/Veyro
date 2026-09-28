@@ -1,5 +1,63 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Profile tab redesigned, sound set inline, generated avatar; guide restyled (feat-game-UI-improvement / profile-guide-polish)
+
+Owner feedback on device screenshots: the how-to-play card's copy did not fill it and looked
+off-style next to the rest of the game; the profile's bottom block of settings links was
+poorly presented; "new name" should read "re-roll name"; the avatar should be generated from
+the player's name.
+
+**Profile tab** (`Menu/ProfilePage.cs`, new `ProfileSettingsCard.cs`, `MenuRows.cs`): the page
+is now a vertical `ScrollRect` (five cards no longer fit a 16:9 screen; tapping PROFILE again
+returns to the top). The loose three-across link grid is replaced by two list cards with
+hairline-divided rows, each row one tap target that lights only while pressed:
+- **SETTINGS** — MUSIC and SOUNDS set right there as ten tappable bars + an ON/OFF pill (the
+  pause menu's mute), then NOTIFICATIONS / GAMEPLAY ANALYTICS / HOW TO PLAY with chevrons.
+  Bars rather than sliders: a slider in a scroll view jumps its level when a swipe starts on
+  it. Engine-free `Audio/VolumeSteps.cs` maps the stored 0..1 level to bars (quietest bar is
+  10 %, silence is the pill's job), so levels set with the old slider carry over. Every tap
+  saves; the button's own click plays after the level changes, so SOUNDS is heard at its new
+  level. The SOUND link, `SoundPanel` and its RunFlow/MainMenu wiring are removed, with the
+  SOUND case of `PendingChallengePanelTests` (the modal no longer exists).
+- **ACCOUNT** — PLAYER ID (COPY), RECOVERY CODE (COPY, still says anyone holding it can claim
+  the profile), IMPORT PROFILE (PASTE), PRIVACY POLICY, DELETE ONLINE PROFILE (still two taps;
+  the second line says "immediate and permanent" before the first tap). Each row's second
+  line doubles as its feedback slot. Rows with nothing to act on hide and the card re-flows.
+- Player card: the name link reads **re-roll name**; the grey square is a **generated avatar**
+  — a mirrored 7×7 pixel critter with two enclosed eyes, from the handle (engine-free
+  `Social/PlayerAvatar.cs`: FNV-1a + lowbias32, case/space-insensitive, never
+  `string.GetHashCode`) on one of 8 `MenuTheme` colour pairs (`Menu/PlayerAvatarView.cs`, one
+  point-filtered 7×7 texture rewritten in place). Re-rolling the name re-rolls the critter.
+
+**Guide** (`Gameplay/FirstRunGuide.cs`, `Track/GuideState.cs`): dressed like the result card —
+rounded paper card on the park's ink, bold title, progress dots instead of "1 / 4", rounded
+pink primary. Pages are structured (`GuidePage` = lead, `GuideRow`s, note) instead of one
+hand-wrapped string, wrapped to the card and stacked by measured height; spare height is
+shared between the gaps and centred, so nothing pools above the button. Mode pages show a
+bold verb chip per movement; the choice page shows one tile per mode with the first frame of
+that mode's own illustration cropped square. Pictures sit in rounded, bordered, stencil-masked
+frames: the art's paper is textured (#FEFAEE→#FBF3E6), so a bare picture showed a faint edge
+on the flat #FBF5E9 card. Card 880×1480, slot 784×490 (`GUIDE_ILLUSTRATIONS.md` updated, plus
+"frame 1 doubles as a centre-square thumbnail"). Copy budgets are constants in `GuideState`,
+pinned by `GuideStateTests`; `FirstRunGuide.Overflow` reports a measured overflow and
+`GuideUiReview` fails on one. New `Editor/ProfileUiReview.cs` renders the profile top, bottom
+and offline bottom (`builds/profile-review/`).
+
+**Verified** in a fresh scratch (`C:\scratch\veyro-ui-polish`, SHA-256-matched to the
+worktree, no extra or missing scripts): Unity 6000.5.9f1, **620/620 EditMode tests passed**
+(621 before the SoundPanel test case was removed; new suites PlayerAvatarTests 7/7,
+VolumeStepsTests 5/5, GuideStateTests 24/24). `GuideUiReview` and `ProfileUiReview` render with no exception
+and no overflow; images checked for overlap, clipping, frame corners, row backgrounds.
+
+**Needs human device test** (dev build): (1) first launch or PROFILE → HOW TO PLAY — four
+pages legible, pictures animate inside their frames, BACK/SKIP/NEXT work; (2) PROFILE —
+scrolls smoothly, a swipe starting on the volume bars scrolls rather than changing volume, a
+tap on a bar changes it (music audibly, sounds with the click), ON/OFF mutes, levels survive a
+relaunch, and the pause menu's MUSIC/SOUNDS toggles agree with the pills; (3) re-roll name →
+avatar changes, same name after relaunch → same avatar; (4) COPY/PASTE/DELETE rows behave as
+before. The 28 Sep merge entry's "open SOUND, deliver a challenge link" step no longer applies
+(no SOUND modal); notifications/analytics still do.
+
 ## 2026-09-28 — Main merged into the game UI branch (feat-game-UI-improvement / main-merge)
 
 Owner committed the audio, illustrated guide, icon and documentation through `d52a8dc`,

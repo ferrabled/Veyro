@@ -39,6 +39,9 @@ description 4,000, IAP display name 35, IAP description 55.
 | Age rating | Every question **None / No** — step-by-step answers below. Expected **4+**, matching the Play PEGI 3 filing |
 | Made for Kids | No |
 | App Store Server Notifications | RevenueCat's Apple server-notification URL, **Production and Sandbox**, version 2 |
+| Encryption documentation | Nothing to upload — HTTPS through the OS + hashing only (exempt); the build sets `ITSAppUsesNonExemptEncryption=false` |
+| DSA / Vietnam game licence / regulated medical device | DSA: after submission (payments can be delayed without it). Vietnam: excluded instead. Medical device: not applicable |
+| App-specific shared secret | Not needed — RevenueCat validates with the In-App Purchase key; no subscriptions |
 
 **Age rating questionnaire (7 steps), answers and why:**
 
@@ -69,7 +72,7 @@ Subtitle alternates (all counted):
 | Field | Value |
 |---|---|
 | Price | Free |
-| Countries | All **except the 27 EU storefronts** until the DSA trader declaration is verified; then add them (no new review needed) |
+| Countries | All **except the 27 EU storefronts** until the DSA trader declaration is verified; then add them (no new review needed). Also exclude **Vietnam** (games need a local game licence) and **China mainland** (games need an approval/ISBN licence) |
 | Apple Silicon Mac availability | **Off** (no tilt, no front camera) |
 | Apple Vision Pro availability | **Off** |
 | Distribution | Public |
