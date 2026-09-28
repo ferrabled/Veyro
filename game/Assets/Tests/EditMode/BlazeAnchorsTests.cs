@@ -4,24 +4,21 @@ using NUnit.Framework;
 
 namespace MotionRunner.Tests
 {
-    /// Why PoseGestureProbe.Load has a try/catch around its body.
+    /// Why any caller of BlazeAffine.LoadAnchors has to catch.
     ///
-    /// LoadAnchors is the first fallible thing that load does, and it is upstream sample code
-    /// (Unity's BlazeDetectionSample, kept diffable — so it is NOT going to grow validation): it
-    /// indexes a fixed number of lines and columns out of a CSV and parses every cell, checking
-    /// none of it. A truncated, re-exported or half-written anchors file therefore throws, and
-    /// before PR #6's review fix that throw escaped PauseMenu.Update through
-    /// FaceTrackingRig.BeginGestureProbe, skipping both branches of the resume handler and
-    /// leaving the player frozen behind a pause card whose buttons were still disabled.
+    /// LoadAnchors is upstream sample code (Unity's BlazeDetectionSample, kept diffable — so it is
+    /// NOT going to grow validation): it indexes a fixed number of lines and columns out of a CSV
+    /// and parses every cell, checking none of it. A truncated, re-exported or half-written anchors
+    /// file therefore throws. That once mattered in the shipping build: the pause screen's
+    /// raise-hand probe loaded the BlazePose anchor table synchronously inside PauseMenu.Update,
+    /// and before PR #6's review fix the throw escaped it and left the player frozen behind a
+    /// pause card whose buttons were still disabled. The probe and its anchor table are gone from
+    /// the shipping build since 28 Sep 2026 (hop-twice resume); the only caller left is the T-010
+    /// CV spike's BlazePoseRunner, which reads its own committed copy (Assets/CV/Data/anchors.csv).
     ///
-    /// These tests pin the throw rather than remove it. The contract that matters is one level
-    /// up — Load turns any of this into "false", the caller falls back to touch, the run stays
-    /// resumable (rule 3) — and it cannot be exercised here because it needs Resources and a
-    /// working inference backend. What CAN be pinned engine-free is that the input really is
-    /// hostile, so nobody later reads the catch as defensive noise and deletes it.
-    ///
-    /// The real file (Resources/CameraInput/pose_anchors.csv) is the well-formed case, and the
-    /// happy-path test below is its shape in miniature.
+    /// These tests pin the throw rather than remove it, so the next caller knows the input really
+    /// is hostile and nobody reads a catch around it as defensive noise. The happy-path test below
+    /// is the real table's shape in miniature.
     public sealed class BlazeAnchorsTests
     {
         /// Written invariant by hand, never through a float formatter: LoadAnchors parses with
@@ -60,7 +57,7 @@ namespace MotionRunner.Tests
         }
 
         /// The same truncation with its trailing newline intact — the way a real half-written
-        /// file looks. Different exception, same disabled gesture and same working RESUME button.
+        /// file looks. Different exception, same need for the caller to catch it.
         [Test]
         public void TruncatedCsvWithTrailingNewline_Throws()
         {

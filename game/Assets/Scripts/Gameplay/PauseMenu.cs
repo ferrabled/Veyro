@@ -2,6 +2,8 @@ using System;
 using MotionRunner.Audio;
 using MotionRunner.CameraInput;
 using MotionRunner.Core;
+using MotionRunner.Inputs;
+using MotionRunner.Pose;
 using MotionRunner.Track;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,14 +20,20 @@ namespace MotionRunner.Gameplay
     /// player behind a camera that will not come back (CLAUDE.md rule 3).
     ///
     /// Since the hands-free flow (2026-09-01) a camera resume is three waits, not one:
-    ///   camera back -> raise your right hand (or tap RESUME) -> 3-2-1 -> run.
+    ///   camera back -> stand still, then hop twice (or tap RESUME) -> 3-2-1 -> run.
     /// The gesture is the whole point of the mode - the player walked away from the phone, so
     /// asking them to walk back and tap it defeats hands-free - but it AUGMENTS, never gates
-    /// (rule 3): both buttons come back the moment the face is found, so a player whose pose
-    /// never detects resumes by touch, and Android back cancels at every step. The countdown
-    /// exists for FaceSteering as much as for the player: its neutral was reset at BeginResume,
-    /// and three seconds of standing still is what it calibrates on, so the run resumes aimed
-    /// straight instead of leaning into a wall.
+    /// (rule 3): both buttons come back the moment the face is found, so a player whose hops
+    /// never register resumes by touch, and Android back cancels at every step. The countdown
+    /// exists for FaceSteering as much as for the player: RunFlow resets the run's steering when
+    /// the count starts (CountdownStarted), so it calibrates on the player standing still right
+    /// after the hops rather than on them walking back in, and the run resumes aimed straight
+    /// instead of leaning into a wall.
+    ///
+    /// The gesture was "raise your right hand" (a BlazePose probe) until 28 Sep 2026; it is now
+    /// two hops, read by DoubleHopConfirm off a FaceSteering of its own. The stand-still comes
+    /// first because the hop rule, on its own, fires on a player walking back into frame - see
+    /// DoubleHopConfirm for why and for what stands in the way.
     ///
     /// One asymmetry runs through all of it: a resume the player asked for has already been
     /// confirmed by the tap that asked, while a resume the GAME asked for (BeginAutoResume, off a
@@ -34,9 +42,9 @@ namespace MotionRunner.Gameplay
     /// card and asks. ResumeConfirm is that rule, engine-free and pinned in tests.
     ///
     /// The menu is up while the game is frozen at Time.timeScale = 0, so everything here counts
-    /// in unscaled time and nothing here waits on a coroutine. The BlazePose probe behind the
-    /// gesture lives on the rig and is affordable for exactly the same reason - see
-    /// PoseGestureProbe; it is disposed the moment the countdown starts.
+    /// in unscaled time and nothing here waits on a coroutine. The hop confirm is arithmetic over
+    /// the face observations the rig already publishes - no model, nothing to load or dispose -
+    /// and it is simply dropped the moment the countdown starts.
     public sealed class PauseMenu : MonoBehaviour
     {
         static readonly Color TextColor = Menu.MenuTheme.Text;
@@ -48,19 +56,26 @@ namespace MotionRunner.Gameplay
         static readonly Color StatusColor = Menu.MenuTheme.Dim;
 
         const string IdleHint = "back button resumes";
-        const string GesturePrompt = "raise your right hand when ready\n— or tap RESUME";
-        const string GestureHoldHint = "hold it…";
+        const string SettlePrompt = "stand still…\n— or tap RESUME";
+        const string HopPrompt = "hop twice when ready\n— or tap RESUME";
+        const string OneMoreHopPrompt = "one more hop…\n— or tap RESUME";
         const string TouchOnlyPrompt = "tap RESUME when ready";
         const string CountdownHint = "get ready…";
         const string FaceLostReason = "couldn't see you — paused";
 
-        /// How long the countdown tolerates the staging losing the face before it cancels back to
-        /// the paused card. CameraStaging demands a fresh CONFIDENT observation, and a single
-        /// blurred frame fails that bar - a player settling into their lane must not have the
-        /// countdown yanked away by one soft frame. 0.75 s is a couple of real detector losses,
-        /// well past the blur regime (FaceSteering carries positions for 0.30 s) and still short
-        /// enough that a player who genuinely walked off does not get an unattended unfreeze.
-        const float CountdownFaceGraceSeconds = 0.75f;
+        /// The same three steps, in the few words the framing overlay's caption has room for.
+        const string SettleCaption = "stand still";
+        const string HopCaption = "hop twice";
+        const string OneMoreHopCaption = "one more hop";
+
+        /// How long the confirm wait and the countdown tolerate losing the face before they give
+        /// up on it - the confirm walking back to the camera wait, the countdown cancelling back
+        /// to the paused card. A player settling into their lane, or hopping (the one movement
+        /// guaranteed to blur a frame or two), must not have either yanked away by one soft frame.
+        /// 0.75 s is a couple of real detector losses, well past the blur regime (FaceSteering
+        /// carries positions for 0.30 s) and still short enough that a player who genuinely
+        /// walked off does not get an unattended unfreeze.
+        const float FaceGraceSeconds = 0.75f;
 
         /// What the player asked for. Raised one frame after the tap at the earliest, and only
         /// once the camera (if any) is back and the countdown has run out.
@@ -71,6 +86,14 @@ namespace MotionRunner.Gameplay
         /// Raised the moment a resume or restart is asked for, before anything is ready: RunFlow
         /// turns the camera back on off the back of this.
         public event Action ResumeStarted;
+
+        /// The 3-2-1 has just begun - confirmed by hops or by tap. RunFlow resets the run's own
+        /// FaceSteering off the back of this, so the resumed run calibrates on the three seconds
+        /// of a player standing where they will play from. Its reset at ResumeStarted is too early
+        /// for that: the calibration it starts completes on the first dozen confident frames, which
+        /// is the player walking back into shot (seen on device 28 Sep: a resumed run held a side
+        /// lane with the player standing in the middle).
+        public event Action CountdownStarted;
 
         /// The countdown lost the player mid-count. RunFlow routes it through RequestPause - the
         /// same path as the back button - so the phase walks back to Paused through the one
@@ -95,9 +118,10 @@ namespace MotionRunner.Gameplay
             None,
             Camera,
 
-            /// Waiting to be confirmed. Usually "raise your right hand — or tap RESUME"; with no
-            /// working probe (it never loaded, or it died mid-wait) the same wait runs on touch
-            /// alone, which is why this is the confirm step and not literally the gesture.
+            /// Waiting to be confirmed: "stand still…", then "hop twice when ready", with "or tap
+            /// RESUME" under both. Without a hop confirm (ResumeConfirm's TouchConfirm row) the
+            /// same wait runs on touch alone, which is why this is the confirm step and not
+            /// literally the gesture.
             Gesture,
             Countdown
         }
@@ -113,9 +137,17 @@ namespace MotionRunner.Gameplay
         Pending _pending;
         Wait _wait;
 
+        /// The hop confirm, alive only during the confirm wait: its own input adapter over the
+        /// rig (so its own FaceSteering, which it recalibrates at will) and the rule reading it.
+        /// Null outside that wait, and null inside it on ResumeConfirm's touch-only row.
+        CameraFaceInput _hopInput;
+        DoubleHopConfirm _hop;
+        DoubleHopConfirm.Phase _loggedPhase;
+        int _loggedHops;
+
         /// Whether the pending resume was asked for by the player or by the game. It decides one
         /// thing only, and it is the one thing that must never be got wrong: what happens at the
-        /// end of the camera wait when there is no working gesture probe. See ResumeConfirm.
+        /// end of the camera wait when there is no gesture to confirm with. See ResumeConfirm.
         ResumeOrigin _origin;
 
         /// Why the game paused itself, prefixed onto whatever the card says next. Cleared the
@@ -152,12 +184,12 @@ namespace MotionRunner.Gameplay
         public void RequestResume() => Begin(Pending.Resume, ResumeOrigin.User);
 
         /// Back out of a re-acquisition: the camera goes off again and the menu returns to rest.
-        /// Every wait ends here - the probe, the countdown and the staging all go, whichever of
-        /// them was up. An auto-pause reason survives the cancel: backing out of the recovery
+        /// Every wait ends here - the hop confirm, the countdown and the staging all go, whichever
+        /// of them was up. An auto-pause reason survives the cancel: backing out of the recovery
         /// does not change why the game stopped.
         public void CancelResume()
         {
-            _rig?.EndGestureProbe();
+            EndHopConfirm();
             _countdown.Cancel();
             _countdownDigits.gameObject.SetActive(false);
             _panel.SetActive(true); // the card comes back from wherever the count had put it
@@ -185,7 +217,7 @@ namespace MotionRunner.Gameplay
         /// sitting on an idle card. The player is by definition away from the phone — that is
         /// what an outage IS — so asking them to walk over and tap RESUME before the camera even
         /// starts looking for them defeats the hands-free loop (acceptance criterion 1:
-        /// auto-pause → framing overlay → re-enter → raise your hand, no touch anywhere). The
+        /// auto-pause → framing overlay → re-enter → stand still, hop twice, no touch anywhere). The
         /// reason rides along on top of the staging copy, and every existing way out still works:
         /// back cancels to the idle card, QUIT leaves, a camera that will not come back drops to
         /// tilt through the same Failed path.
@@ -198,8 +230,10 @@ namespace MotionRunner.Gameplay
         /// What separates this from the button, all the way through the staging, is that NOBODY
         /// HAS CONFIRMED ANYTHING yet: the tap that normally starts a resume is the confirmation,
         /// and there was no tap. So a resume begun here may only ever be finished by an explicit
-        /// confirm — the raised hand, or a RESUME tap — never by the staging simply reaching
-        /// "I can see you". That is ResumeOrigin.Auto, and TickCameraWait is where it pays off.
+        /// confirm — two hops, or a RESUME tap — never by the staging simply reaching "I can see
+        /// you", and never by the player merely walking back into shot (DoubleHopConfirm's
+        /// stand-still is what separates those). That is ResumeOrigin.Auto, and TickCameraWait is
+        /// where it pays off.
         public void BeginAutoResume(string reason)
         {
             _reason = reason;
@@ -336,9 +370,10 @@ namespace MotionRunner.Gameplay
         ///
         /// While the gesture wait is up, this same method IS the touch confirm: both buttons are
         /// deliberately live there (rule 3 - the gesture augments, it never gates), and a tap
-        /// skips the hand-raise and goes straight to the countdown. Only a USER origin may do
-        /// that: the shortcut's whole justification is that a tap just happened, so an auto-resume
-        /// arriving on top of a confirm wait must not be allowed to spend it as a confirmation.
+        /// skips the stand-still and the hops and goes straight to the countdown. Only a USER
+        /// origin may do that: the shortcut's whole justification is that a tap just happened, so
+        /// an auto-resume arriving on top of a confirm wait must not be allowed to spend it as a
+        /// confirmation.
         void Begin(Pending pending, ResumeOrigin origin)
         {
             if (_wait == Wait.Gesture && origin == ResumeOrigin.User)
@@ -420,21 +455,22 @@ namespace MotionRunner.Gameplay
                     // takes it from here is whoever still owes a confirmation, which is exactly
                     // ResumeConfirm's table.
                     //
-                    // The probe is asked for FIRST because loading it is the only way to know
-                    // whether the gesture is on the table at all (assets missing, a model that
-                    // will not run, a load that throws - all answer false, all leave the touch
-                    // path untouched: rule 3, the gesture augments and never gates).
-                    switch (ResumeConfirm.For(_origin, _rig.BeginGestureProbe()))
+                    // The hop confirm is started FIRST because starting it is what says whether
+                    // the gesture is on the table at all. It needs no model, so with the staging
+                    // Ready it always is; the other two rows are the safety net for a rig that
+                    // is somehow not tracking, and leave the touch path untouched (rule 3, the
+                    // gesture augments and never gates).
+                    switch (ResumeConfirm.For(_origin, BeginHopConfirm()))
                     {
                         case ResumeConfirmStep.Gesture:
                             // The face is found — whatever reason paused the run is resolved, and
-                            // from here the gesture prompt is the only line that matters.
+                            // from here the confirm's prompt is the only line that matters.
                             _reason = null;
                             _wait = Wait.Gesture;
                             _pendingFrame = Time.frameCount;
+                            _faceUnseenFor = 0f;
                             SetButtonsInteractable(true);
-                            _status.text = GesturePrompt;
-                            _overlay?.ShowRaiseHandHint(true);
+                            ShowHopPrompt();
                             return;
 
                         case ResumeConfirmStep.Countdown:
@@ -447,18 +483,19 @@ namespace MotionRunner.Gameplay
                             return;
 
                         default:
-                            // No gesture AND no confirmation: the game paused itself and the
-                            // probe is not there to be raised at. Counting down here would
-                            // unfreeze a run because the player walked back into shot - which is
-                            // not a thing anybody asked for. So the card comes back with its
-                            // buttons live and asks, and the reason stays on top of the ask
-                            // because this player has not read it yet: they were out of frame
-                            // for the whole auto-pause. Everything else still works from here -
-                            // a tap counts down, back cancels, a camera that dies drops to tilt,
-                            // and losing the face walks back to the camera wait, which gives the
-                            // probe another chance at the gesture prompt on the way through here.
+                            // No gesture AND no confirmation: the game paused itself and there is
+                            // no hop confirm to answer it. Counting down here would unfreeze a run
+                            // because the player walked back into shot - which is not a thing
+                            // anybody asked for. So the card comes back with its buttons live and
+                            // asks, and the reason stays on top of the ask because this player has
+                            // not read it yet: they were out of frame for the whole auto-pause.
+                            // Everything else still works from here - a tap counts down, back
+                            // cancels, a camera that dies drops to tilt, and losing the face walks
+                            // back to the camera wait, which offers the hop confirm again on the
+                            // way through here.
                             _wait = Wait.Gesture;
                             _pendingFrame = Time.frameCount;
+                            _faceUnseenFor = 0f;
                             SetButtonsInteractable(true);
                             _status.text = WithReason(TouchOnlyPrompt);
                             return;
@@ -466,60 +503,137 @@ namespace MotionRunner.Gameplay
             }
         }
 
-        /// The staging keeps being polled underneath the gesture: it is the one definition of
-        /// "the camera can see you", and walking out of shot mid-gesture walks this wait back to
-        /// the camera one, probe and all.
+        /// The confirm wait. The staging keeps being polled underneath it - it is still the one
+        /// place that knows the camera has died - but whether the player is still THERE is read
+        /// off the hop confirm's own steering, with FaceGraceSeconds of slack, and not off the
+        /// staging's Ready. That answer is deliberately strict (a confident face, held half a
+        /// second, before a run is handed over), and a hop is the one movement guaranteed to blur
+        /// a frame or two under it: every hop would walk the wait back to the camera one and throw
+        /// the confirm away mid-gesture. HasPosition keeps a blurred face for as long as a
+        /// confident one is 0.30 s behind it, and never carries detector noise; too far away
+        /// counts as gone, as it does for the staging.
+        ///
+        /// Walking out of shot for longer than the grace walks this wait back to the camera one,
+        /// and coming back starts the confirm over from "stand still".
         void TickGestureWait()
         {
-            switch (_staging.Poll())
+            CameraStaging.Stage stage = _staging.Poll();
+            if (stage == CameraStaging.Stage.Failed)
             {
-                case CameraStaging.Stage.Waiting:
-                    _rig.EndGestureProbe();
-                    _overlay?.ShowRaiseHandHint(false);
-                    _wait = Wait.Camera;
-                    SetButtonsInteractable(false);
-                    _status.text = WithReason(_staging.Status);
-                    return;
-
-                case CameraStaging.Stage.Failed:
-                    HandleCameraFailure();
-                    return;
+                HandleCameraFailure();
+                return;
             }
 
-            PoseGestureProbe probe = _rig.GestureProbe;
-            if (probe == null || !probe.IsRunning)
+            FaceSteering steering = null;
+            if (_hopInput != null)
             {
-                // Either the probe died mid-wait (it logs why) or it never loaded and this wait
-                // is the auto-resume's touch confirm. Both mean the same thing: the touch path
-                // carries on alone, and nothing auto-resumes, because a confirm the player never
-                // gave is not one. Note this is the ONE rule that does not split on
-                // ResumeOrigin - a user-initiated resume does not fall through to a countdown
-                // here either, because the player is standing in front of the phone watching a
-                // prompt, and pulling the count out from under them mid-hold reads as the game
-                // resuming by itself. The reason line only exists on the auto path.
+                _hopInput.Tick();
+                steering = _hopInput.Steering;
+            }
+
+            bool seen = steering != null
+                ? steering.HasPosition && !steering.IsTooFar
+                : stage == CameraStaging.Stage.Ready;
+            _faceUnseenFor = seen ? 0f : _faceUnseenFor + Time.unscaledDeltaTime;
+            if (_faceUnseenFor > FaceGraceSeconds)
+            {
+                EndHopConfirm();
+                _wait = Wait.Camera;
+                SetButtonsInteractable(false);
+                _status.text = WithReason(_staging.Status);
+                return;
+            }
+
+            if (_hop == null)
+            {
+                // ResumeConfirm's touch-only row: the touch path carries on alone, and nothing
+                // auto-resumes, because a confirm the player never gave is not one. Note this is
+                // the ONE rule that does not split on ResumeOrigin - a user-initiated resume does
+                // not fall through to a countdown here either, because the player is standing in
+                // front of the phone watching a prompt, and pulling the count out from under them
+                // reads as the game resuming by itself. The reason line only exists on the auto
+                // path.
                 _status.text = WithReason(TouchOnlyPrompt);
                 return;
             }
 
-            if (probe.Confirmed)
+            bool confirmed = _hop.Tick(Time.unscaledDeltaTime);
+            LogHopProgress();
+            if (confirmed)
             {
                 StartCountdown();
                 return;
             }
 
-            // "hold it…" for as long as any evidence is standing, not only on frames the rule
-            // agreed: the lite landmarker drops the overhead wrist for the odd sample, and a
-            // prompt that flips back to "raise your right hand" against an arm that never moved
-            // reads as a broken gesture (the 2026-09-02 device complaint). The streak now winds
-            // down through misses instead of resetting, so streak > 0 is exactly "a hold is in
-            // progress".
-            _status.text = probe.HandRaisedNow || probe.Streak > 0 ? GestureHoldHint : GesturePrompt;
+            ShowHopPrompt();
         }
 
-        /// Confirmed - by hand or by tap. The probe goes FIRST (the design rule: the heavy model
-        /// is disposed the moment the countdown starts, so it is provably never alive when the
-        /// world unfreezes), then three seconds of numerals while FaceSteering calibrates on a
-        /// player standing still.
+        /// Starts the hop confirm on an input adapter of its own - CameraFaceInput over the rig,
+        /// fed the rig's published observations exactly like the run's adapter and the overlay's
+        /// are (rule 2: an adapter, never the camera or the model). Its own, because the confirm
+        /// recalibrates its steering at every stand-still, and neither the run's steering nor
+        /// the overlay's may be reset under their owners.
+        ///
+        /// Nothing to load, so the only way it is unavailable is a rig that is not tracking - which
+        /// a Ready staging already rules out. The false branch is the safety net ResumeConfirm's
+        /// table keeps honest, not a path anybody is expected to take.
+        bool BeginHopConfirm()
+        {
+            EndHopConfirm();
+            if (_rig == null || _rig.State != FaceTrackingRig.RigState.Tracking) return false;
+
+            _hopInput = new CameraFaceInput(_rig);
+            _hop = new DoubleHopConfirm(_hopInput.Steering);
+            _loggedPhase = (DoubleHopConfirm.Phase)(-1);
+            _loggedHops = -1;
+            LogHopProgress();
+            return true;
+        }
+
+        /// Idempotent, and called from every way the confirm wait can end: the countdown
+        /// starting, the face walking off, the resume being cancelled, the camera failing.
+        void EndHopConfirm()
+        {
+            _hopInput = null;
+            _hop = null;
+            if (_overlay != null) _overlay.ShowHopHint(null, false);
+        }
+
+        /// The card's line and the overlay's caption for where the confirm has got to. Called
+        /// every frame of the wait; both sinks ignore a repeat of what they already show.
+        void ShowHopPrompt()
+        {
+            if (_hop.State == DoubleHopConfirm.Phase.Settling)
+            {
+                _status.text = SettlePrompt;
+                if (_overlay != null) _overlay.ShowHopHint(SettleCaption, false);
+            }
+            else if (_hop.Hops == 0)
+            {
+                _status.text = HopPrompt;
+                if (_overlay != null) _overlay.ShowHopHint(HopCaption, true);
+            }
+            else
+            {
+                _status.text = OneMoreHopPrompt;
+                if (_overlay != null) _overlay.ShowHopHint(OneMoreHopCaption, true);
+            }
+        }
+
+        /// One logcat line each time the confirm changes phase or hop count - the only way to
+        /// tell "my hops were not seen" from "I never stood still long enough" after a device
+        /// session (adb logcat -s Unity | grep "hop confirm").
+        void LogHopProgress()
+        {
+            if (_hop == null || (_hop.State == _loggedPhase && _hop.Hops == _loggedHops)) return;
+            _loggedPhase = _hop.State;
+            _loggedHops = _hop.Hops;
+            Debug.Log($"[CAM] hop confirm: {_hop.State} hops={_hop.Hops} restarts={_hop.Resettles}");
+        }
+
+        /// Confirmed - by hops or by tap. The hop confirm goes first (its steering has done its
+        /// job), then three seconds of numerals while FaceSteering calibrates on a player
+        /// standing still.
         ///
         /// The card steps ASIDE for the count (owner call from the 2026-09-02 device session):
         /// the countdown belongs to the run the player is about to rejoin, so what is on screen
@@ -530,8 +644,7 @@ namespace MotionRunner.Gameplay
         /// same way on its own.
         void StartCountdown()
         {
-            _rig.EndGestureProbe();
-            _overlay?.ShowRaiseHandHint(false);
+            EndHopConfirm();
             _wait = Wait.Countdown;
             _faceUnseenFor = 0f;
             SetButtonsInteractable(false);
@@ -542,6 +655,7 @@ namespace MotionRunner.Gameplay
             _countdownDigits.gameObject.SetActive(true);
             _tickedDigit = _countdown.DisplayDigit;
             GameAudio.Play(Sfx.CountdownTick); // "3"
+            CountdownStarted?.Invoke(); // RunFlow recalibrates the run's steering on this
         }
 
         void TickCountdown()
@@ -562,7 +676,7 @@ namespace MotionRunner.Gameplay
             _faceUnseenFor = stage == CameraStaging.Stage.Ready
                 ? 0f
                 : _faceUnseenFor + Time.unscaledDeltaTime;
-            if (_faceUnseenFor > CountdownFaceGraceSeconds)
+            if (_faceUnseenFor > FaceGraceSeconds)
             {
                 _countdown.Cancel();
                 _countdownDigits.gameObject.SetActive(false);
@@ -597,7 +711,7 @@ namespace MotionRunner.Gameplay
         /// taken down before the run is handed to tilt+touch.
         void HandleCameraFailure()
         {
-            _rig.EndGestureProbe();
+            EndHopConfirm();
             _countdown.Cancel();
             _countdownDigits.gameObject.SetActive(false);
             _panel.SetActive(true);
@@ -627,12 +741,10 @@ namespace MotionRunner.Gameplay
             _overlay = null;
         }
 
-        /// The probe dies with the menu, not with the rig: quitting mid-wait destroys the rig
-        /// (which also ends it), but a menu closed any other way must not leave a pose model
-        /// running behind an unfrozen run.
+        /// The overlay goes with the menu, however the menu was closed. (The hop confirm holds
+        /// nothing that needs releasing - it is arithmetic over the rig's published observations.)
         void OnDestroy()
         {
-            _rig?.EndGestureProbe();
             DismissOverlay();
         }
     }

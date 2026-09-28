@@ -365,7 +365,7 @@ recovery keys, purchase tokens and raw logs must stay outside the event payloads
 | Consent/network | No initialization before the applicable choice; required advertising suppression, revocation, in-flight and offline queue behavior proven |
 | OneSignal | Correct app/device subscription; actual delivery; safe cold/warm/foreground tap handling |
 | Layers | Expected device events arrive once; no attract-run inflation; QA isolated; offline replay and selected identity path work |
-| Regression | Tilt, camera, pause/raise-hand resume, store purchase/restore and normal offline play still work |
+| Regression | Tilt, camera, pause/hop-twice resume, store purchase/restore and normal offline play still work |
 | Publication/evidence | SDKs verified in the public build; campaign deployed; dated experiment result and learning recorded |
 
 **Needs human device test when implemented:**

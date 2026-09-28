@@ -47,10 +47,10 @@ namespace MotionRunner.CameraInput
         public bool MirrorForSelfie { get; set; } = true;
 
         /// Whether the upright frame actually carries the selfie mirror — MirrorForSelfie only
-        /// applies to a front-facing camera (see EnsureTarget). Consumers that read anatomy off
-        /// the frame need this: BlazePose labels left/right as if the image were unmirrored, so
-        /// which wrist is "the player's right hand" depends on exactly this flag
-        /// (RaisedHand.WristFor). An Editor webcam usually reports front=false and lands on the
+        /// applies to a front-facing camera (see EnsureTarget). Only a consumer that reads
+        /// ANATOMY off the frame needs this (a pose model labels left/right as if the image were
+        /// unmirrored); nothing in the shipping build does since the raise-hand confirm went
+        /// (28 Sep 2026). An Editor webcam usually reports front=false and lands on the
         /// unmirrored side.
         public bool IsSelfieMirrored => MirrorForSelfie && IsFrontFacing;
 

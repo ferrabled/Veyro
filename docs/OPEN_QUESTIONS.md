@@ -119,6 +119,9 @@ the question. Keep this file short; it is read every session.
     the spec's defaults; each is one constant. Confirm or retune on device:
     - Raise-hand hold: 3 consecutive probe samples (`RaisedHandConfirm.RequiredSamples`, ~1 s at
       the probe's ~3 Hz); margin 0.5 head units above the nose (`RaisedHand.HeadUnitsAboveNose`).
+      *(28 Sep 2026: obsolete — raise-hand and BlazePose are gone from the build, replaced by
+      "hop twice" (IOS_HANDOFF decision 7); its dials are in `CAMERA_TUNING.md` §Resume gesture.
+      The "Pose model size" bullet below is obsolete for the same reason.)*
     - Countdown: 3 s (`ResumeCountdown.DefaultDurationSeconds`), camera resumes only. **Show it on
       tilt resumes too, for consistency?** *Default taken: no — tilt resumes stay instant.*
     - **Should the picker's initial "I can see you!" staging also use the gesture + countdown?**

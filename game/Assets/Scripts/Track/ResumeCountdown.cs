@@ -6,10 +6,11 @@ namespace MotionRunner.Track
     ///
     /// ---- why a countdown exists at all ---------------------------------------------------------
     ///
-    /// A camera resume cannot drop straight into gameplay. FaceSteering.Reset() fires at BeginResume
-    /// and calibrates on whatever it sees next, so unfreezing immediately calibrates on a player who
-    /// is still walking back into shot — and lands them in a moving run aimed at whichever lane
-    /// their mid-stride body happened to read as. The countdown buys the three things that fix that
+    /// A camera resume cannot drop straight into gameplay. FaceSteering calibrates on whatever it
+    /// sees after a Reset(), so a calibration started as the player walks back into shot lands them
+    /// in a moving run aimed at whichever lane their mid-stride body happened to read as. RunFlow
+    /// therefore resets the run's steering again the moment this countdown begins
+    /// (PauseMenu.CountdownStarted). The countdown buys the three things that fix that
     /// at once: the recentred axis gets a still player to calibrate against, the framing overlay
     /// stays up long enough for the player to watch themselves settle into the middle lane, and the
     /// tap or gesture that asked to resume is spent frames before the run reads input again.
@@ -72,8 +73,8 @@ namespace MotionRunner.Track
             }
         }
 
-        /// Starts counting. Called on confirm — the raised-hand gesture OR the RESUME button, which
-        /// must stay equivalent (rule 3: a player whose pose never detects resumes by button).
+        /// Starts counting. Called on confirm — the two hops OR the RESUME button, which must stay
+        /// equivalent (rule 3: a player whose hops never register resumes by button).
         ///
         /// Restarts from the top if one is already in flight, which is what a second confirm means:
         /// there is no queue of countdowns, only the current one.

@@ -53,7 +53,7 @@ loadout synchronization are not implemented in this version.
 1. Owner device acceptance: open the pass from Home, scroll both tracks, collect an earned
    free item, open the locker by tapping the Home character, preview/equip it, and complete
    a Tilt & Touch run. Check hat clearance and trail visibility during jumps/lane changes.
-2. Repeat Camera mode with a person in frame, including lost tracking, pause/raise-hand
+2. Repeat Camera mode with a person in frame, including lost tracking, pause/hop-twice
    resume, countdown and return to Home. Automation cannot judge physical steering feel.
 3. Exercise the real Test Store pass purchase/restore/refund path as part of the existing
    commerce acceptance. Pure/service tests and the isolated fixture cover ownership gates;

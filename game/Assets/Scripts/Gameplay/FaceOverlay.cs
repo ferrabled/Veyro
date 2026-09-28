@@ -147,7 +147,7 @@ namespace MotionRunner.Gameplay
         Image[] _glyphParts;
         Image[] _bands;
         Text _caption;
-        GameObject _hintArm;
+        GameObject _hintMarks;
         string _captionOverride;
 
         float _innerHalfWidth;
@@ -230,29 +230,50 @@ namespace MotionRunner.Gameplay
             Destroy(gameObject);
         }
 
-        /// The raised-hand affordance for the resume gesture: the stickman grows a raised arm and
-        /// the caption says what to do. Drawn on the glyph's SCREEN-RIGHT side, which - because
-        /// the whole pipeline below the once-mirrored upright frame works in the player's own
-        /// left/right (see the mirroring note on this class) - is the side the player's actual
-        /// right hand appears on in this mirror-like view. Same side as the wrist the rule reads:
-        /// RaisedHand.WristFor pins the landmark half of that, this pins the picture half.
-        public void ShowRaiseHandHint(bool on)
+        /// The resume confirm's affordance on the pause screen: a caption saying what to do
+        /// ("stand still", "hop twice", "one more hop"), and - while hops are what is wanted - an
+        /// up-chevron either side of the stickman's head, the way the guide draws a hop. The
+        /// chevrons ride on the glyph, so they jump with it when the player does. A null caption
+        /// takes the whole hint down.
+        ///
+        /// Called every frame of the confirm wait, so a repeat of what is already shown costs
+        /// nothing: the caption is only re-laid out when it changes.
+        public void ShowHopHint(string caption, bool marks)
         {
-            if (on && _hintArm == null)
+            if (marks && _hintMarks == null)
             {
                 // Built like the glyph's own parts, but kept out of _glyphParts: the hint keeps
                 // its instructional colour instead of turning red with a lost face - the caption
-                // already narrates loss, and a red "raise your hand" reads as "stop".
-                Image arm = Part("RaisedArm",
-                    new Vector2(_glyphHeight * 0.075f, _glyphHeight * 0.165f),
-                    new Vector2(_glyphHeight * 0.026f, _glyphHeight * 0.13f), -30f);
-                arm.color = EnterTickColor;
-                _hintArm = arm.gameObject;
+                // already narrates loss, and a red prompt reads as "stop".
+                GameObject root = RuntimeUi.Element("HopHint", _glyph, out RectTransform rect);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = Vector2.zero;
+                rect.sizeDelta = Vector2.zero;
+                Chevron(rect, -_glyphHeight * 0.16f);
+                Chevron(rect, _glyphHeight * 0.16f);
+                _hintMarks = root;
             }
 
-            if (_hintArm != null) _hintArm.SetActive(on);
-            _captionOverride = on ? "raise your right hand" : null;
-            _shownCaption = null; // force the caption redraw either way
+            if (_hintMarks != null && _hintMarks.activeSelf != marks) _hintMarks.SetActive(marks);
+            if (caption == _captionOverride) return;
+            _captionOverride = caption;
+            _shownCaption = null; // force the caption redraw
+        }
+
+        /// One "^" at head height, `x` from the glyph's centre line: two bars leaning into each
+        /// other, the same stroke weight as the stickman's limbs.
+        void Chevron(RectTransform parent, float x)
+        {
+            float stroke = _glyphHeight * 0.024f;
+            float length = _glyphHeight * 0.075f;
+            float half = length * 0.5f * 0.7071f; // each bar's centre, half a 45-degree stroke out
+            float y = _glyphHeight * 0.20f;
+            foreach (int side in new[] { -1, 1 })
+            {
+                Image bar = Part("Chevron", new Vector2(x + side * half, y),
+                    new Vector2(stroke, length), side * 45f, parent);
+                bar.color = EnterTickColor;
+            }
         }
 
         // ---- per frame -----------------------------------------------------------------------
@@ -353,8 +374,7 @@ namespace MotionRunner.Gameplay
             if (health == Health.Lost) return _framing ? "can't see you" : "no face";
 
             // The gesture prompt only replaces the idle chatter: a health problem above always
-            // outranks it, because "raise your right hand" is bad advice to someone the camera
-            // cannot see.
+            // outranks it, because "hop twice" is bad advice to someone the camera cannot see.
             if (_captionOverride != null) return _captionOverride;
 
             if (steering.IsSlideActive) return "crouch";
@@ -486,7 +506,7 @@ namespace MotionRunner.Gameplay
         /// player costs exactly one transform write per frame however many pieces the glyph has.
         void BuildGlyph(Transform parent, float height)
         {
-            _glyphHeight = height; // the raise-hand hint is built lazily, to the same scale
+            _glyphHeight = height; // the hop hint is built lazily, to the same scale
             GameObject go = RuntimeUi.Element("Glyph", parent, out RectTransform rect);
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = rect.anchorMin;
@@ -507,9 +527,11 @@ namespace MotionRunner.Gameplay
                 new Vector2(height * 0.028f, height * 0.13f), -20f);
         }
 
-        Image Part(string name, Vector2 position, Vector2 size, float rotation)
+        Image Part(string name, Vector2 position, Vector2 size, float rotation,
+            Transform parent = null)
         {
-            GameObject go = RuntimeUi.Element(name, _glyph, out RectTransform rect);
+            GameObject go = RuntimeUi.Element(name, parent != null ? parent : _glyph,
+                out RectTransform rect);
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = rect.anchorMin;
             rect.anchoredPosition = position;

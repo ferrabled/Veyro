@@ -419,7 +419,7 @@ Wide 16:10 landscape, plain flat #FBF5E9 paper to every edge, no border, no roun
 Do not include: a pink beam or pink shape on the floor, any text, letters, numbers or labels, logos, watermark, app interface elements, photorealism, 3D render, gradients, blur, dark background, extra furniture, stick figures, capsule or blob bodies, extra fingers or limbs, vehicles, neon.
 ```
 
-### `pause_02.png` — raise your right hand to resume
+### `pause_02.png` — hop twice to resume
 
 **Attach**
 1. Your approved `camera_02.png`.
@@ -427,7 +427,7 @@ Do not include: a pink beam or pink shape on the floor, any text, letters, numbe
 ```text
 Edit the attached image. Keep the style, inks, paper, viewpoint, framing, table, phone, pink triangle, floor shape, dashed floor line and the player's figure and position exactly as they are.
 
-Change only this: the player stands on the spot, on the centre line two metres from the table, and raises their RIGHT arm straight up (the arm on the RIGHT side of the picture), open palm facing the phone; a small pink ring circles the raised hand. The left arm stays relaxed. The pink triangle does not move. The phone's screen shows two short vertical pink bars on paper-white (a pause symbol).
+Change only this: the player, on the spot on the centre line two metres from the table, is in the air in a small hop straight up: the whole figure (head included) raised a little, both feet a hand's width above the floor, knees slightly bent, arms relaxed at their sides. Two small pink upward chevrons (simple ^ shapes) float one either side of the player's head, the way the game's hint draws "hop twice". The pink triangle does not move. The phone's screen shows two short vertical pink bars on paper-white (a pause symbol).
 
 Scene, unchanged from the attached image: flat risograph-style instructional illustration in deep teal #12454C, fluoro pink #EE3D87, mint #87BEA6 and gold #FFC85C on warm off-white paper #FBF5E9, slight grain, at most a hairline ink offset and no pink outlines around shapes, flat shapes, no gradients. A simple room drawn symmetric about one vertical centre line, seen from directly behind and above the player. A low teal table at the top, seen straight on, with a phone upright in a stand at its exact middle facing the player's spot. A flat, pale, see-through pink triangle opens from the phone's front camera toward the spot and stops there, never touching the floor. A dashed teal line runs along the centre line of a flat pale-mint floor rectangle, from under the phone to the spot. Nothing else is in the room. The player is a simplified but real human figure, full body, seen from directly behind, with exactly the clothes and colours of the attached image.
 
