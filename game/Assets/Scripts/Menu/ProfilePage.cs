@@ -15,8 +15,8 @@ namespace MotionRunner.Menu
     ///
     /// All the cards can be real now. Best score, streak and the recent-runs list come off
     /// disk through ProgressStore; the leaderboard comes from the shared Supabase board (T-009)
-    /// through LiveLeaderboard when the backend answers, and falls back to MockLeaderboard —
-    /// still labelled as sample data — when it does not (no key, offline, first frames). The
+    /// through LiveLeaderboard when the backend answers; until then (first frames, offline, no
+    /// key) the card shows empty slots under a "loading" / "no connection" panel. The
     /// player card shows the server-generated handle once a profile exists, with unlimited
     /// rerolls and a critter drawn from the handle (PlayerAvatar), and the account card carries
     /// the account-deletion path Play policy requires.
@@ -37,7 +37,6 @@ namespace MotionRunner.Menu
         const string DeleteLabel = "DELETE ONLINE PROFILE";
         const string DeleteHint = "two taps · immediate and permanent";
 
-        readonly ILeaderboardSource _mock = new MockLeaderboard();
         LiveLeaderboard _live;
 
         BoardScope _scope = BoardScope.Daily;
@@ -179,6 +178,7 @@ namespace MotionRunner.Menu
             float pad = MenuTheme.CardPadding;
             _board = new LeaderboardCard();
             _board.Build(slot);
+            _board.Retry = () => _live.Refresh();
 
             // The two scopes of the shared board (D15). The scheme half of the split (tilt vs
             // camera) follows the mode the player last ran with, same as the bests above.
@@ -187,9 +187,9 @@ namespace MotionRunner.Menu
             _scopeAllTime = BuildScopeTab(slot, "ScopeAll", -pad - 176f, -pad, "ALL-TIME",
                 () => SetScope(BoardScope.AllTime));
 
-            // One bottom line, two honest states: the sample-data admission or the player's
-            // live rank. (The TAP TO JOIN consent ask lived here until 17 Sep - joining is
-            // automatic now, owner call; the privacy policy copy describes exactly that.)
+            // One bottom line under a live board: the player's rank. (The TAP TO JOIN consent ask
+            // lived here until 17 Sep - joining is automatic now, owner call; the privacy policy
+            // copy describes exactly that.)
             _boardNote = _board.Note;
         }
 
@@ -432,7 +432,7 @@ namespace MotionRunner.Menu
 
         /// Points the live board at (scope of the toggle) × (group of the last-used scheme) ×
         /// today's content. The fetch is async; until rows land — or forever, with no backend —
-        /// the mock fills the card, labelled as the sample data it is.
+        /// the card shows its empty slots under the loading / no-connection panel.
         void ShowBoard()
         {
             var scheme = ModePickerCard.LastUsed;
@@ -462,30 +462,29 @@ namespace MotionRunner.Menu
             FillBoard();
         }
 
+        /// Real rows, or nothing: while the board is loading or unreachable the card shows its
+        /// slots empty with a "loading" / "no connection" panel over them (owner call, 28 Sep).
+        /// It used to fill them with MockLeaderboard's sample players, labelled as samples, and
+        /// the jump from made-up names to the real board when the fetch landed read as a glitch.
         void FillBoard()
         {
-            ILeaderboardSource source = _live.IsLive ? _live : _mock;
-            var entries = source.Top(LeaderboardCard.Rows, _allTimeBestShown);
+            if (!_live.IsLive)
+            {
+                _board.ShowUnavailable(_live.IsLoading);
+                _boardNote.text = string.Empty;
+                return;
+            }
 
-            // The player's own critter on their row, whatever name the board gives them (the
-            // sample board calls them "YOU"): the same face as the player card above.
+            var entries = _live.Top(LeaderboardCard.Rows, _allTimeBestShown);
+
+            // The player's own critter on their row: the same face as the player card above.
             _board.Show(entries, _headline.text);
             RefreshBoardNote(entries.Count);
         }
 
-        /// The bottom line of the board card: no live board → say the rows are samples;
-        /// live → the player's rank, or a nudge to finish a run.
+        /// The bottom line of a live board: the player's rank, or a nudge to finish a run.
         void RefreshBoardNote(int rows)
         {
-            if (!_live.IsLive)
-            {
-                _boardNote.text = _live.IsLoading
-                    ? "sample board — loading online scores…"
-                    : "sample board — online scores unavailable";
-                _boardNote.color = MenuTheme.Faint;
-                return;
-            }
-
             _boardNote.text = rows == 0 ? "nobody yet — set the first score"
                 : _live.MyRank > 0 ? "you are #" + _live.MyRank + " on this board"
                 : "finish a run to land on this board";

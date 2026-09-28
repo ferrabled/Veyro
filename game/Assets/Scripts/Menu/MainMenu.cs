@@ -57,7 +57,7 @@ namespace MotionRunner.Menu
         public StoreCatalogView Catalog { get; private set; }
 
         /// The online profile seam, for the profile tab. May be a never-ready fake (no
-        /// backend configured) - pages must treat that as "boards are sample data".
+        /// backend configured) - pages must treat that as "no board to show".
         public IProfileService Profile { get; private set; }
         public SkinService Skins { get; private set; }
         public SeasonService Season => Skins.Season;

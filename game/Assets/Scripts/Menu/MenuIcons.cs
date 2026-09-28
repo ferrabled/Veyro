@@ -37,6 +37,33 @@ namespace MotionRunner.Menu
             Stroke(box, "Long", joint + Rotate(new Vector2(longLeg * 0.5f, 0f), 45f), 45f, longLeg, thickness, color);
         }
 
+        /// Three rising signal bars, centred in `box`, and - with `crossed` - a slash through them:
+        /// "no connection" without a glyph. Returns the slash so a caller can toggle it.
+        public static GameObject Signal(RectTransform box, Color color, bool crossed, float size = 56f)
+        {
+            float bar = size * 0.2f, gap = size * 0.12f;
+            float width = 3f * bar + 2f * gap;
+            for (int i = 0; i < 3; i++)
+            {
+                var go = RuntimeUi.Element("Bar" + i, box, out var rect);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0f, 0f);
+                float height = size * (0.35f + 0.325f * i);
+                rect.anchoredPosition = new Vector2(-width * 0.5f + i * (bar + gap), -size * 0.5f);
+                rect.sizeDelta = new Vector2(bar, height);
+                var panel = go.AddComponent<CosmeticPanel>();
+                panel.color = color;
+                panel.Radius = bar * 0.4f;
+                panel.raycastTarget = false;
+            }
+
+            var slash = RuntimeUi.Element("Slash", box, out var slashRect);
+            slashRect.anchorMin = slashRect.anchorMax = new Vector2(0.5f, 0.5f);
+            Stroke(slashRect, "Stroke", Vector2.zero, -45f, size * 1.25f, size * 0.1f, color);
+            slash.SetActive(crossed);
+            return slash;
+        }
+
         static Vector2 Rotate(Vector2 v, float degrees)
         {
             float r = degrees * Mathf.Deg2Rad, c = Mathf.Cos(r), s = Mathf.Sin(r);

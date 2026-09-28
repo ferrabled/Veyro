@@ -40,9 +40,17 @@ namespace MotionRunner.Menu
         readonly Place[] _places = new Place[Podium.Places];
         readonly ListRow[] _rows = new ListRow[ListRows];
 
-        /// The line under the board. ProfilePage writes it: the sample-data admission or the
-        /// player's live rank.
+        GameObject _status;
+        GameObject _slash;
+        Text _statusTitle;
+        Text _statusDetail;
+
+        /// The line under the board. ProfilePage writes it: the player's live rank, or nothing
+        /// while the board is not there.
         public Text Note { get; private set; }
+
+        /// A tap on the "no connection" panel: ProfilePage refetches.
+        public System.Action Retry;
 
         public void Build(RectTransform slot)
         {
@@ -70,12 +78,65 @@ namespace MotionRunner.Menu
                 new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(pad, 12f), new Vector2(-pad, 56f),
                 26, TextAnchor.MiddleLeft, MenuTheme.Faint);
+
+            BuildStatus(slot);
+        }
+
+        /// The panel over an absent board: signal bars (crossed out when there is no
+        /// connection), a line saying which, and - offline - a tap to try again. It sits over
+        /// the podium and list drawn as empty grey spots, so the card keeps its shape and real
+        /// rows fill the same slots when they arrive instead of replacing a made-up board.
+        void BuildStatus(RectTransform slot)
+        {
+            RuntimeUi.Element("Status", slot, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+            // Centred on the podium-and-list block.
+            rect.anchoredPosition = new Vector2(0f, -(PodiumTop + ListTop + ListRows * RowHeight) * 0.5f);
+            rect.sizeDelta = new Vector2(640f, 250f);
+            var surface = CosmeticUi.Surface(rect, MenuTheme.ItemCard, 32f);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = surface;
+            button.transition = Selectable.Transition.None;
+            button.onClick.AddListener(() => { if (_slash != null && _slash.activeSelf) Retry?.Invoke(); });
+            RuntimeUi.TapSound(button);
+
+            RuntimeUi.Element("Icon", rect, out var icon);
+            icon.anchorMin = icon.anchorMax = new Vector2(0.5f, 1f);
+            icon.anchoredPosition = new Vector2(0f, -62f);
+            icon.sizeDelta = new Vector2(64f, 64f);
+            _slash = MenuIcons.Signal(icon, MenuTheme.Dim, true);
+
+            _statusTitle = RuntimeUi.Label("Title", rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(24f, -160f), new Vector2(-24f, -108f), 34, TextAnchor.MiddleCenter, MenuTheme.Text);
+            _statusTitle.fontStyle = FontStyle.Bold;
+            _statusDetail = RuntimeUi.Label("Detail", rect, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(24f, -232f), new Vector2(-24f, -162f), 24, TextAnchor.UpperCenter, MenuTheme.Dim);
+            MenuRows.Fit(_statusDetail, 24);
+
+            _status = rect.gameObject;
+            _status.SetActive(false);
+        }
+
+        /// No board to show - still loading, or no connection. Every place and row goes to its
+        /// empty grey spot and the panel says which it is.
+        public void ShowUnavailable(bool loading)
+        {
+            for (int i = 0; i < Podium.Places; i++) _places[i].Show(null, null);
+            for (int i = 0; i < ListRows; i++) _rows[i].ShowEmpty(Podium.Places + i + 1);
+
+            _status.SetActive(true);
+            _slash.SetActive(!loading);
+            _statusTitle.text = loading ? "Loading scores…" : "No connection";
+            _statusDetail.text = loading
+                ? "the leaderboard appears in a moment"
+                : "Connect to the internet to see the leaderboard\ntap to try again";
         }
 
         /// Fills the card from a board, best first. `yourHandle` draws the player's own critter on
-        /// their row: the sample board names them "YOU", and their face should still be theirs.
+        /// their row, the same face as the player card whatever name the row carries.
         public void Show(IReadOnlyList<LeaderboardEntry> entries, string yourHandle)
         {
+            if (_status != null) _status.SetActive(false);
             var podium = Podium.Split(entries, out var rest);
             for (int i = 0; i < Podium.Places; i++)
                 _places[i].Show(podium[i], yourHandle);
