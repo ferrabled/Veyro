@@ -1,0 +1,98 @@
+[
+  {
+    "file": "camera_01-793.webp",
+    "source": "screenshots/guide/camera_01.png",
+    "source_sha256": "29e002e9d0e0ae2ae25ce60ceaf0e0d31ae384e1fe9619ed116da33434dc86e7",
+    "width": 793,
+    "height": 496,
+    "bytes": 9360
+  },
+  {
+    "file": "camera_02-793.webp",
+    "source": "screenshots/guide/camera_02.png",
+    "source_sha256": "857b01fa34c5132265000fb50bd57c2cc8bded169cd40ef3c6fe407f3cdb081e",
+    "width": 793,
+    "height": 496,
+    "bytes": 11102
+  },
+  {
+    "file": "camera_03-793.webp",
+    "source": "screenshots/guide/camera_03.png",
+    "source_sha256": "e45cdef68f7dd04663fc517cf80c39f6327b34989dd621415f3ebb8afedcedcd",
+    "width": 793,
+    "height": 496,
+    "bytes": 11320
+  },
+  {
+    "file": "camera_04-793.webp",
+    "source": "screenshots/guide/camera_04.png",
+    "source_sha256": "40e21e914dff4bbf3262544ec9bc725759e1a3940c33e58ad7a678fc3e3f9a10",
+    "width": 793,
+    "height": 496,
+    "bytes": 11082
+  },
+  {
+    "file": "camera_05-793.webp",
+    "source": "screenshots/guide/camera_05.png",
+    "source_sha256": "139bb8670637a205f94cd2cf5571a996ea114dbd2ae9d572e6c27582e008606a",
+    "width": 793,
+    "height": 496,
+    "bytes": 10360
+  },
+  {
+    "file": "run_01-793.webp",
+    "source": "screenshots/guide/run_01.png",
+    "source_sha256": "a1e5fda36900e297b8c76040e4302d888cfe002ca3ac329e271ee01573fac165",
+    "width": 793,
+    "height": 496,
+    "bytes": 27430
+  },
+  {
+    "file": "run_01-1586.webp",
+    "source": "screenshots/guide/run_01.png",
+    "source_sha256": "a1e5fda36900e297b8c76040e4302d888cfe002ca3ac329e271ee01573fac165",
+    "width": 1586,
+    "height": 992,
+    "bytes": 76750
+  },
+  {
+    "file": "tilt_01-793.webp",
+    "source": "screenshots/guide/tilt_01.png",
+    "source_sha256": "c5bef33deed2b6b05e2251d7a0cc18787c0ad2d002cea6cb235fe00a3f25f4ef",
+    "width": 793,
+    "height": 496,
+    "bytes": 17270
+  },
+  {
+    "file": "tilt_02-793.webp",
+    "source": "screenshots/guide/tilt_02.png",
+    "source_sha256": "06addc60e63713ae61b0cc9d50237d3d1ff284f508a46e432cf52a68f42e2034",
+    "width": 793,
+    "height": 496,
+    "bytes": 15738
+  },
+  {
+    "file": "tilt_02-1586.webp",
+    "source": "screenshots/guide/tilt_02.png",
+    "source_sha256": "06addc60e63713ae61b0cc9d50237d3d1ff284f508a46e432cf52a68f42e2034",
+    "width": 1586,
+    "height": 992,
+    "bytes": 52660
+  },
+  {
+    "file": "tilt_03-793.webp",
+    "source": "screenshots/guide/tilt_03.png",
+    "source_sha256": "897bbc0ddca7355f8935cbf03f99cf0c4204de08760e89c597aaf6316556a4cc",
+    "width": 793,
+    "height": 496,
+    "bytes": 16098
+  },
+  {
+    "file": "tilt_04-793.webp",
+    "source": "screenshots/guide/tilt_04.png",
+    "source_sha256": "d046ad7bbac1e235560c3a59e42fe61c61a129a35108024c79453e621884d507",
+    "width": 793,
+    "height": 496,
+    "bytes": 15292
+  }
+]

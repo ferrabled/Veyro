@@ -4,38 +4,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Veyro Run — page not found</title>
-  <meta name="theme-color" content="#FBF5E9">
+  <meta name="theme-color" content="#E8EDDB">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Atkinson+Hyperlegible:wght@400;700&family=Fragment+Mono&display=swap">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 
 <header class="site-header">
-  <a class="wordmark" href="/">Veyro <span>Run</span></a>
+  <a class="wordmark" href="/" aria-label="Veyro Run home"><img src="/favicon-64.png" width="40" height="40" alt="">Veyro <span>Run</span></a>
+  <nav class="site-nav" aria-label="Site">
+    <a class="nav-link" href="/#how">How it plays</a>
+    <a class="nav-link" href="/#daily">Daily Run</a>
+    <a class="nav-link" href="/support/">Support</a>
+  </nav>
 </header>
 
-<main class="doc">
+<main class="doc" id="main">
   <div class="doc-inner">
     <span class="stamp pink">404</span>
-    <h1 class="ghosted" style="margin-top:18px;">This track doesn't exist</h1>
-    <p style="margin-top:16px;">Whatever was here either never generated or reset at midnight UTC.</p>
-    <p style="margin-top:26px;"><a class="btn" href="/">Back to the start</a></p>
+    <h1>You've wandered off the path</h1>
+    <p>We couldn't find this page. Head back to the garden and try again.</p>
+    <p><a class="btn" href="/">Back to the start</a></p>
   </div>
 </main>
 
 <footer class="site-footer">
-  <div class="cols">
-    <a class="wordmark" href="/">Veyro <span>Run</span></a>
-    <nav aria-label="Legal">
-      <a href="/privacy/">Privacy</a>
-      <a href="/terms/">Terms</a>
-      <a href="/support/">Support</a>
-    </nav>
-  </div>
-  <p class="fine">© 2026 Fernando Rabasco ("ferrabled")</p>
+  <div class="cols"><a class="wordmark" href="/" aria-label="Veyro Run home"><img src="/favicon-64.png" width="40" height="40" alt="">Veyro <span>Run</span></a><nav aria-label="Legal"><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/support/">Support</a></nav><a class="back-top" href="#main">Back to top ↑</a></div>
+  <p class="fine">© 2026 Fernando Rabasco ("ferrabled") · Veyro Run for Android · Google Play is a trademark of Google LLC</p>
 </footer>
 
 </body>

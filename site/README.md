@@ -1,111 +1,136 @@
 # Veyro Run — marketing site
 
-Static site for **veyro.ferrabled.com**. No framework, no build step: plain HTML/CSS/JS served as
-Cloudflare Workers static assets (free tier, unmetered for static requests).
+Static HTML/CSS/JS for **veyro.ferrabled.com**, served as Cloudflare Workers static
+assets. No framework, build step, analytics or new runtime dependencies.
 
-Design: "Riso Print" — two-ink risograph poster (teal `#12454C` + fluoro pink `#EE3D87` on paper
-`#FBF5E9`). Direction pitch and rationale: https://claude.ai/code/artifact/c0ca2d3c-4582-4968-8592-8b2a9cfb46be
+## Visual direction
+
+The 28 September refresh follows the approved how-to-play illustrations and current
+park/menu palettes. Warm paper artwork sits inside rounded cards on sage; teal is
+the reading colour, with pink motion marks, mint vegetation and gold rewards.
+The older two-ink-only rule and capsule figures are retired. No text shadows,
+page-wide grain, glossy effects or invented runner drawings.
+
+- **Anybody** for expressive headings; **Atkinson Hyperlegible** for body copy;
+  **Fragment Mono** sparingly for labels and the Daily Run. Existing Google Fonts
+  loading is preserved.
+- Named tokens in `public/styles.css` cover the owner's core, supporting and UI
+  colours. Reading text uses `--ink` or `--secondary`; pink/gold are accents.
+- Artwork is never cropped, stretched, recoloured or used behind reading text.
+- Guide frames change only when a visitor chooses a step; no autoplay, timers or
+  cross-fades. Reduced motion disables smooth scrolling and button transitions.
+- Cosmetics use honest product labels; approved skin-specific web artwork is a
+  future optional addition, not replaced with fabricated renderings.
+
+Primary references (read-only): `docs/GUIDE_ILLUSTRATIONS.md`, `screenshots/guide/`,
+`ParkTheme.cs`, `MenuTheme.cs`, `docs/GAME_ART.md`, and the approved ticket/V icon in
+`screenshots/icon.png`. For this refresh they were read from the active
+`feat-iOS-implementation` reference worktree; every edit stays under `site/` in
+`feat/update-website-ui`.
 
 ## Layout
 
-```
-site/
-  wrangler.jsonc          deploy config (assets-only Worker + custom domain)
-  public/                 everything in here ships verbatim
-    index.html            homepage — built from independent <section> blocks
-    styles.css            design tokens + one CSS block per section
-    site.js               daily-ticket generator (page works without JS)
-    challenge/            landing page for a shared run (T-024) — index.html + challenge.js
-    privacy/index.html    REQUIRED by Google Play; path /privacy/ is load-bearing
-    terms/index.html      terms of use (cosmetic IAPs, safety notice)
-    support/index.html    contact, FAQ, data-deletion statement
-    404.html              served for unknown paths (see wrangler not_found_handling)
-    favicon.svg  robots.txt  _headers
+- `public/index.html`: hero, two control modes, Daily Run, cosmetics, camera privacy,
+  developer contact.
+- `public/styles.css`: named tokens, shared components, section-specific rules,
+  supporting-page styles, responsive and reduced-motion rules.
+- `public/site.js`: UTC ticket date and manual guide-frame selection. The date
+  refreshes after midnight UTC. It does not invent or claim to compute a game seed.
+- `public/art/`: optimized derivatives of all ten approved guide PNGs.
+- `public/favicon.svg`, `favicon-32.png`, `favicon-64.png`, `apple-touch-icon.png`:
+  resized approved V/ticket identity (the SVG embeds the 64px PNG).
+- `public/challenge/`: existing shared-run landing page and unmodified deep-link JS.
+- `public/privacy/`, `terms/`, `support/`, `404.html`: existing routes with shared
+  visual chrome. The support deletion anchor `#delete` is preserved.
+- `public/_headers`, `robots.txt`, `wrangler.jsonc`: production configuration,
+  unchanged by this refresh.
+- `tools/prepare_assets.py`: repeatable image conversion (authoring only; Pillow).
+- `tools/preview.py`: standard-library local server that applies `_headers` and
+  serves the custom 404 with a 404 status.
+- `art-manifest.json`: derivative dimensions, byte sizes, source paths and hashes.
+- `STATUS.md`: website-only task claim, acceptance and verification record.
+
+Header/footer markup is duplicated across all **six** HTML pages. Keep them in
+sync. Each main content region has a skip-link target. Navigation stays available
+on phones without requiring JavaScript.
+
+## Local preview
+
+From the repository root:
+
+```sh
+python site/tools/preview.py
 ```
 
-## Deploy
+Open **http://127.0.0.1:8765**. Use `--port` to choose a different explicit port.
+This server is loopback-only, reads only `public/`, applies the current CSP and
+other production headers, and disables cache for local iteration. Cloudflare's
+own preview remains available with `npx wrangler dev` from `site/`.
+Temporary browser QA tooling and screenshots belong in ignored `site/.preview/`.
 
+## Artwork derivatives
+
+Original PNGs and game runtime copies are never edited. To regenerate, with
+Pillow installed:
+
+```sh
+python site/tools/prepare_assets.py PATH_TO_REFERENCE_REPO
 ```
+
+All ten frames have a 793×496 WebP derivative (exactly half the original dimensions).
+Hero `tilt_02` and Daily Run `run_01` also have 1586×992 versions for responsive
+`srcset`. Quality 84, Lanczos downsampling, WebP method 6; no crop or colour edits.
+The twelve WebPs total **274,462 bytes**. Only images that are used are requested;
+additional guide frames load on interaction. Explicit dimensions reserve layout
+space, and a failed frame load leaves the preceding image and selection intact.
+The source illustration set was supplied by the owner and documented as AI-generated;
+this website pass creates no new AI art.
+
+## Content and route contracts
+
+- **Tilt & Touch**: tilt to steer, tap to jump.
+- **Camera Mode (BETA)**: move sideways to steer, hop to jump. On supported phones,
+  optional and processed on-device. Do not advertise sliding: current guide
+  documentation confirms it isn't implemented.
+- Camera frames stay on-device. The app itself uses network services for cosmetics,
+  shared scores, enabled notifications and opt-in analytics. Never broaden camera
+  privacy into a whole-app no-network claim.
+- Optional purchases are appearance-only; there is no gameplay advantage. The
+  Ember/Frost/Season 1 names come from the existing cosmetics catalog. No web
+  purchase controls or speculative pricing are added.
+- Daily tracks match within a content version/world. Shared seeds allow replay;
+  don't claim yesterday's track is gone forever.
+- `/challenge/?s=&v=&w=&p=&m=&d=` is a published contract. Keep existing parameter
+  names, unknown parameters and repeated-key semantics. The unchanged JS uses
+  `URLSearchParams`, passes its serialization to `veyro://challenge`, and wraps it
+  in an Android intent with the existing Google Play fallback. No automatic
+  launch occurs on page load. Test actual OS handoff on a phone separately.
+- `/privacy/` is load-bearing for Google Play and the game. Its body remains in
+  sync with `docs/PRIVACY_POLICY.md`; this pass changes its presentation only.
+- Keep support contact `ferrabled+veyro@gmail.com` until the owner replaces it.
+- No automotive imagery or racing language. Paths are garden walkways.
+
+## Availability and deployment
+
+Public release was **not confirmed on 28 September 2026**: repo decision D19 says
+Play production review is pending; a direct public Play URL check was unavailable
+and public search returned no listing. These results are not proof of absence.
+The homepage keeps the existing **join the closed test** email destination, with
+no stale September release promise. The challenge page keeps its existing Play
+URL and fallback, using availability wording. No App Store URL or released-iOS
+claim was added.
+
+Once the owner verifies a public listing, update the homepage CTA using the real
+store URL. Do not infer availability from a registered bundle ID or an internal
+build. Coordinate policy publication with release owners as already required;
+shop-enabled builds contact RevenueCat at launch and resume, not only at purchase.
+
+Production deployment is outside the refresh task. Existing owner deployment:
+
+```sh
 cd site
-npx wrangler login      # once, opens browser
+npx wrangler login
 npx wrangler deploy
 ```
 
-First deploy registers `veyro.ferrabled.com` automatically (the zone must be in the same
-Cloudflare account). A `*.workers.dev` URL also works for previewing before DNS.
-
-Local preview (no Cloudflare needed): `npx wrangler dev` from `site/`, or any static file server
-pointed at `site/public/`.
-
-## How to modify things (the modular contract)
-
-- **Homepage sections are independent.** Each `<section>` in `index.html` has a banner comment;
-  each has a matching CSS block in `styles.css` (same name). To remove a section, delete both.
-  To reorder, move the HTML — no section depends on another.
-- **Design tokens** live at the top of `styles.css`. The two-ink rule: anything that must be
-  *read* is teal ink; pink is display/accent only (contrast: pink passes only as large text).
-- **Header/footer are duplicated** into every page (marked `@partial` in comments). Changing
-  them means changing all five HTML files — grep for `@partial`.
-- **Fonts**: Anybody (titles/headings via variable width axis), Atkinson Hyperlegible (body),
-  Fragment Mono (data/labels). Loaded from Google Fonts; self-host later if wanted.
-
-## Placeholder figures (owner-flagged — replace when the real model exists)
-
-The capsule-person figures are **stopgaps the owner explicitly dislikes** (25 Aug). Once the
-game has its main character model and skins, replicate *that* character here instead —
-keeping the riso treatment (teal ink figure + offset pink misregistration ghost). Tracked as
-**T-037** in `docs/BACKLOG.md`. Every spot to touch:
-
-| Where | What |
-| --- | --- |
-| `index.html` — SECTION: hero, `.hero-stage .fig` | big leaning figure |
-| `index.html` — SECTION: how, `.panel .fig` × 3 | lean / hop / crouch poses |
-| `favicon.svg` | mini leaning figure |
-
-Any technique works (SVG traced from renders, or actual renders duotoned to the two inks), as
-long as the two-ink rule holds and each pose still reads at a glance.
-
-## Launch-day switches
-
-1. **Hero CTA** (`index.html`, SECTION: hero): swap the pre-launch "join the closed test" block
-   for the commented "Get it on Google Play" block once the listing is live.
-2. **Spec strip numbers** are real values from the game — update only when the game's change.
-3. **Privacy policy**: source of truth is `docs/PRIVACY_POLICY.md`; `/privacy/` here must match
-   it. Both MUST be updated before RevenueCat purchases / OneSignal / Layers ship (they start
-   real data collection). The in-game link is `GameLinks.PrivacyPolicyUrl`.
-   *T-020 (purchases) written 29 Aug 2026 — privacy, terms, support and the home page all
-   drop the absolute "no network requests" claim and are awaiting deploy. `wrangler deploy`
-   goes out in the same window as the versionCode-5 upload, not before.*
-   *Corrected 30 Aug 2026 (PR #4 review), still undeployed: the 29 Aug wording replaced one
-   absolute claim with another — that the game contacts RevenueCat only when you buy. It
-   does not; the SDK is configured at boot and refreshed on every resume, so every launch
-   contacts it. All four pages now say so. Any future page that describes when the game goes
-   online has to match `docs/PRIVACY_POLICY.md` §Purchases.*
-   *Revised 15 Sep 2026 (release-revenue-cat), still undeployed: effective dates moved to the
-   real revision date (15 Sep); privacy, terms and support distinguish the no-shop closed-beta
-   versions from shop-enabled versions (the home page stays version-neutral); deletion no
-   longer claims to prevent restoration (the Play purchase is Google's record);
-   uninstall/new-identifier claims hedge for Android Auto Backup (observed 29 Aug); offline
-   copy says owned cosmetics normally stay available from cache; support's restore route is
-   SHOP → RESTORE PURCHASES; and "trails" left the sales copy (not shipped). Deploy before
-   the RevenueCat build reaches testers.*
-4. **Contact email** `ferrabled+veyro@gmail.com` is a temporary alias — when the real one
-   exists, grep the whole `site/` + `docs/PRIVACY_POLICY.md` for it.
-5. **`/challenge/` (T-024, added 21 Sep 2026 — undeployed).** Where a shared run lands. It must be
-   live *before* any build with a SHARE button reaches a tester, or every shared link 404s. The
-   page only reads its own query string (`?s=&v=&w=&p=&m=&d=`) and re-emits it verbatim as
-   `veyro://challenge?…` — wrapped in an `intent://…#Intent;…;S.browser_fallback_url=…;end` URL
-   on Android, so the browser itself falls back to the Play listing when the game is missing;
-   the app parses both shapes with the same code
-   (`MotionRunner.Track.ChallengeMessage`), so **the key names are a contract — do not rename
-   them**, links already in somebody's chat history have to keep working. Script is a separate
-   file because `_headers` sets `script-src 'self'` (no inline JS anywhere on this site).
-   Optional upgrade, owner-only: publish `public/.well-known/assetlinks.json` with the Play app
-   signing SHA-256 and the https link opens the game directly, skipping this page
-   (`docs/PLAY_CONSOLE_SETUP.md` §F, OPEN_QUESTIONS 24).
-
-## Copy rules (binding — docs/store-kit/ART_DIRECTION.md)
-
-Nothing automotive, nothing racing: no cars, wheels, flags, road imagery. Banned words:
-race, speed, drive, circuit, grand prix, turbo. Camera mode always carries the BETA label and
-the on-device privacy line. Monetization copy is always "cosmetics only".
+The Workers configuration, custom domain, CSP and challenge fallback are preserved.

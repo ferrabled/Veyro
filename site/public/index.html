@@ -4,269 +4,121 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Veyro Run — the controller is you</title>
-  <meta name="description" content="Play hands-free with the camera, or tilt to steer. A new endless track daily. On-device, offline, no ads.">
-  <meta name="theme-color" content="#FBF5E9">
-  <meta property="og:title" content="Veyro Run">
-  <meta property="og:description" content="An endless runner you play by moving — lean, hop, crouch in front of the camera, or tilt the phone. A new track every day.">
+  <meta name="description" content="A little movement. A new run every day. Tilt your phone or try Camera Mode (BETA) in Veyro Run, a motion-controlled garden runner.">
+  <meta name="theme-color" content="#E8EDDB">
+  <meta property="og:title" content="Veyro Run — the controller is you">
+  <meta property="og:description" content="Tilt to steer, tap to jump. Or go hands-free with Camera Mode (BETA). Find your rhythm in a sunny garden, with a fresh Daily Run every day.">
   <meta property="og:url" content="https://veyro.ferrabled.com/">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,100..900&family=Atkinson+Hyperlegible:wght@400;700&family=Fragment+Mono&display=swap">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     @partial: header  (duplicated on every page — keep in sync)
-     ═══════════════════════════════════════════════════════════════════════ -->
+<a class="skip-link" href="#main">Skip to content</a>
+<!-- @partial: header (duplicated on every page — keep in sync) -->
 <header class="site-header">
-  <a class="wordmark" href="/">Veyro <span>Run</span></a>
+  <a class="wordmark" href="/" aria-label="Veyro Run home"><img src="/favicon-64.png" width="40" height="40" alt="">Veyro <span>Run</span></a>
   <nav class="site-nav" aria-label="Site">
-    <a class="nav-link" href="#how">How it plays</a>
-    <a class="nav-link" href="#daily">Daily run</a>
+    <a class="nav-link" href="/#how">How it plays</a>
+    <a class="nav-link" href="/#daily">Daily Run</a>
     <a class="nav-link" href="/support/">Support</a>
   </nav>
 </header>
-
-<main>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: hero
-     The one bold moment of the page. CTA is in "pre-launch" state — see the
-     commented "launch" variant below to flip when the Play listing is live.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section hero">
-  <div class="section-inner">
-    <div>
-      <span class="stamp pink">Camera mode · Beta</span>
-      <h1 class="ghosted">The controller is&nbsp;you</h1>
-      <p class="hero-sub">An endless runner you play by moving. Stand in front of the camera — <strong>lean to steer, hop to jump, crouch to slide</strong>. Or just tilt the phone.</p>
-      <p class="hero-fine">front camera only · processed on your phone, never recorded · plays offline</p>
+<main id="main">
+<!-- SECTION: hero -->
+<section class="section hero" aria-labelledby="hero-title">
+  <div class="section-inner hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow"><span class="accent-dot" aria-hidden="true"></span>A little movement. A lot of play.</span>
+      <h1 id="hero-title">The controller<br>is <span class="emphasis">you.</span></h1>
+      <p class="hero-sub">Your next run starts with a tilt. Dodge planters, hop for gold and find your rhythm in a sunny garden.</p>
       <div class="cta-row">
-        <!-- pre-launch CTA -->
-        <a class="btn" href="mailto:ferrabled+veyro@gmail.com?subject=Veyro%20Run%20closed%20test">Play it first — join the closed test</a>
-        <span class="cta-note">Coming to Google Play · September 2026</span>
-        <!-- launch CTA — swap in when the listing is live, delete the two lines above:
-        <a class="btn" href="https://play.google.com/store/apps/details?id=com.ferrabled.veyro.run">Get it on Google Play</a>
-        <a class="btn secondary" href="#how">See how it plays</a>
-        -->
+        <a class="btn" href="mailto:ferrabled+veyro@gmail.com?subject=Veyro%20Run%20closed%20test">Join the closed test <span aria-hidden="true">↗</span></a>
+        <a class="text-link" href="#how">See how to play <span aria-hidden="true">↓</span></a>
       </div>
+      <p class="cta-note">For Android · Free to play · No ads</p>
     </div>
-    <div class="hero-stage" aria-hidden="true">
-      <div class="fig">
-        <div class="layer l2">
-          <span class="head" style="left:40%; top:4%; width:19%; aspect-ratio:1;"></span>
-          <span class="limb" style="left:38%; top:24%; width:15%; height:36%; transform:rotate(-20deg);"></span>
-          <span class="limb" style="left:24%; top:57%; width:12%; height:34%; transform:rotate(22deg);"></span>
-          <span class="limb" style="left:46%; top:59%; width:12%; height:32%; transform:rotate(-8deg);"></span>
-        </div>
-        <div class="layer">
-          <span class="head" style="left:40%; top:4%; width:19%; aspect-ratio:1;"></span>
-          <span class="limb" style="left:38%; top:24%; width:15%; height:36%; transform:rotate(-20deg);"></span>
-          <span class="limb" style="left:24%; top:57%; width:12%; height:34%; transform:rotate(22deg);"></span>
-          <span class="limb" style="left:46%; top:59%; width:12%; height:32%; transform:rotate(-8deg);"></span>
-        </div>
-      </div>
-    </div>
+    <figure class="hero-art">
+      <div class="art-label"><span class="mono">MOVE YOUR PHONE.</span><span class="mono">FIND YOUR FLOW.</span></div>
+      <img src="/art/tilt_02-793.webp" srcset="/art/tilt_02-793.webp 793w, /art/tilt_02-1586.webp 1586w" sizes="(max-width: 800px) 100vw, 55vw" width="1586" height="992" fetchpriority="high" alt="Hands tilt a phone to move a pink-shirted runner along a garden path lined with gold coins.">
+      <figcaption><span class="pill">Tilt. Tap. Go.</span><span>A garden run, in your hands.</span></figcaption>
+    </figure>
+  </div>
+  <div class="section-inner feature-strip" aria-label="Game features">
+    <span><b>02</b> ways to play</span><span><b>01</b> fresh Daily Run</span><span><span class="small-star" aria-hidden="true">✳</span> Your movement makes it happen</span>
   </div>
 </section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: how it plays  (#how)
-     Three instruction panels: lean / hop / crouch. Verbs match the in-game
-     copy exactly ("lean to steer, hop to jump, crouch to slide").
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section how" id="how">
+<!-- SECTION: how -->
+<section class="section how" id="how" aria-labelledby="how-title">
   <div class="section-inner">
-    <div class="head-row">
-      <span class="eyebrow">Operating instructions</span>
-      <h2 class="ghosted-ink">No controller. No wearable. Just you.</h2>
-    </div>
-    <div class="panels">
-      <div class="panel">
-        <span class="n" aria-hidden="true">1</span>
-        <div class="fig" style="inset:12% 20% 26% 20%;" aria-hidden="true">
-          <div class="layer l2">
-            <span class="head" style="left:48%; top:6%; width:22%; aspect-ratio:1;"></span>
-            <span class="limb" style="left:45%; top:28%; width:17%; height:36%; transform:rotate(-24deg);"></span>
-            <span class="limb" style="left:30%; top:60%; width:14%; height:32%; transform:rotate(20deg);"></span>
-            <span class="limb" style="left:50%; top:62%; width:14%; height:30%;"></span>
-          </div>
-          <div class="layer">
-            <span class="head" style="left:48%; top:6%; width:22%; aspect-ratio:1;"></span>
-            <span class="limb" style="left:45%; top:28%; width:17%; height:36%; transform:rotate(-24deg);"></span>
-            <span class="limb" style="left:30%; top:60%; width:14%; height:32%; transform:rotate(20deg);"></span>
-            <span class="limb" style="left:50%; top:62%; width:14%; height:30%;"></span>
+    <div class="section-heading"><div><span class="eyebrow">Find your way to play</span><h2 id="how-title">Small moves.<br>Big grins.</h2></div><p>Hold your phone or make a little room.<br>Same garden. Two ways to get moving.</p></div>
+    <div class="mode-grid">
+      <article class="mode-card" data-guide="tilt">
+        <div class="mode-heading"><span class="mode-number">01</span><h3>Tilt &amp; Touch</h3><span class="pill">Phone in hand</span></div>
+        <div class="guide-art"><img id="tilt-art" src="/art/tilt_01-793.webp" width="793" height="496" loading="lazy" alt="Two hands hold a phone upright, with the garden runner on its screen."></div>
+        <div class="mode-body"><p class="control-summary">Tilt to steer. Tap to jump.</p><p>Hold your phone upright. Tip it left or right to change lanes, then tap the screen to hop over obstacles.</p>
+          <div class="guide-controls" role="group" aria-label="Tilt and touch illustrations" hidden>
+            <button type="button" data-frame="tilt_01" aria-controls="tilt-art" aria-pressed="true">Hold</button><button type="button" data-frame="tilt_02" aria-controls="tilt-art" aria-pressed="false">Tilt left</button><button type="button" data-frame="tilt_03" aria-controls="tilt-art" aria-pressed="false">Tilt right</button><button type="button" data-frame="tilt_04" aria-controls="tilt-art" aria-pressed="false">Tap</button>
           </div>
         </div>
-        <span class="arrow" style="left:8%; top:34%;" aria-hidden="true">&#10229;</span>
-        <span class="verb">Lean</span>
-        <span class="cap">the runner<br>steers</span>
-      </div>
-      <div class="panel">
-        <span class="n" aria-hidden="true">2</span>
-        <div class="fig" style="inset:6% 20% 26% 20%;" aria-hidden="true">
-          <div class="layer l2">
-            <span class="head" style="left:42%; top:0; width:22%; aspect-ratio:1;"></span>
-            <span class="limb" style="left:42%; top:22%; width:17%; height:34%;"></span>
-            <span class="limb" style="left:28%; top:52%; width:14%; height:28%; transform:rotate(30deg);"></span>
-            <span class="limb" style="left:52%; top:53%; width:14%; height:28%; transform:rotate(-28deg);"></span>
-          </div>
-          <div class="layer">
-            <span class="head" style="left:42%; top:0; width:22%; aspect-ratio:1;"></span>
-            <span class="limb" style="left:42%; top:22%; width:17%; height:34%;"></span>
-            <span class="limb" style="left:28%; top:52%; width:14%; height:28%; transform:rotate(30deg);"></span>
-            <span class="limb" style="left:52%; top:53%; width:14%; height:28%; transform:rotate(-28deg);"></span>
+        <p class="mode-note">Ready when you are. All you need is your phone.</p>
+      </article>
+      <article class="mode-card" data-guide="camera">
+        <div class="mode-heading"><span class="mode-number">02</span><h3>Camera Mode</h3><span class="pill beta">BETA</span></div>
+        <div class="guide-art"><img id="camera-art" src="/art/camera_02-793.webp" width="793" height="496" loading="lazy" alt="A person faces a phone on a table, standing in the front camera's view."></div>
+        <div class="mode-body"><p class="control-summary">Move sideways to steer. Hop to jump.</p><p>Prop up your phone, step back and face the front camera. Leave yourself clear space to move.</p>
+          <div class="guide-controls" role="group" aria-label="Camera mode illustrations" hidden>
+            <button type="button" data-frame="camera_01" aria-controls="camera-art" aria-pressed="false">Set up</button><button type="button" data-frame="camera_02" aria-controls="camera-art" aria-pressed="true">Stand</button><button type="button" data-frame="camera_03" aria-controls="camera-art" aria-pressed="false">Left</button><button type="button" data-frame="camera_04" aria-controls="camera-art" aria-pressed="false">Right</button><button type="button" data-frame="camera_05" aria-controls="camera-art" aria-pressed="false">Hop</button>
           </div>
         </div>
-        <span class="arrow" style="left:10%; top:8%;" aria-hidden="true">&#8593;</span>
-        <span class="verb">Hop</span>
-        <span class="cap">the runner<br>jumps</span>
-      </div>
-      <div class="panel">
-        <span class="n" aria-hidden="true">3</span>
-        <div class="fig" style="inset:30% 20% 26% 20%;" aria-hidden="true">
-          <div class="layer l2">
-            <span class="head" style="left:42%; top:8%; width:24%; aspect-ratio:1;"></span>
-            <span class="limb" style="left:40%; top:36%; width:18%; height:26%; transform:rotate(-10deg);"></span>
-            <span class="limb" style="left:28%; top:60%; width:15%; height:22%; transform:rotate(34deg);"></span>
-            <span class="limb" style="left:50%; top:62%; width:15%; height:22%; transform:rotate(-30deg);"></span>
-          </div>
-          <div class="layer">
-            <span class="head" style="left:42%; top:8%; width:24%; aspect-ratio:1;"></span>
-            <span class="limb" style="left:40%; top:36%; width:18%; height:26%; transform:rotate(-10deg);"></span>
-            <span class="limb" style="left:28%; top:60%; width:15%; height:22%; transform:rotate(34deg);"></span>
-            <span class="limb" style="left:50%; top:62%; width:15%; height:22%; transform:rotate(-30deg);"></span>
-          </div>
-        </div>
-        <span class="arrow" style="left:10%; top:30%;" aria-hidden="true">&#8595;</span>
-        <span class="verb">Crouch</span>
-        <span class="cap">the runner<br>slides</span>
-      </div>
+        <p class="mode-note">Optional, on supported phones. Camera processing stays on-device.</p>
+      </article>
     </div>
-    <div class="footline">
-      <p>camera mode is optional and marked beta · prefer buttons? tilt &amp; touch is the full game — tilt to swerve, tap to jump</p>
-    </div>
+    <p class="how-note" hidden>Pick any step to see the move. Take it at your own pace.</p>
   </div>
 </section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: camera privacy callout
-     The trust section. Claims here must always match /privacy/ exactly.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section on-ink camera-privacy">
+<!-- SECTION: daily -->
+<section class="section daily" id="daily" aria-labelledby="daily-title">
+  <div class="section-inner daily-grid">
+    <div class="daily-copy"><span class="eyebrow">A fresh reason to come back</span><h2 id="daily-title">One track.<br>Everyone.<br><span class="underline-accent">Every day.</span></h2><p>A new garden route, every day. Collect coins, weave past planters and see how far you can go.</p><p>The Daily Run gives everyone on the same game version and world the same track. Try once, or come back and beat your best.</p><span class="pill daily-reset">New run at midnight UTC</span></div>
+    <figure class="daily-ticket">
+      <div class="ticket-top"><span class="eyebrow">Veyro Run / Daily ticket</span><span class="ticket-dot" aria-hidden="true"></span></div>
+      <img src="/art/run_01-793.webp" srcset="/art/run_01-793.webp 793w, /art/run_01-1586.webp 1586w" sizes="(max-width: 800px) 100vw, 52vw" width="1586" height="992" loading="lazy" alt="A runner collects gold coins on a warm stone walkway between mint lawns, round teal trees and coral planters.">
+      <figcaption class="ticket-bottom"><div><span class="eyebrow">Your daily invitation</span><p class="ticket-date" id="ticket-date">A fresh run every day</p></div><span class="ticket-seal" aria-hidden="true">V</span></figcaption>
+      <p class="ticket-fine">Same track. Your own best.</p>
+    </figure>
+  </div>
+</section>
+<!-- SECTION: cosmetics -->
+<section class="section pledge" id="cosmetics" aria-labelledby="cosmetics-title">
   <div class="section-inner">
-    <span class="eyebrow">Camera mode &amp; your privacy</span>
-    <h2>Your face never leaves your phone</h2>
-    <ul class="facts">
-      <li><b>On-device only</b>Camera frames are processed in memory by a local model and discarded. Never recorded, never saved, never transmitted.</li>
-      <li><b>Only if you choose it</b>The camera is used only in camera mode, only after you grant permission. Declining loses nothing — tilt &amp; touch is the full game.</li>
-      <li><b>No sign-in, no ads</b>The game goes online for cosmetics and — from the leaderboard update — for shared scores under a generated player name. Notification-enabled versions also use a delivery service that processes device registration and notification interactions. Versions with GAMEPLAY ANALYTICS also offer optional Layers analytics, off until you enable it. Camera frames always stay on your phone. See our privacy policy for details.</li>
-    </ul>
-    <p class="mono"><a href="/privacy/">Read the full privacy policy →</a></p>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: daily ticket  (#daily)
-     Regenerated from today's UTC date by site.js; static fallback below.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section daily" id="daily">
-  <div class="section-inner">
-    <div>
-      <span class="eyebrow">The Daily Run</span>
-      <h2 class="ghosted-ink">One track. Everyone. Every day.</h2>
-      <p>Each day the game builds one endless track from the date itself — the same track on every phone on Earth, with no server involved. Run it once or chase your best all day; at midnight UTC it's gone forever.</p>
-      <p class="small-print">Ticket is illustrative — the real seed is computed inside the game, deterministically, and two devices produce byte-identical runs.</p>
+    <div class="section-heading"><div><span class="eyebrow">A little more you</span><h2 id="cosmetics-title">Fresh look.<br>Same playing field.</h2></div><p>The full game is free to play. Optional skins and Season 1 rewards change your look. Never your chances.</p></div>
+    <div class="cosmetic-grid">
+      <article class="cosmetic-card ember"><span class="eyebrow">Optional skin</span><h3>Ember</h3><p>A warmer look for your next run.</p><span class="cosmetic-tag">Appearance only</span></article>
+      <article class="cosmetic-card frost"><span class="eyebrow">Optional skin</span><h3>Frost</h3><p>A cooler take on the same runner.</p><span class="cosmetic-tag">Appearance only</span></article>
+      <article class="cosmetic-card season"><span class="eyebrow">Season 1</span><h3>Play. Unlock.<br>Make it yours.</h3><p>Cosmetic rewards on free and paid tracks.</p><span class="cosmetic-tag">No gameplay advantage</span></article>
     </div>
-    <div class="pticket" role="img" aria-label="Today's daily run ticket">
-      <div class="r1"><span>Veyro Run</span><span>Daily ticket</span></div>
-      <div class="date" id="ticket-date">TUE 25 AUG 2026</div>
-      <div class="seed" id="ticket-seed">seed 0x7C21A9F3 · identical on every device</div>
-      <div class="chunks" id="ticket-chunks">
-        <span class="chunk">start_flat</span>
-        <span class="chunk">coin_dash</span>
-        <span class="chunk hot">hop_gate</span>
-        <span class="chunk">weave_blocks</span>
-        <span class="chunk">bridge_span</span>
-      </div>
-      <div class="bars" id="ticket-bars"></div>
-      <div class="r2"><span>one track · everyone</span><span>resets 00:00 UTC</span></div>
-    </div>
+    <div class="pledge-line"><span class="small-star" aria-hidden="true">✳</span><p>No boosts. No extra lives for sale. Just a look you like.</p></div>
   </div>
 </section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: cosmetics pledge
-     Monetization positioning (DECISIONS D6) — cosmetics only, core copy.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section pledge">
-  <div class="section-inner">
-    <span class="eyebrow">The pledge</span>
-    <h2 class="ghosted-ink">The game you download is the whole game</h2>
-    <p>Everything you can buy is cosmetic and optional. No boosts, no extra lives, no advantage of any kind over a player who never spends a penny.</p>
-    <div class="chips">
-      <span class="stamp">No ads</span>
-      <span class="stamp">No paywalls</span>
-      <span class="stamp pink">Cosmetics only</span>
-    </div>
-  </div>
+<!-- SECTION: camera privacy -->
+<section class="section camera-privacy" aria-labelledby="privacy-title">
+  <div class="section-inner privacy-grid"><div><span class="eyebrow">Your moves stay yours</span><h2 id="privacy-title">Camera on.<br>Privacy intact.</h2><a class="text-link" href="/privacy/">Read our privacy policy <span aria-hidden="true">↗</span></a></div><div class="privacy-copy"><p><strong>Camera Mode (BETA) processes frames on your phone.</strong> They're used in memory and discarded. Never recorded, saved or transmitted.</p><p>You choose whether to enable the camera. Tilt &amp; Touch is always there.</p><p class="network-note">The app uses online services for purchases, shared scores and enabled notifications. Gameplay analytics are optional. Camera images stay on-device.</p></div></div>
 </section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: spec strip
-     "The honest spec sheet" — every number is real and comes from the repo.
-     Update values only when the game's values change.
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section on-ink specs">
-  <div class="section-inner">
-    <div class="lead">The honest spec sheet — every number is real</div>
-    <div class="strip">
-      <span>3 lanes at <b>±1.6&nbsp;m</b></span>
-      <span>pace <b>12 → 19.7&nbsp;m/s</b></span>
-      <span>face detection <b>3.7&nbsp;ms</b> median, on-device</span>
-      <span>camera model <b>418&nbsp;KB</b></span>
-      <span>sign-in <b>none</b></span>
-      <span>leaderboard name <b>generated, never typed</b></span>
-      <span>ads <b>none</b></span>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     SECTION: about / built in public
-     ═══════════════════════════════════════════════════════════════════════ -->
-<section class="section about">
-  <div class="section-inner">
-    <span class="eyebrow">Built in public</span>
-    <h2 class="ghosted-ink">Made by one developer</h2>
-    <blockquote>
-      <p>Veyro Run is made by one developer, in public. It is early, it will get better, and if something feels wrong the fastest way to change it is to tell us.</p>
-    </blockquote>
-    <p class="mono" style="margin-top:20px;"><a href="mailto:ferrabled+veyro@gmail.com">ferrabled+veyro@gmail.com</a></p>
-  </div>
-</section>
-
+<!-- SECTION: about -->
+<section class="section about"><div class="section-inner about-grid"><div><span class="eyebrow">Made by one developer</span><h2>A small game.<br>An open conversation.</h2></div><div><p>Veyro Run is being built in public, one run at a time. Found a rough edge or had a great run? I'd love to hear about it.</p><a class="text-link" href="mailto:ferrabled+veyro@gmail.com">Say hello <span aria-hidden="true">↗</span></a></div></div></section>
 </main>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     @partial: footer  (duplicated on every page — keep in sync)
-     ═══════════════════════════════════════════════════════════════════════ -->
+<!-- @partial: footer (duplicated on every page — keep in sync) -->
 <footer class="site-footer">
-  <div class="cols">
-    <a class="wordmark" href="/">Veyro <span>Run</span></a>
-    <nav aria-label="Legal">
-      <a href="/privacy/">Privacy</a>
-      <a href="/terms/">Terms</a>
-      <a href="/support/">Support</a>
-    </nav>
-  </div>
+  <div class="cols"><a class="wordmark" href="/" aria-label="Veyro Run home"><img src="/favicon-64.png" width="40" height="40" alt="">Veyro <span>Run</span></a><nav aria-label="Legal"><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a><a href="/support/">Support</a></nav><a class="back-top" href="#main">Back to top ↑</a></div>
   <p class="fine">© 2026 Fernando Rabasco ("ferrabled") · Veyro Run for Android · Google Play is a trademark of Google LLC</p>
 </footer>
-
 <script src="/site.js" defer></script>
 </body>
 </html>
