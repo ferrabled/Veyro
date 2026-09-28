@@ -1,3 +1,4 @@
+using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Commerce.RevenueCat;
 using MotionRunner.Gameplay;
@@ -39,6 +40,12 @@ namespace MotionRunner.Core
             var camGo = new GameObject("MainCamera") { tag = "MainCamera" };
             var cam = camGo.AddComponent<Camera>();
             camGo.AddComponent<AudioListener>();
+
+            // Audio (T-045): music, one-shots and the levels behind them. Before RunFlow, whose
+            // first ShowMenu starts the menu loop. Fail-open like the store - missing clips are
+            // warnings, never exceptions - and every call site goes through GameAudio's statics,
+            // which no-op without an instance.
+            GameAudio.Create(new SoundSettings(new PlayerPrefsSoundStore()));
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.09f, 0.10f, 0.16f);
             cam.cullingMask &= ~(1 << MotionRunner.Menu.RunnerPreview.Layer);
@@ -102,8 +109,9 @@ namespace MotionRunner.Core
             // same time; both are documented on RunHud.
             //   * Loadout  - the card renders the player's live outfit, so the runner on the
             //                screenshot is the runner they just ran with.
-            //   * HoldRun  - SHARE is the only button that stays ON the card, so the release that
-            //                opens the share sheet has to be denied the "tap anywhere" restart.
+            //   * HoldRun  - SHARE is the only button that stays ON the card; the hold keeps the
+            //                camera hop (the only gesture restart left) from firing across the
+            //                share sheet's round trip. See the note on RunHud.HoldRun.
             hud.Loadout = () => skins.Effective;
             hud.HoldRun = held => session.Frozen = held;
 

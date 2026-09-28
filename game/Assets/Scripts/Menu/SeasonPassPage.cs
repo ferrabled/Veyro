@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using MotionRunner.Progression;
@@ -22,10 +23,10 @@ namespace MotionRunner.Menu
         bool _listening;
         protected override void Build()
         {
-            var background=CosmeticUi.Surface(CosmeticUi.Area("Backdrop",Root,Vector2.zero,Vector2.one),MenuTheme.PreviewTop,0);
+            var background=CosmeticUi.Backdrop(Root,MenuTheme.PreviewTop);
             background.Gradient=true;background.Bottom=MenuTheme.PreviewBottom;
             _preview=RunnerPreview.Create(CosmeticUi.Area("Preview",Root,new Vector2(0,0.43f),new Vector2(1,0.855f)));
-            CosmeticUi.Pill(CosmeticUi.Rect("Back",Root,0.025f,0.21f,44,70),"< BACK",Menu.GoHome,MenuTheme.ItemCard,26);
+            CosmeticUi.Pill(CosmeticUi.Rect("Back",Root,0.025f,0.21f,44,70),"< BACK",Menu.GoHome,MenuTheme.ItemCard,26,Sfx.UiBack);
             CosmeticUi.Text("Title",CosmeticUi.Rect("Heading",Root,0.23f,0.98f,44,70),"SEASON 1  /  WORLD RUNNER",33,MenuTheme.Text);
             _xp=CosmeticUi.Text("Xp",CosmeticUi.Rect("XpSlot",Root,0.035f,0.98f,132,56),"",40,MenuTheme.Text);
             _next=CosmeticUi.Text("Next",CosmeticUi.Rect("NextSlot",Root,0.035f,0.98f,191,40),"",25,MenuTheme.Dim);
@@ -98,7 +99,7 @@ namespace MotionRunner.Menu
         {
             var item=CosmeticCatalog.Find(_selected);if(item==null)return;
             if(Menu.Season.CanCollect(item.Id))
-            { Menu.Season.Collect(item.Id);if(item.Slot==CosmeticSlot.CrashFx)_preview.Burst();Refresh(); }
+            { if(Menu.Season.Collect(item.Id))GameAudio.Confirm();else GameAudio.Deny();if(item.Slot==CosmeticSlot.CrashFx)_preview.Burst();Refresh(); }
             else if(Menu.Season.IsOwned(item.Id))Menu.ShowCosmetic(item.Id);
             else if(item.Rule.Track==SeasonTrack.Pass && !Menu.IsPassOwned())Menu.Show(MenuTab.Shop);
         }

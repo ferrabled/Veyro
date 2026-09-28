@@ -240,7 +240,9 @@ the question. Keep this file short; it is read every session.
     verified provider-deletion process.* Production feature baseline and unused Play
     versionCode are still owner decisions in Q19; no signed Play release was assumed.
 
-23. **Production Season 1 XP curve (T-025, before release).** Owner requested a tiny temporary
+23. ✅ **ANSWERED by owner, 28 Sep 2026 — the suggested curve below is approved as-is (D20);
+    `SeasonCurve.ProductionApproved` is now true, so release builds are no longer gated.**
+    **Production Season 1 XP curve (T-025, before release).** Owner requested a tiny temporary
     cap for testing. Development builds now use cumulative thresholds 0–9; actual server XP
     is unchanged. Choose production pacing after device acceptance. Suggested tuning starting
     point: 0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP, not yet approved. Production builds

@@ -1,5 +1,8 @@
 # T-030 — Google Play store listing copy
 
+> App Store Connect copy and field values (subtitle, keywords, App Privacy, IAP fields) live in
+> `APP_STORE_LISTING.md`; this file stays the Play listing.
+
 Drafted 23 Aug 2026 (no-unity-prep session). **Copy only — no binary assets.** Character limits
 verified against Play Console Help on 23 Aug 2026: app name **30**, short description **80**, full
 description **4,000**; limits apply to full-width and half-width characters alike [L1].

@@ -74,15 +74,22 @@ namespace MotionRunner.Menu
         /// a run (a challenge link) must stand aside for it - see BeginPick / Commit.
         public bool HasPendingPick => !_done && _pending != Pick.None;
 
-        public void Build(RectTransform slot)
+        /// `onGuide` opens how-to-play: the "i" in the card's corner, the quick way back to the
+        /// guide from the one screen where the choice it explains is made.
+        public void Build(RectTransform slot, Action onGuide)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
 
+            // Inset symmetrically by the "i" so the centred status line stays centred and clear
+            // of it.
             _status = RuntimeUi.Label("Status", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(MenuTheme.CardPadding, -96f), new Vector2(-MenuTheme.CardPadding, -12f),
+                new Vector2(MenuTheme.CardPadding + InfoReserve, -96f),
+                new Vector2(-MenuTheme.CardPadding - InfoReserve, -12f),
                 30, TextAnchor.UpperCenter, MenuTheme.Dim);
             _status.text = IdleStatus;
+
+            BuildInfoButton(slot, onGuide);
 
             bool lastWasCamera = LastUsed == ControlScheme.Camera;
             _tiltButton = BuildButton(slot, "Tilt", -104f, "TILT & TOUCH",
@@ -90,30 +97,86 @@ namespace MotionRunner.Menu
                 lastWasCamera ? MenuTheme.Text : MenuTheme.OnAccent,
                 () => BeginPick(Pick.Tilt));
 
-            _cameraButton = BuildButton(slot, "Camera", -244f, "CAMERA (BETA)",
+            _cameraButton = BuildButton(slot, "Camera", -244f, "CAMERA",
                 lastWasCamera ? MenuTheme.Accent : MenuTheme.Slot,
                 lastWasCamera ? MenuTheme.OnAccent : MenuTheme.Text,
                 ChooseCamera);
+            AddBetaTag(_cameraButton);
+        }
+
+        /// "BETA" as a gold pill after the CAMERA label - the guide's tile tag - instead of the
+        /// "(BETA)" that made the label the longest word on the screen.
+        static void AddBetaTag(Button button)
+        {
+            const float tagWidth = 92f, gap = 18f;
+            var label = button.GetComponentInChildren<Text>();
+            float labelWidth = label.preferredWidth;
+
+            // Word and tag centred as one group: the label steps left by half the tag.
+            float shift = (tagWidth + gap) * 0.5f;
+            label.rectTransform.offsetMin -= new Vector2(shift, 0f);
+            label.rectTransform.offsetMax -= new Vector2(shift, 0f);
+
+            RuntimeUi.Element("Beta", button.transform, out var tag);
+            tag.anchorMin = tag.anchorMax = new Vector2(0.5f, 0.5f);
+            tag.pivot = new Vector2(0f, 0.5f);
+            tag.anchoredPosition = new Vector2(labelWidth * 0.5f + gap - shift, 0f);
+            tag.sizeDelta = new Vector2(tagWidth, 38f);
+            CosmeticUi.Surface(tag, MenuTheme.Gold, 19f).raycastTarget = false;
+            var text = RuntimeUi.Label("Label", tag, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
+                22, TextAnchor.MiddleCenter, MenuTheme.OnAccent);
+            text.fontStyle = FontStyle.Bold;
+            text.text = "BETA";
+        }
+
+        const float InfoSize = 60f;
+        const float InfoReserve = InfoSize + 8f;
+
+        /// A round "i" in the card's top-right corner. The whole 60 px disc is the target; the
+        /// letter is drawn in the dim ink of the status line beside it, so it reads as part of the
+        /// card's furniture rather than as a third way to start a run.
+        static void BuildInfoButton(RectTransform slot, Action onGuide)
+        {
+            RuntimeUi.Element("Info", slot, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = new Vector2(-MenuTheme.CardPadding, -14f); // flush with the buttons' edge
+            rect.sizeDelta = new Vector2(InfoSize, InfoSize);
+
+            var disc = CosmeticUi.Surface(rect, MenuTheme.Slot, InfoSize * 0.5f);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = disc;
+            button.onClick.AddListener(() => onGuide?.Invoke());
+            RuntimeUi.TapSound(button);
+
+            var letter = RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 38, TextAnchor.MiddleCenter, MenuTheme.Dim);
+            letter.fontStyle = FontStyle.Bold;
+            letter.text = "i";
         }
 
         Button BuildButton(RectTransform slot, string name, float top, string label,
             Color color, Color labelColor, Action onTap)
         {
+            // Rounded and bold like RUN AGAIN on the result card: the thumb meets the same button
+            // at both ends of a run.
             var go = RuntimeUi.Element(name, slot, out var rect);
             RuntimeUi.Stretch(rect,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(MenuTheme.CardPadding, top - 132f),
+                new Vector2(MenuTheme.CardPadding, top - 124f),
                 new Vector2(-MenuTheme.CardPadding, top));
 
-            var image = go.AddComponent<Image>();
-            image.color = color;
+            var image = CosmeticUi.Surface(rect, color, 124f * 0.32f);
 
             var button = go.AddComponent<Button>();
             button.targetGraphic = image;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
 
-            RuntimeUi.Label("Label", go.transform, Vector2.zero, Vector2.one,
-                Vector2.zero, Vector2.zero, 50, TextAnchor.MiddleCenter, labelColor).text = label;
+            var text = RuntimeUi.Label("Label", go.transform, Vector2.zero, Vector2.one,
+                Vector2.zero, Vector2.zero, 46, TextAnchor.MiddleCenter, labelColor);
+            text.fontStyle = FontStyle.Bold;
+            text.text = label;
 
             return button;
         }

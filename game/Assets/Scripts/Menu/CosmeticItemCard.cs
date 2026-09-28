@@ -1,5 +1,6 @@
 using System;
 using MotionRunner.Commerce;
+using MotionRunner.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,7 +18,7 @@ namespace MotionRunner.Menu
             Rect=rect;Item=item;
             _border=CosmeticUi.Surface(rect,MenuTheme.Empty,22);
             var button=rect.gameObject.AddComponent<Button>();button.targetGraphic=_border;
-            button.onClick.AddListener(()=>tapped());
+            button.onClick.AddListener(()=>tapped());RuntimeUi.TapSound(button);
             _surface=CosmeticUi.Surface(CosmeticUi.Area("Face",rect,Vector2.zero,Vector2.one,Vector2.one*4),MenuTheme.ItemCard,18);
             _surface.raycastTarget=false;
             CosmeticUi.Thumbnail(CosmeticUi.Area("Art",rect,new Vector2(0.06f,0.32f),new Vector2(0.94f,0.97f)),item.Id);

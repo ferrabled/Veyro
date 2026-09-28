@@ -1,3 +1,4 @@
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Track;
 using UnityEngine;
@@ -62,14 +63,19 @@ namespace MotionRunner.Gameplay
             if (input == null) return;
 
             // Lane steering: the axis names a lane, the slide carries the runner to its centre.
+            int laneBefore = _lanes.Lane;
             _lanes.Step(input.GetMoveAxis(), deltaTime);
             float x = _lanes.X;
+            // One swoosh per committed lane change - the slide itself is silent, so a sweep
+            // across the road (one Step, left to right) is one cue, not two.
+            if (_lanes.Lane != laneBefore) GameAudio.Play(Sfx.LaneSwoosh);
 
             float y = transform.position.y;
             if (input.IsJumpPressed() && !_airborne)
             {
                 _verticalVelocity = JumpVelocity;
                 _airborne = true;
+                GameAudio.Play(Sfx.Jump);
             }
 
             if (_airborne)

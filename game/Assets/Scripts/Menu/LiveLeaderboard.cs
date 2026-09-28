@@ -9,7 +9,7 @@ namespace MotionRunner.Menu
     /// promised ("the Supabase board replaces the mock without the card knowing"). The seam is
     /// synchronous and the network is not, so this is a cache: Refresh() fetches, Changed fires
     /// when rows land, Top() serves whatever is cached. IsLive is false until the first rows
-    /// arrive, which keeps the card's "sample board" honesty line exactly as honest as before.
+    /// arrive, and the card shows no rows at all until then (LeaderboardCard.ShowUnavailable).
     public sealed class LiveLeaderboard : ILeaderboardSource
     {
         readonly IProfileService _service;

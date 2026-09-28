@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -64,6 +65,19 @@ namespace MotionRunner.Core
             host.AddComponent<GraphicRaycaster>();
             EnsureEventSystem();
             return canvas;
+        }
+
+        /// A full-screen child of a canvas that shrinks itself to the device's safe area
+        /// (SafeAreaFitter): build what must stay readable and tappable under it, and leave
+        /// backdrops on the canvas so they still reach the screen's edges. The same call does the
+        /// right thing on a notched iPhone, a punch-hole Android and a plain 16:9 phone (where it
+        /// is simply the whole screen).
+        public static RectTransform SafeRoot(Transform canvas, string name = "Safe area")
+        {
+            var go = Element(name, canvas, out var rect);
+            Stretch(rect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            go.AddComponent<SafeAreaFitter>();
+            return rect;
         }
 
         /// A full-screen backdrop: opaque for a menu, translucent for something laid over the run.
@@ -145,9 +159,11 @@ namespace MotionRunner.Core
         }
 
         /// A coloured rectangle with a centred label on it, placed by anchor + offset + size.
+        /// Every button clicks (`sound`, default the UI tap; CLOSE / QUIT / back links pass
+        /// Sfx.UiBack) - see TapSound for why the cue is added here rather than at each site.
         public static Button TextButton(string name, Transform parent, Vector2 anchor,
             Vector2 position, Vector2 size, Color color,
-            string label, int fontSize, Color labelColor, Action onTap)
+            string label, int fontSize, Color labelColor, Action onTap, Sfx sound = Sfx.UiTap)
         {
             var go = Element(name, parent, out var rect);
             rect.anchorMin = anchor;
@@ -161,10 +177,22 @@ namespace MotionRunner.Core
             var button = go.AddComponent<Button>();
             button.targetGraphic = image;
             button.onClick.AddListener(() => onTap());
+            TapSound(button, sound);
 
             Label("Label", go.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 fontSize, TextAnchor.MiddleCenter, labelColor).text = label;
             return button;
+        }
+
+        /// Gives a hand-rolled button its click. Added AFTER the action listener on purpose, and
+        /// UnityEvent invokes in registration order: an action that fires a confirm or a deny has
+        /// already done so by the time this runs, and GameAudio lets that stronger cue stand in
+        /// for the plain tap. The closure holds no reference to the button, so a button that
+        /// destroys its own screen (QUIT TO MENU) still clicks.
+        public static void TapSound(Button button, Sfx sound = Sfx.UiTap)
+        {
+            if (button == null) return;
+            button.onClick.AddListener(() => GameAudio.Play(sound));
         }
 
         /// An empty parented RectTransform - the first three lines of every element above.

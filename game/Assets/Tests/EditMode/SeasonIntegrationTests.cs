@@ -173,9 +173,10 @@ namespace MotionRunner.Tests
                 Assert.IsTrue((bool)Skin("IsEquipped","cap"));
                 menuType.GetMethod("ShowCosmetic").Invoke(menu,new object[]{"crown"});
                 Assert.IsFalse((bool)Season("IsOwned","crown"));Assert.IsTrue((bool)Skin("IsEquipped","cap"),"Locked preview must leave the outfit unchanged.");
-                Assert.IsFalse(menu.transform.Find("Header").gameObject.activeSelf);
+                // The header lives inside the safe-area root (RuntimeUi.SafeRoot).
+                Assert.IsFalse(menu.transform.Find("Safe area/Header").gameObject.activeSelf);
                 menuType.GetMethod("GoHome").Invoke(menu,null);
-                Assert.IsTrue(menu.transform.Find("Header").gameObject.activeSelf);
+                Assert.IsTrue(menu.transform.Find("Safe area/Header").gameObject.activeSelf);
             }
             finally { UnityEngine.Object.DestroyImmediate(menu.gameObject); }
         }

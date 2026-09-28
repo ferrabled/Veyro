@@ -66,6 +66,16 @@ namespace MotionRunner.Gameplay
         /// pause button. 440x180 is ~4% of the portrait screen.
         public static readonly Vector2 HudSize = new Vector2(440f, 180f);
         public static readonly Vector2 HudPosition = new Vector2(0f, -320f);
+        static readonly Vector2 HudAnchor = new Vector2(0.5f, 1f);
+
+        /// On the result card (camera mode only): centre-anchored, 20 px above the card's top
+        /// edge. The card is 1420 tall and centred (RunHud), so its top is at +710; the panel's
+        /// centre at +820 puts it at +730..+910 - clear of the masthead and the score it used to
+        /// cover at HudPosition (PR #5 review), 50 px under the top of a 16:9 screen and well
+        /// under any cutout on a taller one (the 6T's teardrop ends ~80 px in on a 2120-tall
+        /// design space whose top is +1060).
+        public static readonly Vector2 ResultPosition = new Vector2(0f, 820f);
+        static readonly Vector2 ResultAnchor = new Vector2(0.5f, 0.5f);
 
         /// Bigger while staging, where there is nothing else to look at and the whole point is to
         /// get yourself into frame.
@@ -131,6 +141,8 @@ namespace MotionRunner.Gameplay
 
         // ---- built elements ----
 
+        RectTransform _panel;
+        bool _onResultCard;
         RectTransform _glyph;
         Image[] _glyphParts;
         Image[] _bands;
@@ -160,8 +172,23 @@ namespace MotionRunner.Gameplay
             var overlay = New(rig, input, false);
             // Anchored to the top of the screen, where the score rows are, rather than to the
             // centre: it belongs to the readout, not to the middle of the track.
-            overlay.Build(HudSortingOrder, new Vector2(0.5f, 1f), HudPosition, HudSize);
+            overlay.Build(HudSortingOrder, HudAnchor, HudPosition, HudSize);
             return overlay;
+        }
+
+        /// Run variant only. Moves the panel between its run slot (under the score rows) and its
+        /// result-card slot (above the card), where RunFlow.SyncOverlay keeps it up so a camera
+        /// player can see they are in frame before hopping the next run in. On the card the
+        /// lane bands follow the live axis, like the framing preview: there is no runner
+        /// committed to a lane any more, and a band stuck on the crash lane would say the camera
+        /// had frozen. Cheap to call every frame - two rect writes, only when the state flips.
+        public void Place(bool onResultCard)
+        {
+            if (_panel == null || _onResultCard == onResultCard) return;
+            _onResultCard = onResultCard;
+            _panel.anchorMin = _panel.anchorMax = onResultCard ? ResultAnchor : HudAnchor;
+            _panel.anchoredPosition = onResultCard ? ResultPosition : HudPosition;
+            if (onResultCard) _hasReportedLane = false;
         }
 
         /// While a screen is staging the camera. No run is polling the camera yet, so the overlay
@@ -345,11 +372,15 @@ namespace MotionRunner.Gameplay
             // sizes and a number tuned at one size means the same thing at the other.
             float k = size.y / HudSize.y;
 
-            GameObject panel = RuntimeUi.Element("Panel", transform, out RectTransform panelRect);
+            // Placed inside the safe area, like the HUD rows it sits under: the top-anchored HUD
+            // position moves down with them on a phone with a cutout.
+            var safe = RuntimeUi.SafeRoot(transform);
+            GameObject panel = RuntimeUi.Element("Panel", safe, out RectTransform panelRect);
             panelRect.anchorMin = anchor;
             panelRect.anchorMax = anchor;
             panelRect.anchoredPosition = position;
             panelRect.sizeDelta = size;
+            _panel = panelRect;
 
             // Nothing here is ever a raycast target: the panel sits on its own canvas above a
             // screen with live buttons, and a backdrop that eats taps is how an overlay stops

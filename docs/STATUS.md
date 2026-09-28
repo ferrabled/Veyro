@@ -1,5 +1,346 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — Settings sheets rounded, menu header on the page colour (feat-game-UI-improvement / profile-guide-polish, fourth pass)
+
+Owner: round the notifications and gameplay-analytics panels like the rest; the home title
+sat on a white band while the page is sage.
+
+- **`Menu/MenuSheet.cs`** — the shared modal: park-ink dim that closes on tap, rounded paper
+  card (radius 44, width 900), round X (`IconButton`, also used by the guide now), bold title,
+  best-fit body, `Primary` (pink) / `Secondary` (plain) / `Link` (text) actions, no lingering
+  selected tint. **NotificationPanel** and **AnalyticsPanel** rebuilt on it: X, tap outside and
+  Android back all close (Close still cancels a permission request in flight); the CLOSE slab
+  is gone; support-id and privacy actions are links. **Analytics ENABLE and KEEP OFF are the
+  same Secondary style on purpose** — a consent choice must not dress the default-off answer as
+  the lesser one; notifications keep ENABLE as the pink primary.
+- **Header colour** — `MenuTheme.Page` (opaque sage): the menu backdrop and header now use it,
+  so the title sits on the page colour every tab uses, including the strip behind a cutout;
+  the tab bar stays paper and its backdrop bleeds down past the bottom inset.
+- `ProfileUiReview` also renders `notifications.png` / `analytics.png` with the fake services.
+
+**Verified:** 637/637 EditMode; renders checked (sage sampled at y=20/60 beside the title and
+between cards, paper tab bar and bottom strip). **OnePlus 6T** `1.0.0-dev.20260928-1546.nogit`
+(permissions unchanged): header sage from y=0 to the first card; both sheets open from
+PROFILE → SETTINGS, close with X / tap outside / back, stay open on a tap on the card; the
+analytics body fully readable; ENABLE / KEEP OFF pixel-identical in size and style; logcat
+clean. No consent, notification, volume or profile state was changed. Afterwards the two
+sheets were tightened to their copy (equal width, less empty card) — re-verified with
+`1.0.0-dev.20260928-1602.nogit` (637/637): both 994 px wide on the 6T, title→body→buttons
+gaps down from ~220 px to ~95–160 px, body type size unchanged and fully readable.
+
+## 2026-09-28 — Guide X / tap-outside, home redesign, safe area for cutouts and notches (feat-game-UI-improvement / profile-guide-polish, third pass)
+
+Owner feedback: the guide should close with an arrow/X rather than "skip"/"back" and on a
+tap outside it; the home tab should follow the new design; the phone's camera cutout (the
+6T's centred teardrop, the Nord 2's corner hole) cuts through "VEYRO RUN" — fix it in a
+modular way that also covers iOS.
+
+- **Guide**: round X (top right) and round back arrow (top left, pages 2–4) drawn as strokes
+  (`Menu/MenuIcons.cs`: chevron, cross, tick — no glyphs, gotcha #7); the dim around the card
+  is a button that dismisses (a tap on the card itself does not). Every exit still marks it
+  seen.
+- **Home** (`HomePage`, `SeasonPassCard`, `DailyStampsCard`, `ModePickerCard`): sage page like
+  the profile; rounded cards (`CosmeticUi.Card`, `MenuTheme.CardRadius` 28 — also applied to
+  every profile card, and pressed rows light as a rounded pill); SEASON 1 PASS as the shop's
+  ink-to-teal banner with a state pill and a rounded gold XP bar; stamps as rounded squares
+  with a stroke tick, today rimmed pink, spread edge to edge under the title, streak as a pill;
+  the runner on the locker's teal-to-cream stage with YOUR LOOK and a CUSTOMIZE pill; mode
+  buttons rounded and bold, CAMERA with a gold BETA tag (group centred); a card gap above the
+  tab bar. App Store review note updated for the label.
+- **Safe area** (`Core/SafeArea.cs`): `SafeAreaFitter` anchors a full-screen child of a canvas
+  to `Screen.safeArea` — Unity reports it from Android's display-cutout insets and from iOS's
+  safe-area insets (notch / Dynamic Island / home indicator) alike, so there is no per-device
+  table — re-checked each frame, degenerate rects fall back to full screen, and a `Simulated`
+  rect lets the desk renders show a cutout. `RuntimeUi.SafeRoot(canvas)` is the one call: the
+  menu (header, pages, tab bar), the run HUD (score rows, pause button; its paper band bleeds
+  up to the screen edge) and the face overlay build inside it; backdrops stay edge to edge
+  (menu backdrop now opaque paper so the cutout strip matches the header; full-screen pages use
+  `CosmeticUi.Backdrop`, which bleeds past the page). Dev builds log `[SafeArea]` per change.
+  Centred cards (guide, pause, result, notification/analytics panels) are unaffected.
+  `androidRenderOutsideSafeArea` stays 1: the world keeps drawing under the cutout.
+
+**Verified:** 637/637 EditMode (SeasonIntegrationTests' header lookup follows the new
+`Safe area/Header` path); `ProfileUiReview` adds `home.png` and `home-cutout.png` (simulated
+teardrop: title 78 px clear, strip colour identical to the header). **OnePlus 6T**,
+`1.0.0-dev.20260928-1452.nogit`: dumpsys cutout `insets=Rect(0, 79 - 0, 0)`, bounding rect
+`(455,0)-(625,79)`; `[SafeArea] safeArea=(0,0,1080,2261) screen=1080x2340` → safe top at 79 =
+cutout bottom, title letters at y=130; header paper seamless to the top. Guide X, back arrow,
+tap-outside closes, tap-on-card does not; home as designed; profile rounded cards and pill
+highlight; shop and season pass clear of the cutout. The season pass page showed a paper band
+under the cutout over its mint → `CosmeticUi.Backdrop` (bleeding backdrop) for it and the
+locker — re-verified on the 6T with `1.0.0-dev.20260928-1510.nogit` (637/637 EditMode): the
+cutout band on both pages is the page's mint (#BFE6DB), no paper band; 60 FPS on home and the
+season page. No runs were started; nothing on the profile changed.
+
+**Needs a human look:** the Nord 2 (corner punch-hole) and, when there is one, an iPhone with a
+notch/Dynamic Island — the same code path, but only a device proves the insets. Notification /
+analytics panels are still square-cornered (not part of this pass).
+
+## 2026-09-28 — Podium leaderboard, runs chart, drag-and-tap volume in the pause menu, guide "i" (feat-game-UI-improvement / profile-guide-polish, second pass)
+
+Owner feedback on the first pass: the leaderboard and "my last runs" were boring; the volume
+bars should also drag (and reach 0 by drag or by a tap); the sound rows belong in the pause
+menu; the RUN tab should have an "i" to reach the guide.
+
+- **Leaderboard** (`Menu/LeaderboardCard.cs`, engine-free `Progression/Podium.cs`): top three
+  on a podium — 2nd / 1st (raised) / 3rd on silver / gold / bronze blocks (`MenuTheme.Silver`,
+  `Bronze` added), each with that player's generated critter, name and score — then five
+  ranked rows with the score in a right-aligned column; the player's row tinted pink.
+  Unclaimed places and rows draw as grey empty spots. The board query now asks for 8 rows.
+- **My last runs** (`Menu/RecentRunsCard.cs`, engine-free `Progression/RunDigest.cs`): a bar
+  per kept run, newest on the right in pink ("latest"), best in gold, score over each bar,
+  empty slots as stubs; BEST / AVERAGE / DISTANCE tiles in the result card's tile style; a
+  "latest · date · mode · pts · m · coins" line.
+- **Volume** (`Menu/VolumeControl.cs`, replaces the private row in `ProfileSettingsCard`): a
+  flat zero mark + ten bars, 11 positions (`VolumeSteps.PositionAt/LevelAt`); tap any bar or
+  the zero mark, or drag — the level follows the finger, silence past the left edge. Nothing
+  happens on pointer-down; a mostly-vertical drag is re-routed to the enclosing `ScrollRect`
+  (so scrolling the profile never nudges a level), a sideways drag scrubs, a tap sets on
+  release. One save + one click per gesture. **Pause menu**: the MUSIC/SOUNDS ON/OFF text
+  links are replaced by the same two rows; the card and its buttons are now rounded like the
+  result card, on the park-ink scrim, and grow by exactly the rows so RESUME keeps its place
+  under the status line. The profile keeps its rows as well.
+- **RUN tab**: a round "i" in the mode card's corner opens how-to-play (`ModePickerCard.Build`
+  takes the callback; the status line is inset symmetrically to stay clear).
+
+**Verified:** 637/637 EditMode in the SHA-256-matched scratch (new `ProfileCardsTests` 8,
+`VolumeStepsTests` 7); `ProfileUiReview` renders profile top/bottom, offline and a new
+`pause.png`, checked. `BuildAndroidDev` `1.0.0-dev.20260928-1350.nogit` (99,370,232 bytes,
+permissions unchanged) on the **OnePlus 6T**, online via the Nord 2 hotspot: "i" → guide →
+skip; sample and live boards (TODAY with empty spots, ALL-TIME live); runs chart numbers
+checked against the bars; bar tap, zero-mark tap, drag up/down/past the edge, vertical swipe
+from the bars scrolls without changing the level, ON/OFF; pause rows tap/drag/mute with the
+run frozen, RESUME, QUIT; levels set in pause shown on the profile; levels restored and
+persisted across relaunch; logcat clean. After the pass, the "i" was moved flush with the
+buttons' edge and the ON/OFF pill no longer keeps the "selected" tint after a tap
+(re-checked: 637/637 EditMode; not re-installed on the phone).
+
+**Device-test side effect (agent error, cannot be undone):** the pause test resumed a tilt run
+and it crashed 1.6 s later (tilt RESUME has no countdown). That run — Daily, score 89 — was
+recorded on the 6T's profile (QUIET-XERUS-33): today's daily stamp and streak 1, the 89 in
+"my last runs" (the oldest, 959, dropped out of the 8), and a submission to today's online
+board. The second test run ended with QUIT TO MENU and was not recorded.
+
+**Open for the owner:** (1) "TILT best 959" on the player card vs "BEST 1856" on the runs chart
+— the chart mixes camera and tilt runs and `RunRecord` does not store the scheme; showing a
+mode per bar needs a `RunHistory` encoding change. (2) The pause card's status box keeps
+~200 px for the multi-line camera prompts, which reads as empty space on a tilt pause.
+(3) Rows stay on the profile as well as the pause menu unless the owner wants pause-only.
+
+## 2026-09-28 — Season 1 XP curve approved; release-build gate lifted (T-025, feat-game-UI-improvement iOS session)
+
+Owner approved the suggested production curve as-is (D20, closes OPEN_QUESTIONS 23):
+0, 10, 25, 50, 100, 180, 300, 450, 650, 900 XP. `SeasonCurve.ProductionApproved` flipped to
+true, so `SeasonArtBuild` no longer fails non-development builds of `com.ferrabled.veyro.run` —
+done now so the iOS release build is not blocked. Curve values and storage ids are unchanged;
+development builds still use the 0–9 test curve. Also trimmed the RevenueCat DX notes in
+`DEVPOST_ANSWERS.md` §4b to the stale product-page observation (owner: the other two are
+expected behaviour).
+
+**Verified:** code read only — the flag has no other readers than `SeasonArtBuild`'s guard, and no
+EditMode test asserts its value. **No Unity run** (EditMode suite not re-run for this one-line
+change); the next batchmode run should confirm it compiles and stays green.
+
+## 2026-09-28 — Profile tab redesigned, sound set inline, generated avatar; guide restyled (feat-game-UI-improvement / profile-guide-polish)
+
+Owner feedback on device screenshots: the how-to-play card's copy did not fill it and looked
+off-style next to the rest of the game; the profile's bottom block of settings links was
+poorly presented; "new name" should read "re-roll name"; the avatar should be generated from
+the player's name.
+
+**Profile tab** (`Menu/ProfilePage.cs`, new `ProfileSettingsCard.cs`, `MenuRows.cs`): the page
+is now a vertical `ScrollRect` (five cards no longer fit a 16:9 screen; tapping PROFILE again
+returns to the top). The loose three-across link grid is replaced by two list cards with
+hairline-divided rows, each row one tap target that lights only while pressed:
+- **SETTINGS** — MUSIC and SOUNDS set right there as ten tappable bars + an ON/OFF pill (the
+  pause menu's mute), then NOTIFICATIONS / GAMEPLAY ANALYTICS / HOW TO PLAY with chevrons.
+  Bars rather than sliders: a slider in a scroll view jumps its level when a swipe starts on
+  it. Engine-free `Audio/VolumeSteps.cs` maps the stored 0..1 level to bars (quietest bar is
+  10 %, silence is the pill's job), so levels set with the old slider carry over. Every tap
+  saves; the button's own click plays after the level changes, so SOUNDS is heard at its new
+  level. The SOUND link, `SoundPanel` and its RunFlow/MainMenu wiring are removed, with the
+  SOUND case of `PendingChallengePanelTests` (the modal no longer exists).
+- **ACCOUNT** — PLAYER ID (COPY), RECOVERY CODE (COPY, still says anyone holding it can claim
+  the profile), IMPORT PROFILE (PASTE), PRIVACY POLICY, DELETE ONLINE PROFILE (still two taps;
+  the second line says "immediate and permanent" before the first tap). Each row's second
+  line doubles as its feedback slot. Rows with nothing to act on hide and the card re-flows.
+- Player card: the name link reads **re-roll name**; the grey square is a **generated avatar**
+  — a mirrored 7×7 pixel critter with two enclosed eyes, from the handle (engine-free
+  `Social/PlayerAvatar.cs`: FNV-1a + lowbias32, case/space-insensitive, never
+  `string.GetHashCode`) on one of 8 `MenuTheme` colour pairs (`Menu/PlayerAvatarView.cs`, one
+  point-filtered 7×7 texture rewritten in place). Re-rolling the name re-rolls the critter.
+
+**Guide** (`Gameplay/FirstRunGuide.cs`, `Track/GuideState.cs`): dressed like the result card —
+rounded paper card on the park's ink, bold title, progress dots instead of "1 / 4", rounded
+pink primary. Pages are structured (`GuidePage` = lead, `GuideRow`s, note) instead of one
+hand-wrapped string, wrapped to the card and stacked by measured height; spare height is
+shared between the gaps and centred, so nothing pools above the button. Mode pages show a
+bold verb chip per movement; the choice page shows one tile per mode with the first frame of
+that mode's own illustration cropped square. Pictures sit in rounded, bordered, stencil-masked
+frames: the art's paper is textured (#FEFAEE→#FBF3E6), so a bare picture showed a faint edge
+on the flat #FBF5E9 card. Card 880×1480, slot 784×490 (`GUIDE_ILLUSTRATIONS.md` updated, plus
+"frame 1 doubles as a centre-square thumbnail"). Copy budgets are constants in `GuideState`,
+pinned by `GuideStateTests`; `FirstRunGuide.Overflow` reports a measured overflow and
+`GuideUiReview` fails on one. New `Editor/ProfileUiReview.cs` renders the profile top, bottom
+and offline bottom (`builds/profile-review/`).
+
+**Verified** in a fresh scratch (`C:\scratch\veyro-ui-polish`, SHA-256-matched to the
+worktree, no extra or missing scripts): Unity 6000.5.9f1, **620/620 EditMode tests passed**
+(621 before the SoundPanel test case was removed; new suites PlayerAvatarTests 7/7,
+VolumeStepsTests 5/5, GuideStateTests 24/24). `GuideUiReview` and `ProfileUiReview` render with no exception
+and no overflow; images checked for overlap, clipping, frame corners, row backgrounds.
+
+**Needs human device test** (dev build): (1) first launch or PROFILE → HOW TO PLAY — four
+pages legible, pictures animate inside their frames, BACK/SKIP/NEXT work; (2) PROFILE —
+scrolls smoothly, a swipe starting on the volume bars scrolls rather than changing volume, a
+tap on a bar changes it (music audibly, sounds with the click), ON/OFF mutes, levels survive a
+relaunch, and the pause menu's MUSIC/SOUNDS toggles agree with the pills; (3) re-roll name →
+avatar changes, same name after relaunch → same avatar; (4) COPY/PASTE/DELETE rows behave as
+before. The 28 Sep merge entry's "open SOUND, deliver a challenge link" step no longer applies
+(no SOUND modal); notifications/analytics still do.
+
+**Follow-up, same day — PR #14 Copilot finding + device pass.** Copilot flagged that the store's
+restore feedback confirmed (cue + "purchases restored") whenever the entitlement set merely
+*changed*, including a restore that only drops a lapsed entitlement (`{season1, skin}` →
+`{skin}`). Fixed in `StoreCatalogView` with one `GainedAny(before, after)` check used by both the
+cue and `DescribeRestore`; `ProfileMenuReviewTests` gained the removal cases (14 cases). **627/627
+EditMode** in the scratch. `BuildAndroidDev` (`1.0.0-dev.20260928-1302.nogit`, 99,360,136 bytes,
+permissions unchanged) installed over the previous dev build on the **OnePlus 6T** (1080×2340).
+On device: home, profile top/bottom, settings and account cards, swipe starting on the volume
+bars scrolls without changing the level, bar taps and ON/OFF, notifications/analytics panels,
+privacy link, all four guide pages (frames animate, chips one line, back/skip), tab re-tap to
+top, relaunch persistence — all PASS; logcat has no managed exceptions (only Unity's usual
+`AssetPackManager` ClassNotFound line at launch). **The phone was offline** (no reachable
+network), so the online-profile rows (PLAYER ID / RECOVERY CODE / IMPORT), "re-roll name" and
+the avatar-per-handle were not exercised on device; re-roll was deliberately not tapped (it
+permanently renames the owner's profile). Those remain for the owner, online.
+
+## 2026-09-28 — Main merged into the game UI branch (feat-game-UI-improvement / main-merge)
+
+Owner committed the audio, illustrated guide, icon and documentation through `d52a8dc`,
+then requested merging main. Fetched `origin/main` at `1da494f` (share-run PR #13 included)
+and merged it into `feat/game-UI-improvement`. The only text conflict was this journal:
+all 13 entries in the conflicting additions were retained, ordered newest first.
+
+The automatic code merge brought in the challenge modal guard but knew only notifications
+and analytics. Switched it to the existing `AnyPanelOpen` check so SOUND also holds an
+incoming challenge. Added three EditMode regressions exercising the actual RunFlow method:
+each panel retains the pending link across repeated checks, and closing it allows processing.
+The tests use a foreign-version link to exercise refusal without starting sensors/services.
+Audio, illustrated guide, icon and the owner's retained slide instructions are preserved.
+
+**Verified:** Unity 6000.5.9f1, **605/605 EditMode tests passed**, including all three new
+panel checks. Both tests and the Android build used `C:\scratch\veyro-audio\game`, with all
+981 Assets/Packages/ProjectSettings files SHA-256 matched to the merge snapshot and no extras
+before execution. Gradle staging was cleared at its checked scratch path. Challenge landing
+JavaScript passes `node --check`. `BuildAndroidDev` completed with exit 0; the ARM64 APK is
+**99,342,700 bytes**, version `1.0.0-dev.20260928-0202.nogit`, versionCode 5, with the same
+permissions as the pre-merge development APK and the UnityPlayerGameActivity launcher.
+SHA-256: `bfcb44632d4ddcc8c6974a16a8da5d0b7db1d0172cc2b6efc3fef894949b08ae`.
+Reports, logs, permission snapshots and APK are under ignored `builds/main-merge-review/`;
+`builds/MotionRunnerDev.apk` was also updated.
+
+**Scope:** verification covers the merge snapshot, before the other pane's concurrent
+profile/guide UI polish. Those edits remain outside the staged merge; the scratch was not
+resynced after that work began. No phone installation, push or deployment in this merge task.
+
+**Needs human device test:** after installing this merged build, open SOUND, deliver a valid
+challenge link and verify the menu/panel remain until SOUND closes, then the challenge starts
+once. Repeat for notifications/analytics. The previous guide animation/legibility, audio mix,
+camera-hop restart, fallback, SHARE-return and two-device challenge checks remain pending.
+
+## 2026-09-28 — Latest UI worktree built and installed on the Nord 2 (feat-game-UI-improvement / phone-install)
+
+Owner requested the latest app on the phone and a check of the remaining pre-merge work.
+Built the current worktree (including uncommitted guide illustrations, fallback cleanup and
+icon) using `BuildScript.BuildAndroidDev` in `C:\scratch\veyro-audio`. Assets, Packages and
+ProjectSettings were synced with `robocopy /E`, checked byte-for-byte by SHA-256, and audited
+for scratch-only files before building; the Gradle staging path was checked and cleared if
+present. The sole trailing-whitespace warning in the worktree's icon settings was removed.
+
+**Build:** Unity 6000.5.9f1 exited 0. `builds/MotionRunnerDev.apk` is **99,338,664 bytes**
+(+2,445,920 bytes versus the 25 Sep local APK). Version `1.0.0-dev.20260928-0134.nogit`,
+versionCode 5, package `com.ferrabled.veyro.run`, launcher `UnityPlayerGameActivity`, adaptive
+ticket icon. `aapt2 dump permissions` is identical to the previous local development APK.
+SHA-256: `9b3371309566e588b27ea9935ea52b7cd6ebe48d893620423c75a85246ba4cce`.
+Build log: `C:\scratch\veyro-audio\guide-phone-build-20260928.log`.
+
+**Device:** Nord 2 / DN2103, 1080×2400. `adb install -r` succeeded, without uninstalling or
+clearing app data. Package first-install time remains **18 Sep 13:16:09**; update time is
+**28 Sep 01:40:01**. Launch succeeded, the menu displays the new build stamp, and the existing
+owned pass/equipped outfit remain visible. A subsequent capture showed an active camera run;
+further input was left to the owner. Screenshots are ignored under `builds/guide-review/`.
+The only startup Unity error sampled was the previously documented AssetPackManager class
+probe; no AndroidRuntime crash was observed. This was an install/launch smoke check, not an
+audio listen or a physical camera-gesture acceptance test. The earlier **590/590 EditMode**
+result still applies; the only source change since that run was YAML whitespace.
+
+**Remaining:** human guide animation/legibility, audio mix, camera-hop restart (no first-frame
+jump), camera fallback and SHARE-return checks. Re-stage and commit the guide/icon/docs changes,
+then merge `origin/main` (now includes share-run PR #13), include SOUND in the pending-challenge
+modal guard, and verify the combined result. This installed APK predates that main merge.
+Slide instructions remain as requested. No commit or merge performed.
+
+## 2026-09-28 — App Store Connect set up under the owner's own Apple account; listing copy written (T-032, feat-game-UI-improvement iOS session)
+
+Play v5 has been in production review since 16 Sep, so the owner opened the iOS route as a
+second store — under **their own** Apple Developer account (individual, approved 28 Sep), not the
+friend's account D11/P2 assumed; iOS revenue and tax now land on the owner. Done by the owner:
+Free + Paid Apps agreements Active, bank account + W-8BEN (line 10 left blank per Apple's tips
+sheet) Active, App ID `com.ferrabled.veyro.run` (In-App Purchase + Push Notifications), app record
+(SKU `veyro-run-ios`), the three non-consumable IAPs as drafts with 1290×2796 placeholder review
+screenshots. EU storefronts stay off until the DSA trader declaration is verified.
+
+Added `docs/store-kit/APP_STORE_LISTING.md`: every App Store Connect field value, including the
+owner-requested camera subtitle `Tilt or camera: daily runner`, keywords, description (camera
+BETA block, STEP wording), App Privacy rows mirroring the Play Data safety state, IAP fields,
+review notes, TestFlight info and the Info.plist strings the iOS build needs. Camera mode ships on
+iOS (owner, 28 Sep).
+
+**Next:** iOS code changes (App Store RevenueCat key + iOS build method, iOS player settings,
+iOS camera permission path, OneSignal iOS package, Layers on iOS without ATT, Android-only copy),
+Xcode export from Windows, then a Mac (rented or the friend's) to archive and upload to TestFlight.
+Not yet verified on any Apple hardware. Owner-approved D19 now records the own-account iOS path
+(D11's iOS clause marked superseded; PREREQUISITES P2/P10/H3 and LICENSING_REVENUE §4 updated).
+RevenueCat App Store app configured (IAP key, server notifications, `appl_` key, products attached
+to the existing entitlements/offering).
+
+## 2026-09-28 — Guide illustrations integrated and rendered (feat-game-UI-improvement / guide-art-integration)
+
+The owner supplied all ten AI-generated PNGs in `screenshots/guide/`: four tilt frames, five
+camera frames (setup → centred player → step left → step right → hop), and one run still.
+Copied them byte-for-byte to `game/Assets/Resources/Art/Guide/` and retained the masters. Every
+source is 1586×992; all ten SHA-256 pairs match. No resizing, recolouring or palette reduction.
+Added explicit keep rules for `screenshots/guide/` (it was already outside the dated-screenshot
+ignore rule) and an LFS rule for its PNGs. Runtime PNGs already had LFS coverage. Unity-generated
+folder/texture `.meta` files are included with the runtime assets.
+
+The guide now displays the supplied art through its existing 1.1-second unscaled frame loop.
+Removed the "illustration coming"/asset-filename line from the missing-sequence fallback; the
+instruction caption remains. Updated the brief, importer/content comments, BACKLOG and GAME_ART
+to describe the delivered assets and the two-folder update workflow. Preserved the owner's
+camera copy change to STEP and the slide instructions, which the owner wants to keep ahead of
+the upcoming slide mechanic. T-015's separate procedural in-mode showcase remains open.
+
+**Verified:** reused `C:\scratch\veyro-guide`, synced Assets/Packages/ProjectSettings with
+`robocopy /E`, checked every source file by SHA-256 and checked for extra scratch files before
+Unity ran. Unity 6000.5.9f1 `GuideUiReview.Render` succeeded; its expanded review checks every
+expected sprite and rejects a page showing fallback. All ten sprites loaded at 1024×640.
+All ten importers have Sprite/Single, no mipmaps, sRGB and the Android 1024/ASTC 6x6 override.
+Four page renders plus ten individual-frame previews are in ignored `builds/guide-review/`;
+the four pages were visually inspected at 1080×2400: artwork visible, copy clear of buttons.
+EditMode: **590/590 passed**, including **20/20 GuideStateTests**; report copied to
+`builds/guide-review/guide-art-tests-20260928.xml`. No Android APK built or phone touched.
+
+**Needs human device test:** open HOW TO PLAY; watch a complete tilt loop (four frames) and
+camera loop (five), verify the run image stays still, then check NEXT/back/skip and legibility
+on the phone. Historical 24/25 Sep notes below describe the earlier placeholder-only state.
+
+**Git:** audio is already committed as `b978dcf`. The owner's existing guide staging was left
+intact; re-stage the edited guide files, both PNG folders, runtime metadata and ignore/LFS rules
+before committing. Main now contains all of share-run via PR #13 (`1da494f`); finish the local
+guide/icon/docs commits before merging `origin/main`. No commit or merge was performed here.
+
 ## 2026-09-28 — PR #13 (feat-share-run) Copilot review: 8 of 9 findings applied
 
 - **Landing page, Android:** `challenge.js` now opens `intent://challenge?<query>#Intent;scheme=veyro;package=com.ferrabled.veyro.run;S.browser_fallback_url=<Play listing>;end`
@@ -49,6 +390,455 @@ unchanged and the reasoning above stands.
 phone **without** the game, open a challenge link in Chrome and tap **Open in Veyro** → the Play
 listing must open, not an error page. With the game installed → the game opens on the challenge.
 Repeat once in Samsung Internet if one is to hand.
+
+## 2026-09-25 — App icon: the approved ticket + V monogram is now the Android launcher icon, applied from code (T-030 icon slice, feat-game-UI-improvement icon session)
+
+Until this pass every build shipped Unity's default icon. The owner-approved "daily ticket + V
+monogram" (`screenshots/icon.png`, `docs/store-kit/ART_DIRECTION.md` §0a) is now the launcher icon,
+and nothing about it was clicked in the inspector: import settings, layer generation and the
+PlayerSettings wiring are all code, and every Android build re-applies it.
+
+**What changed**
+- `Assets/Art/Icon/AppIcon.png` — 1024×1024 from the 1254 master (ffmpeg lanczos), then a
+  256-colour palette: 234 KB against 1.31 MB for the 24-bit downscale (riso grain does not
+  compress). Difference from 24-bit at launcher size (192 px): mean 0.7/255, max 7 — invisible.
+  Picked up by the existing LFS rule `game/Assets/Art/**/*.png`; `.gitattributes` unchanged.
+- `Assets/Art/Icon/AppIconForeground.png` + `AppIconBackground.png` — generated by the new
+  `Editor/AppIcon.cs` (`AppIcon.Generate`, menu Veyro/Art/Regenerate app icon layers): the flat art
+  at 634/1024 px (62 %) centred on a transparent canvas, and a solid fill of the art's ground colour
+  sampled from the source's corners. Integer supersampling, no time or randomness — two runs gave
+  byte-identical SHA-256s. Committed as assets, regenerated only when the source changes.
+- **Deviation from the brief, on purpose:** the background layer is the art's own teal ground
+  (`#053740`), not paper `#FBF5E9`. The art is a paper ticket on a flat teal field (σ < 1 across
+  all four corners), so a matching field makes the scaled square melt into the background and the
+  masked icon reads exactly like the flat one; a paper background would have shown the teal
+  square's edges as four paper slivers through Android's round mask. At 62 % the ticket's far
+  corner sits at 0.55 of the half-size, inside the 66 dp safe circle (0.61). Flip it in one place
+  (`AppIcon.SampleGround`) if the art ever gets a non-uniform ground.
+- `Editor/AppIconImport.cs` — `AssetPostprocessor` for `Assets/Art/Icon/`: Default type, sRGB,
+  no mips, readable (Unity reads the pixels to make the mipmap-* sizes), **uncompressed** (no ASTC
+  artefacts in a 48 px icon), max 1024, Android/iPhone overrides cleared.
+- `Editor/ProjectSetup.cs` — `EnsureAppIcon()`: default icon via `SetIcons(NamedBuildTarget.Unknown)`,
+  Android Adaptive = (background, foreground), Round and Legacy = the flat art (minSdk is 26, so
+  every supported device takes the adaptive one). Called from `SetupUrp` and from the new batchmode
+  entry `ProjectSetup.ApplyAppIcon` (exit 4 when the art is missing). A missing texture warns and
+  leaves that kind alone — the icon can never fail a build.
+- `Editor/BuildScript.cs` — `Build()` calls `ProjectSetup.EnsureAppIcon()` first, inside the try,
+  so a headless build from a fresh checkout or a scratch copy always carries it. It is a persistent
+  setting, deliberately not restored in the finally.
+- `ProjectSettings/ProjectSettings.asset` — only icon lines: `m_BuildTargetIcons` gains the 128 px
+  default slot, and the 18 Android slots (6 adaptive × 2 layers, 6 round, 6 legacy) now reference
+  the three textures by GUID. No other field moved.
+
+**Verified.** Scratch `C:\scratch\veyro-icon` (Library from veyro-guide, `Bee/Android/Prj`
+deleted, `Assets/` and `ProjectSettings/` byte-equal to the worktree before the run). Batchmode
+`AppIcon.Generate` twice → identical hashes; `ProjectSetup.ApplyAppIcon` → the diff above;
+`BuildScript.BuildAndroidDev` → `C:\scratch\veyro-icon\builds\MotionRunnerDev.apk`, 96.1 MB
+(95.8 MB on 24 Sep; the delta is the launcher PNGs). Inside the APK: `res/mipmap-anydpi-v26/app_icon.xml`
++ `app_icon_round.xml` (adaptive), `ic_launcher_foreground.png` / `ic_launcher_background.png` at
+ldpi…xxxhdpi (81…432 px) and `app_icon.png` / `app_icon_round.png` (36…192 px) — extracted to
+`C:\scratch\apk-icon\out\res\` and viewed: the ticket, centred with safe-zone padding, on the teal
+field. `aapt2 dump badging`: `application: label='Veyro Run' icon='res/mipmap-anydpi-v26/app_icon.xml'`,
+`application-icon-120…640` all resolve to it, and the 28 `uses-permission` lines are identical to
+the 24 Sep dev APK. EditMode suite in the same scratch: **590/590** (a first run showed 589/590 — `AudioCatalogTests.ResultMusic_ResolvesToClips`, because the audio session's `result_best/lost.ogg` landed in the worktree after the scratch was synced; copied in, re-run, clean). Not committed. Phone
+not touched — **needs human device test:** install the scratch APK and check the launcher (circle
+and squircle masks) plus the recents/settings tiles.
+
+**Next.** The same `AppIcon.png` is the Devpost 1024×1024 icon and, downscaled to 512, the Play
+listing icon (ART_DIRECTION §0a table) — upload both when the listing is next edited.
+
+## 2026-09-25 — Guide illustration brief checked against the game, one copy-paste section per image (feat-game-UI-improvement guide session)
+
+Owner asked whether `docs/GUIDE_ILLUSTRATIONS.md` matched the game and whether to attach
+screenshots. The file is now one self-contained section per PNG: what to attach (and what a
+screenshot must show), then a full prompt block to paste. Fixes from checking it against the code:
+- **Camera frames:** switched to a view from behind the player. The old side view hid the
+  sideways lean, and its left/right note was backwards.
+- **Colours:** coins are gold `#FFC85C` (`ChunkView`), not pink. The phone-screen track now uses
+  the real park colours (`ParkChunkArt`).
+- **Tilt frames:** the tilt is now a sideways tip around the phone's long axis (roll, which is
+  what `GyroTiltInput` reads), not a steering-wheel turn. Owner correction: the first `tilt_02`
+  came back rotated in the picture plane. The tilt set is generated and approved by the owner.
+- **Camera set:**
+  - The crouch frame is replaced by lean right.
+  - After the owner reviewed the first `camera_02`, the view became a symmetric one from behind
+    and above the player. Phone, floor line, player and wedge now share one centre line, and
+    the wedge stops at the player instead of spilling onto the floor.
+  - `camera_01` is now the empty spot marked with footprints. A "too close" player would hide
+    the phone from this viewpoint.
+  - `camera_04` can be `camera_03` flipped.
+  - The owner is not using pose photos, so every prompt stands on text alone.
+  - 28 Sep: the owner kept the first centred `camera_02`, pink t-shirt included. A whole-image
+    touch-up redrew everything: new table and figure, an all-teal silhouette, heavy pink edges.
+    Fixes to a kept image are now select-area edits only. The brief asks for at most a hairline
+    ink offset.
+  - A select-area narrowing of the table worked, but the owner kept the wide coffee table.
+    `camera_01` (empty spot with footprints) was made from the kept `camera_02` and matches its
+    framing.
+  - `camera_03`/`camera_04` are now a side step of the whole body into the lane, not a lean
+    (owner call, matching how the game is played). `GuideState`'s camera page copy now says
+    "STEP left or right to change lane." (was "LEAN or step left/right…"), and its placeholder
+    caption says "step to steer". Line count and length are unchanged, so the
+    `BodyCopy_FitsUnderTheIllustration` budget still holds (not re-run). `camera_05`'s hop now raises the whole
+    figure, head included, because the jump is detected from the head rising.
+  - The size rule is relaxed to 16:10 at 1024–1600 px wide: the tool returns 1568×980, and the
+    slot uses `preserveAspect`.
+- **Extras:** the step-out/raise-hand frames are renamed `pause_01`/`pause_02` and kept out of
+  `Resources/`, since everything in `Resources/` ships.
+- **Card:** `FirstRunGuide`'s card is now opaque `ParkTheme.Paper`. `MenuTheme.Card`'s 98% alpha
+  over the dim showed a few levels darker than the opaque art, outlining it as a lighter
+  rectangle. Frame counts are unchanged (tilt 4, camera 5, run 1), so `GuideState` is untouched.
+
+**Found, not fixed — owner call.** Slide is not in v1.0: `TRACK_GENERATION.md` says "v1.0 ships
+left/right/jump only", no obstacle needs it, and no gameplay code reads `IsSlidePressed`. Three
+places still teach it:
+- the guide's `TILT & TOUCH` page ("SWIPE DOWN to slide");
+- the guide's `CAMERA MODE` page ("CROUCH to slide");
+- the mode picker ("crouch to slide").
+
+The brief no longer illustrates slide.
+
+**Verified:** by reading only. The one code change is a colour constant, using the same
+`Art.ParkTheme` reference `PauseMenu` already compiles with. No batchmode run.
+
+## 2026-09-24 — First-run guide: four pages, an illustration slot per mode, placeholders until the art lands (feat-game-UI-improvement guide session)
+
+Owner ask: the how-to-play guide should *show* each mode, not just say it. This pass builds the
+slot and the loading path so the pictures are a drop-in; the art itself is not generated yet —
+`docs/GUIDE_ILLUSTRATIONS.md` (written alongside) is the contract for keys, frame counts,
+filenames, size and style. Related to **T-015** (annotated in the backlog, not marked done — the
+procedural in-mode showcase remains open).
+
+**What changed**
+- `Track/GuideState.cs`: 3 → 4 pages — `TWO WAYS TO PLAY` (no picture; the copy takes the
+  height), `TILT & TOUCH` (`tilt`, 4 frames), `CAMERA MODE` (`camera`, 5 frames), `DURING A RUN`
+  (`run`, 1 frame). `GuidePage` gained `Illustration`, `FrameCount`, `Caption`, `HasIllustration`.
+  Copy rewritten to ≤ 9 hand-wrapped lines of ≤ 40 chars on illustrated pages; the new
+  `BodyCopy_FitsUnderTheIllustration` test pins that budget and caught two overruns during this
+  pass (the desk render showed the 10th line touching the button).
+- New engine-free `Track/GuideIllustration.cs`: `FramePath("tilt", 1)` → `Art/Guide/tilt_01`,
+  `FileRange` ("tilt_01.png … tilt_04.png"), `IsValidKey` (lowercase ASCII), `NextFrame`,
+  `SecondsPerFrame = 1.1`.
+- `Gameplay/FirstRunGuide.cs`: 804×502 slot under the counter (16:10, the art's own aspect, so an
+  opaque paper frame melts into the card), body 40 → 34 px re-anchored to a 370 px band above
+  the button; a page without a picture gets the slot's height back. Frames load with
+  `Resources.Load<Sprite>`; ≥ 2 present → cycled every 1.1 s in **unscaled** time (the GIF
+  stand-in), a missing middle frame is skipped, none present → the mock placeholder: rounded
+  `MenuTheme.Slot` panel (CosmeticPanel geometry, no sprite to ship) with an inset
+  `MenuTheme.Empty` outline, the page's caption in `Dim` and
+  "illustration coming · Art/Guide/tilt_01.png … tilt_04.png" in `Faint`.
+- `Editor/GuideArtImport.cs`: `AssetPostprocessor` for anything under
+  `Assets/Resources/Art/Guide/` — Sprite / Single / FullRect mesh, no mips, sRGB, opaque, max
+  1024, Android override ASTC 6x6. The folder does not exist yet; it fires on the first import,
+  so dropping the PNGs in is the whole job.
+- `Editor/GuideUiReview.cs`: renders the four pages to `builds/guide-review/guide-page-N.png` at
+  1080×2400 using the CanvasScaler's real 0.5-match scale (menu Veyro/UI/Render how-to-play
+  pages; batchmode `-executeMethod MotionRunner.EditorTools.GuideUiReview.Render`). Re-run it the
+  day the art lands.
+- `.gitattributes`: LFS pattern for `game/Assets/Resources/Art/Guide/*.png`. `GuideStateTests`
+  updated for four pages, +9 tests.
+
+**Verified.** Scratch copy `C:\scratch\veyro-guide` (Library from veyro-share minus `Bee/`;
+`diff -rq` of `Assets/` against the worktree showed zero non-`.meta` differences before each
+run, per gotcha 4). `Unity 6000.5.9f1 -batchmode -runTests -testPlatform EditMode`: **577/577
+passed**, `GuideStateTests` 20/20 — with the audio session's in-flight code compiled in (one
+early run failed on its then-missing `SoundPanel`, which landed minutes later; not this pass's).
+Trap re-hit: `-runTests` with `-quit` exits before the runner starts and writes no XML (STATUS
+487) — drop `-quit`. Desk renders viewed at 1080×2400 for all four pages: counters read "N / 4",
+placeholders draw with caption + filenames, the body clears the button on every page, page 1
+fills the height with no slot.
+
+**Not done — needs human device test** (`BuildAndroidDev` → install → launch)
+1. On the mode picker tap "how to play". Page 1/4 → 4/4 with NEXT, back with "< back": page 1
+   has no slot and its copy fills the card; pages 2–4 show the slot-coloured placeholder with
+   caption and expected filenames; nothing touches NEXT / LET'S RUN; 34 px body is legible.
+2. Skip once, relaunch: the guide must not come back by itself; it must still open from the link.
+3. When the PNGs exist: drop them in `game/Assets/Resources/Art/Guide/`, confirm the Inspector
+   shows Sprite (2D and UI) / no mips / max 1024 / Android ASTC 6x6 without touching anything,
+   then run the guide: `tilt` and `camera` cycle every ~1.1 s (also with the game paused —
+   unscaled), `run` is a still. Re-run Veyro/UI/Render how-to-play pages for the desk check.
+
+## 2026-09-24 — T-045 Audio: music, SFX and sound settings (feat-game-UI-improvement audio session)
+
+The game had no audio code at all — `GameBootstrap` added an `AudioListener` and nothing ever
+reached it. This pass adds the whole layer behind a fail-open seam, hooks it into every screen
+and gameplay beat, and gives the player two sliders. Assets (CC0, placed by the asset session
+under `game/Assets/Resources/Audio/` with licences alongside) are 14 SFX + `menu_loop` + four
+run tracks `run_01..run_04`; the code discovers the run tracks by probing, so a fifth is a file
+drop. Not committed — owner review pending.
+
+**Architecture.** New asmdef `MotionRunner.Audio` (`Assets/Scripts/Audio/`, engine references
+on, auto-referenced, referenced from the EditMode tests asmdef).
+- `SoundSettings` (engine-free): `MusicVolume`/`SfxVolume` 0–1 linear as set, defaults 0.8/1.0,
+  keys `veyro.audio.music` / `veyro.audio.sfx` (floats) plus `veyro.audio.music.muted` /
+  `veyro.audio.sfx.muted` (ints) for the pause toggles; NaN/out-of-range clamped on load and set;
+  `Perceptual(x) = x²` is the slider → AudioSource map (0→0, 1→1, monotonic, midpoint 0.25 ≈
+  −12 dB). Setters are in-memory, `Save()` writes through `ISoundSettingsStore`
+  (`PlayerPrefsSoundStore` on device, a dictionary fake in tests).
+- `MusicPicker.TrackIndex(RunSeed.RngState(), count)`: lowbias32 mix then modulo, so consecutive
+  daily seeds spread across the tracks; `NextCycled` is the seedless fallback (unused today —
+  every run has a `RunSeed`).
+- `CoinPitch.For(combo)`: 1.0 + 0.035·(combo−1), capped 1.5; the "reset after a gap" is
+  `ScoreState` dropping `Combo` after `ComboWindowSeconds`, which RunSession hands straight in.
+- `AudioCatalog`: `Sfx` enum → `Audio/Sfx/<name>` path table; `MenuMusic`; `RunTrackPath(n)`;
+  `MaxRunTracks = 8` bounds the probe.
+- `GameAudio` (MonoBehaviour, one instance, static surface that no-ops without one): two looping
+  music sources crossfading over 0.8 s (`ignoreListenerPause`, unscaled dt clamped at 0.1 s like
+  `ResumeCountdown`), duck to 35 % on pause over 0.4 s; **asking for the track that is already
+  active RESUMES it** (the source is `Pause()`d at silence, never `Stop()`ped), which is what keeps
+  RUN AGAIN / Daily / RESTART RUN on the same song while a new seed crossfades to a new one. Eight
+  one-shot voices (idle voice first, else round-robin); one identical `Sfx` per frame; a plain
+  `UiTap` yields to a `UiConfirm`/`UiDeny`/`UiBack` already fired that frame (listener order:
+  action first, then the tap — `RuntimeUi.TapSound`); clips lazy-loaded via `Resources.Load`, a
+  missing clip warns once (`[Audio] missing clip …`) and is skipped. `[Audio] play <id>` /
+  `music start|resume|stop <path>` lines are logged only in development builds.
+- `SoundPanel` (Menu, pattern `NotificationPanel`, canvas 140): MUSIC and SOUNDS sliders built
+  from `Image`s in `MenuTheme` colours (track/fill/handle in the stock three-rect layout), live
+  while dragging, `Save()` on pointer-up via a small `IPointerUpHandler` relay; the SOUNDS release
+  plays `ui_tap` at the new level; CLOSE (`ui_back`) and Android back close it (`RunFlow` holds
+  `_soundPanel` exactly like `_notificationPanel`; the three panels share an `AnyPanelOpen` guard).
+  Opened from a new **SOUND** link on the Profile links card — row 0 is now three columns HOW TO
+  PLAY / NOTIFICATIONS / SOUND (each best-fits down from 32 pt; the rows below are untouched).
+- Pause menu: two text-only toggles **MUSIC ON/OFF · SOUNDS ON/OFF** in the 75 px strip under QUIT
+  (y = 44, 340×52 each, 28 pt dim). They fit without moving RESUME/RESTART/QUIT; skipped when no
+  audio instance exists (tests).
+- `Editor/AudioImportRules.cs` (`AssetPostprocessor.OnPreprocessAudio`, `GetVersion() = 1`):
+  `Assets/Resources/Audio/Music/` → Streaming, Vorbis 0.7, `preloadAudioData = false`;
+  `Assets/Resources/Audio/Sfx/` → DecompressOnLoad, Vorbis 0.8, `forceToMono`; Android override =
+  default. The `.ogg`s arrived with no `.meta`, so first import in the scratch copy applied the
+  rule; the generated `.meta` files are copied back with this change.
+
+**Hooks (where each cue fires).** UI tap: `RuntimeUi.TextButton` (new trailing `Sfx sound`
+parameter) and `RuntimeUi.TapSound(button, sound)` on every hand-rolled `AddComponent<Button>`
+site — `RunHud.CardButton/CardLink`, `SeasonPassCard`, `FirstRunGuide.BuildLink`, `ProfilePage`
+(links, scope tabs, reroll), `CosmeticUi.Button/Pill` (new `sound` parameter), `CosmeticItemCard`,
+`ModePickerCard`, `HomePage` locker, `MenuTabBar`. `ui_back`: pause QUIT TO MENU, result card QUIT
+TO MENU, NotificationPanel/AnalyticsPanel/SoundPanel CLOSE, season/locker `< BACK`, guide
+`< back`/`skip`. Confirm: `StoreCatalogView` purchase/paywall success, restore that grew the
+entitlement set, equip (`SkinService.Equip` true), `SeasonPassPage` collect, `CosmeticsPage` equip,
+`FirstRunGuide` completed, profile import. Deny: purchase/restore failure (not Cancelled/Pending),
+"not for sale yet", delete with no profile / delete failure, import failure. Gameplay: `coin`
+(`RunSession.ResolveCollisions`, pitch from `Score.Combo`), `jump` and `lane_swoosh`
+(`RunnerController.Step`; one swoosh per committed lane change), `crash` + `StopMusic()` in
+`RunSession.Crash`. Result: `result_jingle` on the frame the card starts fading in
+(`RunHud.Update`, after the crash pose) — **`new_best` replaces it on a new all-time best** (one
+stinger per card; a daily best keeps the jingle). Countdown: `countdown_tick` on each `DisplayDigit`
+edge (3, 2, 1) and `countdown_go` on completion in `PauseMenu` — camera resumes only, tilt has
+no countdown. `streak`: `DailyStampsCard.Refresh` when today's stamp appears during the process
+(first refresh of the process only baselines, so an already-stamped launch is silent). Music:
+`RunFlow.ShowMenu` → menu loop; `RunSession.StartRun` → `PlayRunMusic(CurrentSeed.RngState())`;
+`RunFlow.ApplyPhase` → `SetDucked(IsFrozen)`. **Not hooked: `slide`** — `RunnerController`
+never reads `IsSlidePressed` (slide is still the T-002 stub), so the clip ships in the catalog
+and the test, with no mechanic to sound.
+
+**Verified.** Scratch copy `C:\scratch\veyro-audio` (robocopy `/E` of this worktree without
+`.git`/`builds`, `Library/` seeded from `veyro-layers-stock`, `Library/Bee/Android/Prj` deleted
+first — gotcha 4/11; the copy was checked for the new files and for `GameAudio.Create` in
+`GameBootstrap` before trusting it). `Unity 6000.5.9f1 -batchmode -nographics -runTests
+-testPlatform EditMode` → **577 tests, 576 passed, 1 failed**; the 33 new audio tests
+(`SoundSettingsTests` 12, `MusicPickerTests` 7, `AudioCatalogTests` 7 incl. the `Resources.Load`
+resolution of all 14 SFX, the menu loop and the gap-free `run_01..run_04` probe, `CoinPitchTests`
+4 — plus 3 pure catalog checks) all pass. The one failure is
+`GuideStateTests.BodyCopy_FitsUnderTheIllustration` ("CAMERA MODE has 10 lines; the body band
+under the picture holds 9") — the guide-illustration work another session has uncommitted in
+this same worktree (`GuideState.cs`, `GuideStateTests.cs`, `GuideIllustration.cs`), not audio;
+that session trimmed the copy the same afternoon and its later run (entry above) was
+**577/577** with both changes compiled in.
+Baseline before this change was 515/515 (21 Sep) plus that session's additions. The first import
+of the `.ogg`s generated 19 `.meta` files with the rule's settings (checked `coin.ogg.meta`:
+loadType 0, Vorbis, 0.8, preload, mono; `run_01.ogg.meta`: loadType 2, 0.7, no preload; Android
+block identical) — copied back to the worktree along with the `.meta`s for the new scripts.
+Note for the next person: in this batchmode test context `GameBootstrap.Boot()` runs on every
+domain reload (it always has — it builds the scene), so the test log now also shows
+`[Audio] music start Audio/Music/menu_loop` four times; no exception follows it.
+
+**Device (Nord 2, 24 Sep 13:00–13:08; finished by the coordinating session after the audio
+session hit its API limit).** The first `BuildAndroidDev` died with `No space left on device`
+in the IL2CPP backend; ~10 GB of stale scratch `Library/` caches (`veyro-hud`,
+`veyro-layers-stock`) were deleted, the worktree re-synced into `C:\scratch\veyro-audio`
+(hashes of the changed files checked) and `Library/Bee/Android/Prj` cleared before the rebuild
+(gotcha 4). Result: **`builds/MotionRunnerDev.apk` 95.8 MB vs 91.9 MB** for the 24 Sep 00:18 dev
+build — +3.9 MB for 6.4 MB of source Ogg re-encoded by the import rule. Installed and driven
+with `adb shell input`; `adb logcat -d -s Unity` shows, in order:
+- cold launch → `[Audio] music start Audio/Music/menu_loop`; the only `E/Unity` line is the
+  pre-existing AssetPackManager probe (CAMERA_TUNING 119);
+- PROFILE → SOUND: panel renders (title, MUSIC 80 % / SOUNDS 100 %, hint, CLOSE); every tap logs
+  `play UiTap`; dragging MUSIC to 29 %, CLOSE, `am force-stop`, relaunch, reopen → **29 %**
+  (persistence), then restored to 80 %;
+- TILT & TOUCH → `run tracks: 4`, `music start Audio/Music/run_04` (seed-picked), `play Coin`
+  then `Coin pitch=1.04 / 1.07 / 1.11 / 1.14` as the combo climbed, `play Jump` on a tap,
+  `play Crash` + `music stop Audio/Music/run_04` from `RunSession.Crash`, `play ResultJingle`
+  1.0 s later as the card faded in;
+- tap-to-restart → **`music resume Audio/Music/run_04`** (same seed, same song, no restart);
+- II → pause card shows `MUSIC ON · SOUNDS ON` under QUIT with RESUME/RESTART/QUIT unmoved;
+  tapping MUSIC ON flips it to `MUSIC OFF` (screenshot) and back; QUIT TO MENU →
+  `play Streak` (the day's stamp appearing on the rebuilt card), `music start
+  Audio/Music/menu_loop`, `play UiBack`.
+- Not exercised on the desk: `lane_swoosh` (the phone lay flat, no tilt), countdown ticks
+  (camera resume only), confirm/deny (no Test Store purchase), `new_best`.
+Screenshots: `C:\scratch\veyro-audio\shot-{menu,profile,sound,sound-30,sound-persist,run,pause,pause-muted}.png`
+(not committed). The APK is copied to this worktree's `builds/MotionRunnerDev.apk` for the listen.
+
+### Owner feedback pass — 2026-09-25 (result-screen music, no tap-anywhere, camera hop)
+
+Four owner asks on the result screen, all in this uncommitted change.
+
+**Result music.** After the stinger the card now has a loop under it: `Audio/Music/result_best`
+when the run set a best of either kind (`summary.IsNewRecord` = all-time OR daily — the badge's
+own rule), else `Audio/Music/result_lost`. `RunHud.Update` cues it `ResultMusicDelaySeconds`
+(1.0 s) after the stinger fires, unscaled, through `GameAudio.PlayResultMusic(bool)` (crossfade
+0.8 s as usual); `HideResult` clears the pending cue so a RUN AGAIN or quit inside that second
+cannot drop the loop onto the next run. Both paths are in `AudioCatalog`
+(`ResultBestMusic`/`ResultLostMusic`) and in `AudioCatalogTests` (paths distinct and in the
+music folder; both `Resources.Load`). The two `.ogg`s and the replacement `crash.ogg` came from
+the asset session mid-pass; their `.meta`s were generated by `AudioImportRules` on first import in
+the scratch and copied back.
+- *Resume across the result loop.* `GameAudio.PlayMusic` used to resume only when the request
+  matched `_activePath`; with `result_lost` active, RUN AGAIN's `run_04` would have restarted
+  from the top. The deck logic is now an engine-free `Audio/MusicDeck.cs`: a path per slot,
+  `Plan(path)` → `Resume` of WHICHEVER slot still holds it (active or parked), else `Start` on
+  the non-active slot (replacing whatever was parked there — the menu loop under a run, or the
+  previous result loop), `FadeOut` parks the active slot, `Tick` moves the two levels in the
+  caller's clock. `GameAudio` keeps the AudioSources, the unscaled/clamped dt, the duck and the
+  `Pause()`-at-silence; it just does what the deck decides, and the `[Audio] music
+  start|resume|stop` lines are unchanged. `MusicDeckTests` (9) pin it, including the scenario:
+  run parked → result loop on the other slot → the run track resumes on its own slot with the
+  loop fading out, and a second crash's `result_best` replacing `result_lost` without touching
+  the parked run.
+
+**Tap-anywhere restart removed, every run type and scheme.** `RunSession.Update` no longer
+feeds `RestartGate.Tick` from the composite `Input` (`IsJumpPressed || IsSpecialPressed`);
+the gate is fed only from a new optional `RunSession.RestartGesture` (`IGameInput`, null =
+button-only). The `"tap anywhere or press space"` hint is gone (Space in the Editor no longer
+restarts either — click RUN AGAIN). Comments rewritten in `RunHud` (events, `RevealSeconds`,
+`HoldRun`, the Quit link), `RunSession` (gate field, the result-card branch, `Crash`,
+`RequestRestart`), `RestartGate` (class note: who may ask, why never immediate) and
+`GameBootstrap`. `RestartGateTests` rewritten to the new contract, +3: a hop held across 11
+frames starts the run only once it has ended; with no gesture nothing but the button starts a
+run (the tap-anywhere test's replacement); a hop landing with the click buys one run after the
+hop. **`HoldRun` (SHARE) is kept**, not simplified: on a tilt card it now guards nothing, but on
+a camera card the face keeps being read across the share sheet's round trip, and holding the
+loop for the tap's frame and the post-focus window is the cheap belt against a re-acquired face
+being read as a hop — not clearly dead, so it stays with its comment rewritten to say exactly
+that.
+
+**Camera mode: hop to run again, panel visible.** `RunFlow.StartRun` sets
+`_session.RestartGesture = _faceInput` (the same `CameraFaceInput` instance inside the
+composite — read by the session, never ticked twice) and null in tilt mode; `DropCameraMode`
+clears it, so a run that fell back to tilt gets a button-only card. Found while wiring it:
+`FaceSteering.IsJumpActive` holds for `JumpWindowSeconds` = 0.18 s (~11 frames) and
+`RunnerController` reads jump as a level, so the gate's one-frame deferral would have let the
+restarting hop jump the new run on its first frame. `RestartGate.Tick(dt, gestureActive,
+overlayOpen)` therefore HOLDS a queued run (however it was asked for) while a gesture is in
+flight and starts it on the first gesture-free frame; the post-crash lockout (`RevealSeconds`)
+and the open-menu drop are unchanged. On the card: `RunFlow.SyncOverlay` keeps the `FaceOverlay`
+up when the session is not running as long as `_faceInput != null` (hidden when frozen, and on
+any non-camera card), and calls the new `FaceOverlay.Place(onResultCard)` which moves the HUD
+panel from its run slot (top-centre, −320) to `ResultPosition` (centre-anchored, +820: 20 px
+above the card's top edge at +710, so +730…+910 — clear of the masthead and score it covered in
+the PR #5 review, 50 px under the top of a 16:9 screen, well under the 6T's cutout); on the card
+the lane bands follow the live axis instead of the crash lane (`_hasReportedLane` reset;
+`LateUpdate` only reports while running). The card's hint slot under the card (the old
+tap-anywhere line, 34 px paper, 72–132 from the bottom) now reads `stand where the phone can
+see you · HOP to run again`, shown only when `RunHud.HopRestartAvailable` (set by `RunSession`
+before `ShowResult` from `RestartGesture != null`) and only once the card is fully up. SHARE /
+QUIT TO MENU / SKINS & SHOP are untouched (they never went through the gate).
+
+**Desk render.** New `Editor/ResultCardReview.cs` (menu Veyro/UI/Render result card; batchmode
+`-executeMethod MotionRunner.EditorTools.ResultCardReview.Render`) renders the card at 1080×2340
+(the 6T) to `builds/result-review/result-{camera,camera-newbest,tilt}.png` with a rig-less
+`FaceOverlay` placed on the card for the camera ones — the state a desk cannot reach on the
+device without a person in front of it.
+
+**Verified (desk).** Scratch `C:\scratch\veyro-audio` re-synced with `robocopy /E` (no
+`Library`/`Temp`/`builds`), sha256 of all 14 changed files checked against the worktree,
+`diff -rq Assets/` clean apart from the three `.ogg`s that landed mid-sync (re-synced), and
+`ProjectSettings.asset` identical (gotchas 4/11). `Unity 6000.5.9f1 -batchmode -runTests
+-testPlatform EditMode` (no `-quit`): **590/590 passed** — baseline 577 + `MusicDeckTests` 9 +
+`AudioCatalogTests` 2 (now 9, both result loops resolve) + `RestartGateTests` net +2 (now 12);
+`SeasonIntegrationTests` 16/16 still passes through its reflection call of `ShowResult(summary,
+bool)`, which is why `HopRestartAvailable` is a property and not a third parameter. The two
+generated `result_*.ogg.meta` (Streaming / Vorbis 0.7 / no preload, Android block identical) were
+copied back. `ResultCardReview.Render` at 1080×2340 → `builds/result-review/result-camera.png`
+(panel above the card, "no face" red glyph, hint under the card), `result-camera-newbest.png`
+(NEW BEST pill, same clearances), `result-tilt.png` (no panel, no hint) — copied into this
+worktree's gitignored `builds/result-review/`.
+
+**Device (OnePlus 6T `ONEPLUS A6013`, 1080×2340, Android 13, adb `a085659b`; 25 Sep 00:36–00:50).**
+Scratch re-synced with the icon files and `ProjectSettings.asset` (byte-identical to the
+worktree, 17 hashes checked, `diff -rq Assets/` clean), `Library\Bee\Android\Prj` deleted,
+27 GB free. `BuildAndroidDev` → **`builds/MotionRunnerDev.apk` 96,892,744 B (96.9 MB) vs 95.8 MB**
+on 24 Sep: +1.07 MB for the two result loops (683 + 647 KB of Ogg, re-encoded at 0.7) and the
+launcher icon. The phone carried a `com.ferrabled.veyro.run` signed with a different key, so it
+was **uninstalled** first (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`; the 6T's local prefs — bests,
+streak, guide-seen — reset), which is why the first launch showed the guide and OneSignal's
+"integration complete" in-app message. Driven with `adb shell input`; `adb logcat -d -s Unity`,
+timestamps as logged:
+- 00:48:15 `music start Audio/Music/run_04` (seed-picked; 4 tracks probed) → 00:48:19.022
+  `play Crash` + `music stop Audio/Music/run_04` → 00:48:20.026 `play NewBest` (fresh install:
+  first run is a best) → **00:48:21.048 `music start Audio/Music/result_best`** (+1.02 s after
+  the stinger, as written);
+- tap on the card's stage, well outside every button: **no log line at all**, and the
+  screenshot 2 s later (`p2-result-tap.png`) still shows the card;
+- RUN AGAIN 00:49:05.642 `play UiTap` → **00:49:05.646 `music resume Audio/Music/run_04`** —
+  the run track came back from the parked slot under `result_best`, same frame, no restart;
+- same seed, same crash, no record this time → 00:49:09.949 `play ResultJingle` →
+  **00:49:10.964 `music start Audio/Music/result_lost`**; the card shows `best today 89` and
+  the defeat pose (`p2-result-lost.png`);
+- RUN AGAIN again → 00:49:37.536 **`music resume Audio/Music/run_04`** from under
+  `result_lost` too.
+- No `[Audio] missing clip` warning in the whole session; the only `E/Unity` line is the
+  pre-existing AssetPackManager probe.
+- Launcher (for the icon session, which verified the APK resources but not a device): HOME →
+  app drawer → search "Veyro" → `p2-launcher.png` shows **Veyro Run with the new adaptive icon**
+  (dark teal disc, cream ticket "V" mark) rendered by the 6T's Pixel-style launcher, plus the
+  phone's own work-profile badged copies of the same icon.
+Not exercised on the desk: the camera card and the hop restart — the 6T on a desk sees no face,
+and a camera run auto-pauses after 1.75 s without one (`CameraOutage`), so it never reaches a
+crash; the layout is covered by the `ResultCardReview` render and the behaviour by the human
+steps below. The new `crash.ogg` was not judged for loudness here (no listen); no code-side
+`volumeScale` boost was added.
+Screenshots: `C:\scratch\veyro-audio\p2-{launch,result,result-tap,result-lost,launcher}.png`
+(not committed).
+
+**Needs a human device test** (the parts a screenshot cannot judge — install
+`builds/MotionRunnerDev.apk`, volume up):
+1. Cold launch: the menu loop is audible within a second; PROFILE → SOUND opens the panel; drag
+   MUSIC to ~30 % — the loop drops WHILE dragging; let go, force-stop the app, relaunch: the panel
+   reopens at ~30 % and the loop is quieter (persistence).
+2. Drag SOUNDS to ~50 % and release: a tap sound plays at that level. Set it back to 100 %.
+3. Tap through the menu — every button, tab, link and pill clicks; CLOSE / `< BACK` / QUIT play the
+   lower "back" cue; nothing double-clicks (confirm/deny replace the tap on the same press).
+4. TILT run: the menu loop crossfades into a run track (~0.8 s, no gap); coins chirp and climb in
+   pitch while the combo counter climbs, dropping back after a 2.5 s gap; lane changes swoosh once;
+   a tap jumps with a sound; the crash thuds and the music fades under the card; the jingle lands
+   as the card fades in, and ~1 s later a quiet loop (`result_lost`) fades in under the card and
+   keeps looping. There is no "tap anywhere" line: tap the card anywhere outside its buttons —
+   nothing happens, the card stays.
+5. RUN AGAIN twice on the same day: the SAME run track resumes mid-bar from under the result loop
+   (no restart from the top; the loop fades out under it). QUIT TO MENU: crossfade back to the
+   menu loop.
+6. Pause (II): the music ducks to ~35 %; MUSIC OFF / SOUNDS OFF at the bottom of the card mute
+   instantly and survive RESUME and a relaunch; the panel's sliders read MUTED for a muted channel.
+7. Beat your all-time best: a fanfare INSTEAD of the jingle (the NEW BEST pill pops with it), then
+   the brighter `result_best` loop instead of `result_lost`. Beat only today's best: jingle, NEW
+   DAILY BEST, and still `result_best`.
+8. Finish the day's first Daily Run and return to the menu: the streak cue plays once as the
+   stamp appears; relaunching does not replay it.
+9. CAMERA run, pause, RESUME, raise a hand: three ticks on 3-2-1 and a "go" as the run unfreezes;
+   backing out mid-count plays no "go".
+10. Purchases (Test Store dev build): a completed purchase confirms, a cancelled sheet is silent, a
+    failed one denies; RESTORE PURCHASES with nothing to restore is silent.
+11. CAMERA run to a crash, standing 2 m away: the YOU · CAMERA panel stays up ABOVE the card (not
+    over the score or the pill) and `stand where the phone can see you · HOP to run again` sits
+    under the card. Step out of frame: the glyph goes red / "no face"; step back in: it follows
+    you. HOP: the next run starts as you land, and the runner must NOT jump on its first frame.
+    Hop during the crash pose (before the card is up): nothing. Tap the card outside its buttons:
+    nothing. Then let the camera give up mid-run (cover it until "camera stopped working" /
+    "couldn't see you" and the pause menu drops to tilt): the card after that crash has neither
+    panel nor hint, and only RUN AGAIN restarts.
+12. SHARE on a camera card, come back from the chooser while standing in frame: the card is still
+    there (the hold across the round trip).
 
 ## 2026-09-24 — Consolidated SDK device notes
 

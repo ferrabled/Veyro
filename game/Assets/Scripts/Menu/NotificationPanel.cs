@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Notifications;
 using UnityEngine;
@@ -30,44 +31,27 @@ namespace MotionRunner.Menu
             return panel;
         }
 
+        /// A MenuSheet: X, tap outside and Android back all close (Close already cancels a
+        /// permission request in flight). ENABLE is the sheet's one pink action; TURN OFF sits
+        /// under it as a plain one, and the support id is a quiet link.
         void Build()
         {
-            RuntimeUi.PortraitCanvas(gameObject, 140);
-            RuntimeUi.FullScreenPanel("Dim", transform, new Color(0.04f, 0.05f, 0.09f, 0.9f));
-            var card = RuntimeUi.Card("Card", transform, new Vector2(920f, 1080f), MenuTheme.Card).transform;
-            var title = Label("Title", card, 330f, 210f, 48);
-            title.text = _verification
+            // Sized to its copy: the longest state is four lines at 32 px, so the body band is
+            // that plus a little air, and the buttons follow straight on.
+            var card = MenuSheet.Build(gameObject, 140, new Vector2(MenuSheet.Width, 860f), Close);
+            MenuSheet.Title(card, 104f, _verification ? 130f : 80f).text = _verification
                 ? "Your OneSignal SDK integration is complete!"
                 : "DAILY RUN NOTIFICATIONS";
-            _body = Label("Body", card, 70f, 300f, 34);
-            _primary = RuntimeUi.TextButton("Enable", card, new Vector2(.5f, .5f),
-                new Vector2(0f, -160f), new Vector2(790f, 100f), MenuTheme.Accent,
-                _verification ? "Got it" : "ENABLE NOTIFICATIONS", 34, MenuTheme.Text, Enable);
+            _body = MenuSheet.Body(card, _verification ? 250f : 200f, 250f);
+
+            // Vendor verification has exactly one action, so it takes the bottom slot.
+            _primary = MenuSheet.Primary(card, "Enable", _verification ? 120f : 300f,
+                _verification ? "Got it" : "ENABLE NOTIFICATIONS", Enable);
             _primaryLabel = _primary.GetComponentInChildren<Text>();
 
-            if (_verification) return; // vendor verification has exactly one action
-            RuntimeUi.TextButton("Disable", card, new Vector2(.5f, .5f),
-                new Vector2(0f, -280f), new Vector2(790f, 84f), MenuTheme.Bar,
-                "TURN OFF", 30, MenuTheme.Text, Disable);
-            RuntimeUi.TextButton("CopyId", card, new Vector2(.5f, .5f),
-                new Vector2(0f, -378f), new Vector2(790f, 72f), MenuTheme.Bar,
-                "COPY NOTIFICATION SUPPORT ID", 26, MenuTheme.Dim, CopyId);
-            RuntimeUi.TextButton("Close", card, new Vector2(.5f, .5f),
-                new Vector2(0f, -470f), new Vector2(790f, 72f), MenuTheme.Bar,
-                "CLOSE", 30, MenuTheme.Text, Close);
-        }
-
-        static Text Label(string name, Transform parent, float y, float height, int size)
-        {
-            var text = RuntimeUi.Label(name, parent, new Vector2(.5f, .5f), new Vector2(.5f, .5f),
-                new Vector2(-395f, y - height / 2f), new Vector2(395f, y + height / 2f),
-                size, TextAnchor.MiddleCenter, MenuTheme.Text);
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 24;
-            text.resizeTextMaxSize = size;
-            return text;
+            if (_verification) return;
+            MenuSheet.Secondary(card, "Disable", 176f, "TURN OFF", Disable);
+            MenuSheet.Link(card, "CopyId", 70f, "COPY NOTIFICATION SUPPORT ID", CopyId);
         }
 
         void Refresh()

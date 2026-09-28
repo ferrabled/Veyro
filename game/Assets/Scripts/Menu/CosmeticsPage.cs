@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MotionRunner.Audio;
 using MotionRunner.Commerce;
 using MotionRunner.Core;
 using UnityEngine;
@@ -21,10 +22,10 @@ namespace MotionRunner.Menu
         bool _listening,_onlyOwned;
         protected override void Build()
         {
-            var background=CosmeticUi.Surface(CosmeticUi.Area("Backdrop",Root,Vector2.zero,Vector2.one),MenuTheme.PreviewTop,0);
+            var background=CosmeticUi.Backdrop(Root,MenuTheme.PreviewTop);
             background.Gradient=true;background.Bottom=MenuTheme.PreviewBottom;
             _preview=RunnerPreview.Create(CosmeticUi.Area("Preview",Root,new Vector2(0,0.43f),new Vector2(1,0.94f)));
-            CosmeticUi.Pill(CosmeticUi.Rect("Back",Root,0.025f,0.21f,44,70),"< BACK",Menu.GoHome,MenuTheme.ItemCard,26);
+            CosmeticUi.Pill(CosmeticUi.Rect("Back",Root,0.025f,0.21f,44,70),"< BACK",Menu.GoHome,MenuTheme.ItemCard,26,Sfx.UiBack);
             CosmeticUi.Text("Title",CosmeticUi.Rect("Heading",Root,0.24f,0.70f,44,70),"YOUR LOCKER",36,MenuTheme.Text,TextAnchor.MiddleCenter);
             _clear=CosmeticUi.Pill(CosmeticUi.Rect("Clear",Root,0.76f,0.985f,44,70),"CLEAR SLOT",ClearSlot,MenuTheme.ItemCard,22);
             var hint=CosmeticUi.Rect("RotateHintSlot",Root,0.33f,0.67f,142,44);
@@ -111,7 +112,7 @@ namespace MotionRunner.Menu
         {
             var selected=CosmeticCatalog.Find(_selected);if(selected==null)return;
             if(Menu.Skins.IsUnlocked(_selected))
-            { if(Menu.Skins.Equip(_selected)){_preview.Show(Menu.Skins.Effective);Refresh();} }
+            { if(Menu.Skins.Equip(_selected)){GameAudio.Confirm();_preview.Show(Menu.Skins.Effective);Refresh();} }
             else if(selected.Rule.Kind==UnlockKind.Entitlement)Menu.Show(MenuTab.Shop);
             else Menu.ShowSeasonReward(_selected);
         }

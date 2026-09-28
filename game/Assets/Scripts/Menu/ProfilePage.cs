@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Progression;
 using MotionRunner.Social;
@@ -9,64 +10,90 @@ using UnityEngine.UI;
 
 namespace MotionRunner.Menu
 {
-    /// The right tab: who the player is, where they stand, and what they have been running.
+    /// The right tab: who the player is, where they stand, what they have been running, and
+    /// then the settings and the account.
     ///
-    /// All three cards can be real now. Best score, streak and the recent-runs list come off
+    /// All the cards can be real now. Best score, streak and the recent-runs list come off
     /// disk through ProgressStore; the leaderboard comes from the shared Supabase board (T-009)
-    /// through LiveLeaderboard when the backend answers, and falls back to MockLeaderboard —
-    /// still labelled as sample data — when it does not (no key, offline, first frames). The
+    /// through LiveLeaderboard when the backend answers; until then (first frames, offline, no
+    /// key) the card shows empty slots under a "loading" / "no connection" panel. The
     /// player card shows the server-generated handle once a profile exists, with unlimited
-    /// rerolls, and the links card carries the account-deletion path Play policy requires.
+    /// rerolls and a critter drawn from the handle (PlayerAvatar), and the account card carries
+    /// the account-deletion path Play policy requires.
+    ///
+    /// The page scrolls. Five cards do not fit a 16:9 screen, and the alternative - squeezing
+    /// settings into a grid of bare text links under the runs - is what this layout replaced.
+    /// The player card is at the top, so the numbers the tab is for are what opens.
     public sealed class ProfilePage : MenuPage
     {
         const float TopOffset = 12f;
         const float PlayerHeight = 180f;
-        const float BoardHeight = 520f;
-        const float RunsHeight = 430f;
-        const float LinksHeight = 372f;
 
-        const float RowHeight = 62f;
-        const int BoardRows = 6;
-        const int RunRows = 5;
+        /// Under the last card, so it can be scrolled clear of the tab bar's edge.
+        const float BottomPadding = 28f;
 
-        /// Vertical spacing of the links-card rows. Tighter than RowHeight so the six rows
-        /// (guide, privacy, delete, player id, recovery code, import) fit the height budget.
-        const float LinkSpacing = 56f;
+        const float AvatarSize = 116f;
 
-        readonly ILeaderboardSource _mock = new MockLeaderboard();
+        const string DeleteLabel = "DELETE ONLINE PROFILE";
+        const string DeleteHint = "two taps · immediate and permanent";
+
         LiveLeaderboard _live;
 
         BoardScope _scope = BoardScope.Daily;
         int _allTimeBestShown;
 
+        ScrollRect _scroll;
+        RectTransform _content;
+
+        PlayerAvatarView _avatar;
         Text _headline;
         Text _reroll;
         Text _subline;
-        Text[] _boardRows;
-        Text[] _runRows;
-        Text _runsEmpty;
+        LeaderboardCard _board;
+        RecentRunsCard _runs;
         Text _boardNote;
         Button _scopeDaily;
         Button _scopeAllTime;
-        Text _delete;
-        Text _playerId;
-        Text _recoveryCode;
-        Text _import;
+
+        ProfileSettingsCard _settings;
+
+        RectTransform _accountSlot;
+        RectTransform _playerIdRow;
+        RectTransform _recoveryRow;
+        RectTransform _importRow;
+        RectTransform _privacyRow;
+        RectTransform _deleteRow;
+        Text _playerIdSub;
+        Text _recoverySub;
+        Text _importSub;
+        Text _deleteLabel;
+        Text _deleteSub;
         bool _deleteArmed;
 
         protected override void Build()
         {
-            RuntimeUi.Panel("Scrim", Root, MenuTheme.Scrim);
-
             _live = new LiveLeaderboard(Menu.Profile);
             _live.Changed += OnBoardChanged;
             if (Menu.Profile != null) Menu.Profile.ProfileChanged += OnProfileChanged;
 
-            var stack = new MenuStack(Root, TopOffset);
+            _content = BuildScroll();
+            var stack = new MenuStack(_content, TopOffset);
             BuildPlayerCard(stack.Add("Player", PlayerHeight));
-            BuildBoardCard(stack.Add("Board", BoardHeight));
-            BuildRunsCard(stack.Add("Runs", RunsHeight));
-            BuildLinksCard(stack.Add("Links", LinksHeight));
+            BuildBoardCard(stack.Add("Board", LeaderboardCard.Height));
+            _runs = new RecentRunsCard();
+            _runs.Build(stack.Add("Runs", RecentRunsCard.Height));
+
+            _settings = new ProfileSettingsCard(
+                () => GameAudio.Instance != null ? GameAudio.Instance.Settings : null,
+                () => Menu.RequestNotifications(), () => Menu.RequestAnalytics(),
+                () => Menu.RequestGuide());
+            _settings.Build(stack.Add("Settings", ProfileSettingsCard.Height));
+
+            // Placed at its title's height; LayoutAccount sizes it to the rows that are showing
+            // and sizes the scroll content with it (it is the last card).
+            _accountSlot = stack.Add("Account", MenuRows.TitleHeight);
+            BuildAccountCard(_accountSlot);
+            LayoutAccount();
         }
 
         void OnDestroy()
@@ -74,53 +101,84 @@ namespace MotionRunner.Menu
             if (_live != null) _live.Changed -= OnBoardChanged;
             if (Menu != null && Menu.Profile != null)
                 Menu.Profile.ProfileChanged -= OnProfileChanged;
+            _settings?.Dispose();
+            _avatar?.Dispose();
+            _board?.Dispose();
+        }
+
+        /// The page's scroll view. The viewport paints the scrim itself, so a drag that starts in
+        /// a gap between two cards still has a graphic under it to scroll by.
+        RectTransform BuildScroll()
+        {
+            var viewport = RuntimeUi.Element("Scroll", Root, out var viewRect);
+            RuntimeUi.Stretch(viewRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            viewport.AddComponent<Image>().color = MenuTheme.Scrim;
+            viewport.AddComponent<RectMask2D>();
+
+            _scroll = viewport.AddComponent<ScrollRect>();
+            _scroll.viewport = viewRect;
+            _scroll.horizontal = false;
+            _scroll.vertical = true;
+            _scroll.movementType = ScrollRect.MovementType.Elastic;
+            _scroll.elasticity = 0.08f;
+            _scroll.scrollSensitivity = 45f;
+
+            RuntimeUi.Element("Content", viewRect, out var content);
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = Vector2.one;
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            _scroll.content = content;
+            return content;
         }
 
         void BuildPlayerCard(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
+            CosmeticUi.Card(slot);
             float pad = MenuTheme.CardPadding;
 
-            // A square avatar in the accent colour: there is no photo, so this is a placeholder
-            // that is honest about being one rather than a borrowed silhouette.
-            var avatar = RuntimeUi.Element("Avatar", slot, out var avatarRect);
+            // The avatar is generated from the handle (PlayerAvatar): a critter on a colour tile,
+            // so a player without a photo still has a face, and a reroll changes it.
+            RuntimeUi.Element("Avatar", slot, out var avatarRect);
             avatarRect.anchorMin = new Vector2(0f, 0.5f);
             avatarRect.anchorMax = new Vector2(0f, 0.5f);
-            avatarRect.anchoredPosition = new Vector2(pad + 55f, 0f);
-            avatarRect.sizeDelta = new Vector2(110f, 110f);
-            avatar.AddComponent<Image>().color = MenuTheme.Slot;
+            avatarRect.anchoredPosition = new Vector2(pad + AvatarSize * 0.5f, 0f);
+            avatarRect.sizeDelta = new Vector2(AvatarSize, AvatarSize);
+            _avatar = new PlayerAvatarView(avatarRect, 28f);
 
             _headline = RuntimeUi.Label("Name", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad + 132f, -84f), new Vector2(-pad - 250f, -26f),
+                new Vector2(pad + AvatarSize + 24f, -84f), new Vector2(-pad - 220f, -26f),
                 44, TextAnchor.MiddleLeft, MenuTheme.Text);
 
             // The reroll is a right-aligned link on the name row: rerolling is a small act on
             // the name, not a card of its own. Hidden until a profile exists.
             _reroll = RuntimeUi.Label("Reroll", slot,
                 new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-pad - 240f, -84f), new Vector2(-pad, -26f),
+                new Vector2(-pad - 210f, -84f), new Vector2(-pad, -26f),
                 26, TextAnchor.MiddleRight, MenuTheme.Dim);
             _reroll.raycastTarget = true;
             var rerollButton = _reroll.gameObject.AddComponent<Button>();
             rerollButton.targetGraphic = _reroll;
             rerollButton.onClick.AddListener(RerollHandle);
+            RuntimeUi.TapSound(rerollButton);
 
             _subline = RuntimeUi.Label("Stats", slot,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad + 132f, -150f), new Vector2(-pad, -88f),
+                new Vector2(pad + AvatarSize + 24f, -150f), new Vector2(-pad, -88f),
                 30, TextAnchor.MiddleLeft, MenuTheme.Dim);
+            MenuRows.Fit(_subline, 30);
         }
 
+        /// The podium and the list are LeaderboardCard's; the scope tabs and the note's wording
+        /// stay here with the board logic.
         void BuildBoardCard(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
             float pad = MenuTheme.CardPadding;
-
-            RuntimeUi.Label("Title", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -66f), new Vector2(-pad - 360f, -14f),
-                38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "LEADERBOARD";
+            _board = new LeaderboardCard();
+            _board.Build(slot);
+            _board.Retry = () => _live.Refresh();
 
             // The two scopes of the shared board (D15). The scheme half of the split (tilt vs
             // camera) follows the mode the player last ran with, same as the bests above.
@@ -129,15 +187,10 @@ namespace MotionRunner.Menu
             _scopeAllTime = BuildScopeTab(slot, "ScopeAll", -pad - 176f, -pad, "ALL-TIME",
                 () => SetScope(BoardScope.AllTime));
 
-            _boardRows = BuildRows(slot, BoardRows, -76f);
-
-            // One bottom line, two honest states: the sample-data admission or the player's
-            // live rank. (The TAP TO JOIN consent ask lived here until 17 Sep - joining is
-            // automatic now, owner call; the privacy policy copy describes exactly that.)
-            _boardNote = RuntimeUi.Label("Note", slot,
-                new Vector2(0f, 0f), new Vector2(1f, 0f),
-                new Vector2(pad, 12f), new Vector2(-pad, 56f),
-                26, TextAnchor.MiddleLeft, MenuTheme.Faint);
+            // One bottom line under a live board: the player's rank. (The TAP TO JOIN consent ask
+            // lived here until 17 Sep - joining is automatic now, owner call; the privacy policy
+            // copy describes exactly that.)
+            _boardNote = _board.Note;
         }
 
         Button BuildScopeTab(RectTransform slot, string name, float left, float right,
@@ -152,6 +205,7 @@ namespace MotionRunner.Menu
             var button = text.gameObject.AddComponent<Button>();
             button.targetGraphic = text;
             button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button);
             return button;
         }
 
@@ -162,136 +216,97 @@ namespace MotionRunner.Menu
             ShowBoard();
         }
 
-        void BuildRunsCard(RectTransform slot)
+        /// Who the player is to the backend, and the way out. Each row keeps a quiet second line
+        /// that doubles as the feedback slot ("copied", "import failed: …", the post-delete
+        /// summary) - MenuRows.Fit shrinks a long message rather than letting it leave the card.
+        void BuildAccountCard(RectTransform slot)
         {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
-            float pad = MenuTheme.CardPadding;
-
-            RuntimeUi.Label("Title", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -66f), new Vector2(-pad, -14f),
-                38, TextAnchor.MiddleLeft, MenuTheme.Text).text = "MY LAST RUNS";
-
-            _runRows = BuildRows(slot, RunRows, -76f);
-
-            _runsEmpty = RuntimeUi.Label("Empty", slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(pad, -170f), new Vector2(-pad, -100f),
-                30, TextAnchor.UpperLeft, MenuTheme.Faint);
-            _runsEmpty.text = "no runs yet — the first one lands here";
-        }
-
-        void BuildLinksCard(RectTransform slot)
-        {
-            RuntimeUi.Panel("Card", slot, MenuTheme.Card);
-
-            // "how to play" is the only way back to the first-run guide once it has been
-            // dismissed; "privacy policy" is Play policy - it has to be reachable inside the app,
-            // not only on the store listing. DELETE PROFILE is Play's account-deletion policy:
-            // the moment a server-side profile exists, an in-app deletion path must too
-            // (STORE_COMPLIANCE T-009). Two taps, because it is immediate and permanent.
-            var guide = BuildLink(slot, "Guide", -30f, "HOW TO PLAY", () => Menu.RequestGuide());
-            guide.rectTransform.anchorMax = new Vector2(.5f, 1f);
-            var notifications = BuildLink(slot, "Notifications", -30f,
-                "NOTIFICATIONS", () => Menu.RequestNotifications());
-            notifications.rectTransform.anchorMin = new Vector2(.5f, 1f);
-            ShrinkToFit(guide, 32);
-            ShrinkToFit(notifications, 32);
-            var privacy = BuildLink(slot, "Privacy", -30f - LinkSpacing, "PRIVACY POLICY",
-                () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
-            privacy.rectTransform.anchorMax = new Vector2(.5f, 1f);
-            var analytics = BuildLink(slot, "Analytics", -30f - LinkSpacing, "GAMEPLAY ANALYTICS",
-                () => Menu.RequestAnalytics());
-            analytics.rectTransform.anchorMin = new Vector2(.5f, 1f);
-            ShrinkToFit(privacy, 28);
-            ShrinkToFit(analytics, 28);
-            _delete = BuildLink(slot, "Delete", -30f - 2 * LinkSpacing,
-                "DELETE ONLINE PROFILE", DeleteTapped);
-            ShrinkToFit(_delete, 32);
+            CosmeticUi.Card(slot);
+            MenuRows.Title(slot, "ACCOUNT");
 
             // The support identifier (18 Sep review R3): deletion/support requests without the
             // app need something that locates the record. Tap copies the full id. It locates,
             // it does not authorize — ownership is proven with the recovery code below.
-            _playerId = BuildLink(slot, "PlayerId", -30f - 3 * LinkSpacing, "PLAYER ID", PlayerIdTapped);
-            _playerId.fontSize = 26;
-            _playerId.color = MenuTheme.Faint;
-            ShrinkToFit(_playerId, 26);
+            _playerIdRow = PillRow(slot, "PlayerId", "PLAYER ID", "COPY", PlayerIdTapped, out _playerIdSub);
 
             // The account's private key, player-visible (owner call, 18 Sep): proves ownership
             // to support and re-imports the profile on another install. Anyone holding it can
             // claim the profile, so the row says exactly that.
-            _recoveryCode = BuildLink(slot, "Recovery", -30f - 4 * LinkSpacing,
-                "RECOVERY CODE", RecoveryCodeTapped);
-            _recoveryCode.fontSize = 26;
-            _recoveryCode.color = MenuTheme.Faint;
-            ShrinkToFit(_recoveryCode, 26);
+            _recoveryRow = PillRow(slot, "Recovery", "RECOVERY CODE", "COPY", RecoveryCodeTapped, out _recoverySub);
 
             // The manual rescue when Auto Backup did not carry the key (new device, backup
             // off): paste a recovery code copied on the old install.
-            _import = BuildLink(slot, "Import", -30f - 5 * LinkSpacing,
-                "IMPORT PROFILE (paste a recovery code)", ImportTapped);
-            _import.fontSize = 26;
-            _import.color = MenuTheme.Faint;
-            ShrinkToFit(_import, 26);
+            _importRow = PillRow(slot, "Import", "IMPORT PROFILE", "PASTE", ImportTapped, out _importSub);
+
+            // Play policy: the privacy policy has to be reachable inside the app, not only on
+            // the store listing.
+            _privacyRow = MenuRows.Row(slot, "Privacy");
+            MenuRows.Tap(_privacyRow, () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
+            MenuRows.Label(_privacyRow, "PRIVACY POLICY", MenuRows.ChevronReserve, false);
+            MenuRows.Chevron(_privacyRow);
+
+            // Play's account-deletion policy: the moment a server-side profile exists, an in-app
+            // deletion path must too (STORE_COMPLIANCE T-009). Two taps, because it is immediate
+            // and permanent - and the second line says so before the first tap, not after.
+            _deleteRow = MenuRows.Row(slot, "Delete");
+            MenuRows.Tap(_deleteRow, DeleteTapped);
+            _deleteLabel = MenuRows.Label(_deleteRow, DeleteLabel, MenuTheme.CardPadding, true);
+            _deleteSub = MenuRows.Sub(_deleteRow, MenuTheme.CardPadding);
+            ResetDelete();
         }
 
-        /// The links card's lower rows swap their label for variable-length feedback ("copied",
-        /// "import failed: …", the post-delete summary), and a long message used to run straight
-        /// off the right edge of the screen. Best-fit with the DESIGNED size as the ceiling
-        /// leaves every short label drawn exactly as before and shrinks only the lines that would
-        /// not otherwise fit, on any screen width.
-        ///
-        /// The overflow modes are load-bearing, not tidying: RuntimeUi.Label ships
-        /// Overflow/Overflow, which makes best-fit a NO-OP — an unbounded line always "fits", so
-        /// Unity never shrinks anything and the text just spills past the card. Best-fit only
-        /// means something once the rect actually bounds the text.
-        static void ShrinkToFit(Text text, int designedSize)
+        static RectTransform PillRow(RectTransform slot, string name, string label, string pill,
+            Action onTap, out Text sub)
         {
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 18;
-            text.resizeTextMaxSize = designedSize;
+            var row = MenuRows.Row(slot, name);
+            MenuRows.Tap(row, onTap);
+            MenuRows.Label(row, label, MenuRows.PillReserve, true);
+            sub = MenuRows.Sub(row, MenuRows.PillReserve);
+            MenuRows.Pill(row, pill);
+            return row;
         }
 
-        Text BuildLink(RectTransform slot, string name, float top, string label, Action onTap)
+        /// Stacks the account rows that are showing, sizes the card to them and, since it is the
+        /// last card, the scroll content to it. Rows hide rather than grey out when they have
+        /// nothing to act on (no profile, no recovery code), as the old links did.
+        void LayoutAccount()
         {
-            var text = RuntimeUi.Label(name, slot,
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(MenuTheme.CardPadding, top - 52f),
-                new Vector2(-MenuTheme.CardPadding, top),
-                32, TextAnchor.MiddleLeft, MenuTheme.Dim);
-            text.text = label;
-            text.raycastTarget = true;
+            if (_accountSlot == null) return;
+            float y = MenuRows.TitleHeight;
+            bool first = true;
+            y = Flow(_playerIdRow, y, MenuRows.TallHeight, ref first);
+            y = Flow(_recoveryRow, y, MenuRows.TallHeight, ref first);
+            y = Flow(_importRow, y, MenuRows.TallHeight, ref first);
+            y = Flow(_privacyRow, y, MenuRows.Height, ref first);
+            y = Flow(_deleteRow, y, MenuRows.TallHeight, ref first);
 
-            var button = text.gameObject.AddComponent<Button>();
-            button.targetGraphic = text;
-            button.onClick.AddListener(() => onTap());
-            return text;
+            float height = y + MenuRows.BottomPadding;
+            float top = _accountSlot.offsetMax.y;
+            _accountSlot.offsetMin = new Vector2(_accountSlot.offsetMin.x, top - height);
+            _content.sizeDelta = new Vector2(0f, -top + height + BottomPadding);
         }
 
-        /// A column of single-line rows, built empty and filled by Refresh. Rows are text rather
-        /// than three aligned columns on purpose: one string per row is one thing to get right,
-        /// and the numbers here are short enough that a tab stop buys nothing.
-        Text[] BuildRows(RectTransform slot, int count, float top)
+        static float Flow(RectTransform row, float y, float height, ref bool first)
         {
-            var rows = new Text[count];
-            for (int i = 0; i < count; i++)
-            {
-                rows[i] = RuntimeUi.Label("Row" + i, slot,
-                    new Vector2(0f, 1f), new Vector2(1f, 1f),
-                    new Vector2(MenuTheme.CardPadding, top - (i + 1) * RowHeight),
-                    new Vector2(-MenuTheme.CardPadding, top - i * RowHeight),
-                    30, TextAnchor.MiddleLeft, MenuTheme.Text);
-            }
-            return rows;
+            if (!row.gameObject.activeSelf) return y;
+            y = MenuRows.Place(row, y, height, first);
+            first = false;
+            return y;
         }
+
 
         public override void OnShown()
         {
-            _deleteArmed = false;
-            _delete.text = "DELETE ONLINE PROFILE";
-            _delete.color = MenuTheme.Dim;
+            ResetDelete();
+
+            // Every visit opens at the top - the player card is what the tab is for - and a tap
+            // on the PROFILE tab while already on it is how a player gets back up there.
+            _scroll.StopMovement();
+            _scroll.verticalNormalizedPosition = 1f;
+            _content.anchoredPosition = Vector2.zero;
+
+            _settings.Refresh();
+
             var utcNow = DateTime.UtcNow;
             string todayLabel = DailySeed.LabelForDate(utcNow);
             int streak = DailyStreak.LengthOn(ProgressStore.Streak, DailyStreak.DayNumber(utcNow));
@@ -321,36 +336,39 @@ namespace MotionRunner.Menu
                             "   ·   streak " + streak;
 
             ShowBoard();
-            FillRuns();
+            _runs.Show(ProgressStore.History);
         }
 
         void RefreshHeadline()
         {
             var profile = Menu.Profile?.Current;
             _headline.text = profile != null ? profile.Handle : "RUNNER";
+            _avatar.Show(_headline.text);
 
             // Rerolls are unlimited (owner call, 17 Sep) - the link shows whenever a profile
             // exists and never counts down.
             _reroll.gameObject.SetActive(profile != null);
-            _reroll.text = "new name";
+            _reroll.text = "re-roll name";
 
-            if (_playerId != null)
-            {
-                _playerId.gameObject.SetActive(profile != null);
-                if (profile != null)
-                    _playerId.text = "PLAYER ID  " + profile.UserId + "   (tap to copy)";
-            }
-            if (_recoveryCode != null)
-            {
-                bool hasCode = profile != null &&
-                               !string.IsNullOrEmpty(Menu.Profile?.RecoveryCode);
-                _recoveryCode.gameObject.SetActive(hasCode);
-                if (hasCode)
-                    _recoveryCode.text = "RECOVERY CODE — tap to copy. Restores this profile " +
-                                         "anywhere; anyone with it can claim it";
-            }
-            if (_import != null)
-                _import.gameObject.SetActive(Menu.Profile != null && Menu.Profile.IsReady);
+            _playerIdRow.gameObject.SetActive(profile != null);
+            SetSub(_playerIdSub, profile != null ? profile.UserId : string.Empty, false);
+
+            bool hasCode = profile != null && !string.IsNullOrEmpty(Menu.Profile?.RecoveryCode);
+            _recoveryRow.gameObject.SetActive(hasCode);
+            SetSub(_recoverySub, "restores this profile anywhere · anyone with it can claim it", false);
+
+            _importRow.gameObject.SetActive(Menu.Profile != null && Menu.Profile.IsReady);
+            SetSub(_importSub, "paste a recovery code copied on another install", false);
+
+            LayoutAccount();
+        }
+
+        /// A row's second line: its standing description in Faint, or feedback on what the tap
+        /// just did in Dim, one step louder.
+        static void SetSub(Text sub, string text, bool feedback)
+        {
+            sub.text = text;
+            sub.color = feedback ? MenuTheme.Dim : MenuTheme.Faint;
         }
 
         void PlayerIdTapped()
@@ -358,7 +376,7 @@ namespace MotionRunner.Menu
             var profile = Menu.Profile?.Current;
             if (profile == null) return;
             GUIUtility.systemCopyBuffer = profile.UserId;
-            _playerId.text = "PLAYER ID copied to clipboard";
+            SetSub(_playerIdSub, "copied to clipboard", true);
         }
 
         void RecoveryCodeTapped()
@@ -366,7 +384,7 @@ namespace MotionRunner.Menu
             string code = Menu.Profile?.RecoveryCode;
             if (string.IsNullOrEmpty(code)) return;
             GUIUtility.systemCopyBuffer = code;
-            _recoveryCode.text = "RECOVERY CODE copied — store it somewhere safe";
+            SetSub(_recoverySub, "copied — store it somewhere safe", true);
         }
 
         void ImportTapped()
@@ -375,19 +393,19 @@ namespace MotionRunner.Menu
             if (service == null || !service.IsReady) return;
 
             string pasted = (GUIUtility.systemCopyBuffer ?? string.Empty).Trim();
-            _import.text = "importing…";
+            SetSub(_importSub, "importing…", true);
             service.ImportProfile(pasted, error =>
             {
                 if (this == null || !gameObject.activeInHierarchy) return;
                 if (error != null)
                 {
-                    _import.text = "import failed: " + error.Message;
-                    _import.color = MenuTheme.Dim;
+                    GameAudio.Deny();
+                    SetSub(_importSub, "import failed: " + error.Message, true);
                     return;
                 }
-                _import.text = "profile imported";
-                _import.color = MenuTheme.Dim;
-                RefreshHeadline();
+                GameAudio.Confirm();
+                RefreshHeadline(); // before the message: a refresh restores the standing line
+                SetSub(_importSub, "profile imported", true);
                 ShowBoard();
             });
         }
@@ -414,7 +432,7 @@ namespace MotionRunner.Menu
 
         /// Points the live board at (scope of the toggle) × (group of the last-used scheme) ×
         /// today's content. The fetch is async; until rows land — or forever, with no backend —
-        /// the mock fills the card, labelled as the sample data it is.
+        /// the card shows its empty slots under the loading / no-connection panel.
         void ShowBoard()
         {
             var scheme = ModePickerCard.LastUsed;
@@ -426,7 +444,7 @@ namespace MotionRunner.Menu
             StyleScope(_scopeAllTime, _scope == BoardScope.AllTime);
 
             _live.Show(new BoardQuery(_scope, DailySeed.LabelForDate(DateTime.UtcNow),
-                ChunkLibrary.ContentVersion, RunSeed.DefaultWorldId, group, BoardRows));
+                ChunkLibrary.ContentVersion, RunSeed.DefaultWorldId, group, LeaderboardCard.Rows));
 
             FillBoard();
         }
@@ -444,85 +462,82 @@ namespace MotionRunner.Menu
             FillBoard();
         }
 
+        /// Real rows, or nothing: while the board is loading or unreachable the card shows its
+        /// slots empty with a "loading" / "no connection" panel over them (owner call, 28 Sep).
+        /// It used to fill them with MockLeaderboard's sample players, labelled as samples, and
+        /// the jump from made-up names to the real board when the fetch landed read as a glitch.
         void FillBoard()
-        {
-            ILeaderboardSource source = _live.IsLive ? _live : _mock;
-            var entries = source.Top(_boardRows.Length, _allTimeBestShown);
-
-            for (int i = 0; i < _boardRows.Length; i++)
-            {
-                if (i >= entries.Count)
-                {
-                    _boardRows[i].text = i == 0 && _live.IsLive ? "nobody yet — set the first score" : string.Empty;
-                    _boardRows[i].color = MenuTheme.Faint;
-                    continue;
-                }
-
-                var entry = entries[i];
-                _boardRows[i].text = entry.Rank + ".   " + entry.Name + "        " + entry.Score;
-                _boardRows[i].color = entry.IsYou ? MenuTheme.Accent : MenuTheme.Text;
-            }
-
-            RefreshBoardNote();
-        }
-
-        /// The bottom line of the board card: no live board → say the rows are samples;
-        /// live → the player's rank, or a nudge to finish a run.
-        void RefreshBoardNote()
         {
             if (!_live.IsLive)
             {
-                _boardNote.text = _live.IsLoading
-                    ? "sample board — loading online scores…"
-                    : "sample board — online scores unavailable";
-                _boardNote.color = MenuTheme.Faint;
+                _board.ShowUnavailable(_live.IsLoading);
+                _boardNote.text = string.Empty;
                 return;
             }
 
-            _boardNote.text = _live.MyRank > 0
-                ? "you are #" + _live.MyRank + " on this board"
+            var entries = _live.Top(LeaderboardCard.Rows, _allTimeBestShown);
+
+            // The player's own critter on their row: the same face as the player card above.
+            _board.Show(entries, _headline.text);
+            RefreshBoardNote(entries.Count);
+        }
+
+        /// The bottom line of a live board: the player's rank, or a nudge to finish a run.
+        void RefreshBoardNote(int rows)
+        {
+            _boardNote.text = rows == 0 ? "nobody yet — set the first score"
+                : _live.MyRank > 0 ? "you are #" + _live.MyRank + " on this board"
                 : "finish a run to land on this board";
             _boardNote.color = MenuTheme.Faint;
         }
 
         // ---- deletion ----
 
+        void ResetDelete()
+        {
+            _deleteArmed = false;
+            _deleteLabel.text = DeleteLabel;
+            _deleteLabel.color = MenuTheme.Text;
+            SetSub(_deleteSub, DeleteHint, false);
+        }
+
         void DeleteTapped()
         {
             var service = Menu.Profile;
             if (service == null || !service.IsReady)
             {
-                _delete.text = "no online profile to delete";
-                _delete.color = MenuTheme.Faint;
+                GameAudio.Deny();
+                SetSub(_deleteSub, "no online profile to delete", true);
                 return;
             }
 
             if (!_deleteArmed)
             {
                 _deleteArmed = true;
-                _delete.text = "TAP AGAIN TO DELETE — immediate and permanent";
-                _delete.color = MenuTheme.Accent;
+                _deleteLabel.text = "TAP AGAIN TO DELETE";
+                _deleteLabel.color = MenuTheme.Accent;
+                SetSub(_deleteSub, "immediate and permanent", true);
                 return;
             }
 
             _deleteArmed = false;
-            _delete.text = "deleting…";
-            _delete.color = MenuTheme.Faint;
+            _deleteLabel.text = DeleteLabel;
+            _deleteLabel.color = MenuTheme.Text;
+            SetSub(_deleteSub, "deleting…", true);
             service.DeleteAccount(error =>
             {
                 if (this == null || !gameObject.activeInHierarchy) return;
                 if (error != null)
                 {
-                    _delete.text = "couldn't delete — try again (" + error.Code + ")";
-                    _delete.color = MenuTheme.Dim;
+                    GameAudio.Deny();
+                    SetSub(_deleteSub, "couldn't delete — try again (" + error.Code + ")", true);
                     return;
                 }
                 // Deliberately NO board refresh here: the service is dormant after deletion
                 // and a fetch must not mint a replacement account mid-flow (18 Sep review R2).
                 // Scope is stated honestly: local device stats are device data and stay.
-                _delete.text = "online profile deleted — device stats stay; a fresh profile starts next launch";
-                _delete.color = MenuTheme.Dim;
                 RefreshHeadline();
+                SetSub(_deleteSub, "online profile deleted — device stats stay; a fresh profile starts next launch", true);
                 _boardNote.text = "profile deleted — the board returns next launch";
                 _boardNote.color = MenuTheme.Faint;
             });
@@ -530,26 +545,5 @@ namespace MotionRunner.Menu
 
         static string SchemeName(ControlScheme scheme) =>
             scheme == ControlScheme.Camera ? "CAMERA" : "TILT";
-
-        void FillRuns()
-        {
-            IReadOnlyList<RunRecord> runs = ProgressStore.History;
-            _runsEmpty.gameObject.SetActive(runs.Count == 0);
-
-            for (int i = 0; i < _runRows.Length; i++)
-            {
-                if (i >= runs.Count)
-                {
-                    _runRows[i].text = string.Empty;
-                    continue;
-                }
-
-                var run = runs[i];
-                _runRows[i].text = run.DayLabel + "   " + (run.Daily ? "daily" : "free") +
-                                   "        " + run.Score + "   " + run.Distance + "m   " +
-                                   run.Coins + "c";
-                _runRows[i].color = i == 0 ? MenuTheme.Text : MenuTheme.Dim;
-            }
-        }
     }
 }

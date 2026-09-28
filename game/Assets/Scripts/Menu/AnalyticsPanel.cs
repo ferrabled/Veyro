@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Growth;
 using UnityEngine;
@@ -22,37 +23,27 @@ namespace MotionRunner.Menu
             panel.Build(); analytics.Changed += panel.Refresh; panel.Refresh();
             return panel;
         }
+        /// A MenuSheet: X, tap outside and Android back all close without changing the choice.
+        /// ENABLE and OFF are deliberately the SAME weight - both plain rounded buttons, neither
+        /// pink - because this is a consent choice and the off-by-default one must not look like
+        /// the lesser answer. The support id and the policy are quiet links under them.
         void Build()
         {
-            RuntimeUi.PortraitCanvas(gameObject, 145);
-            RuntimeUi.FullScreenPanel("Dim", transform, new Color(.04f, .05f, .09f, .94f));
-            var card = RuntimeUi.Card("Card", transform, new Vector2(940f, 1320f), MenuTheme.Card).transform;
-            Label("Title", card, 510f, 130f, 45).text = "HELP IMPROVE VEYRO";
-            _body = Label("Body", card, 190f, 450f, 31);
-            _enable = Button(card, "Enable", -140f, "ENABLE ANALYTICS", () => _analytics.SetEnabled(true));
-            _disable = Button(card, "Disable", -250f, "KEEP ANALYTICS OFF", () => _analytics.SetEnabled(false));
-            _copy = Button(card, "CopyId", -360f, "COPY ANALYTICS SUPPORT ID", () =>
+            // The body is the disclosure and runs to ten lines at 30 px; its band is that plus air,
+            // so the copy - not empty card - fills the space between title and choices.
+            var card = MenuSheet.Build(gameObject, 145, new Vector2(MenuSheet.Width, 1180f), Close);
+            MenuSheet.Title(card, 104f, 70f).text = "HELP IMPROVE VEYRO";
+            _body = MenuSheet.Body(card, 190f, 500f, 30);
+            _enable = MenuSheet.Secondary(card, "Enable", 360f, "ENABLE ANALYTICS", () => _analytics.SetEnabled(true));
+            _disable = MenuSheet.Secondary(card, "Disable", 252f, "KEEP ANALYTICS OFF", () => _analytics.SetEnabled(false));
+            _copy = MenuSheet.Link(card, "CopyId", 150f, "COPY ANALYTICS SUPPORT ID", () =>
             {
                 GUIUtility.systemCopyBuffer = _analytics.SupportId;
                 _body.text = "Analytics support ID copied. Email it to ferrabled+veyro@gmail.com for access or deletion. " +
                     "We verify control before acting. Turning analytics off stops future collection and holds unsent events on this device; " +
                     "it does not delete past provider records.";
             });
-            Button(card, "Policy", -470f, "READ PRIVACY POLICY", () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
-            Button(card, "Close", -580f, "CLOSE", Close);
-        }
-        Button Button(Transform parent, string name, float y, string text, Action action) =>
-            RuntimeUi.TextButton(name, parent, new Vector2(.5f, .5f), new Vector2(0f, y),
-                new Vector2(800f, 88f), MenuTheme.Bar, text, 28, MenuTheme.Text, () => action());
-        static Text Label(string name, Transform parent, float y, float height, int size)
-        {
-            var text = RuntimeUi.Label(name, parent, new Vector2(.5f, .5f), new Vector2(.5f, .5f),
-                new Vector2(-400f, y - height / 2), new Vector2(400f, y + height / 2),
-                size, TextAnchor.MiddleCenter, MenuTheme.Text);
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.resizeTextForBestFit = true; text.resizeTextMinSize = 24; text.resizeTextMaxSize = size;
-            return text;
+            MenuSheet.Link(card, "Policy", 80f, "READ PRIVACY POLICY", () => Application.OpenURL(GameLinks.PrivacyPolicyUrl));
         }
         void Refresh()
         {

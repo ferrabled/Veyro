@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.Core;
 using MotionRunner.Menu;
 using MotionRunner.Progression;
@@ -26,6 +27,16 @@ namespace MotionRunner.Gameplay
         const float NearZMax = 10f;
 
         public IGameInput Input;
+
+        /// The one input whose JUMP may restart a finished run from the result card - the camera
+        /// hop, for a player standing 2 m from the phone. RunFlow sets it to the run's
+        /// CameraFaceInput in camera mode and to null in tilt mode and after DropCameraMode;
+        /// null means the RUN AGAIN button is the only way into the next run. It is one of
+        /// Input's own sources, so it is READ here and never ticked (Input.Tick already did).
+        /// A touch tap is deliberately not in this seam: since 24 Sep, tapping the card outside
+        /// its buttons does nothing.
+        public IGameInput RestartGesture;
+
         public RunnerController Runner;
         public TrackDirector Director;
         public RunHud Hud;
@@ -68,10 +79,10 @@ namespace MotionRunner.Gameplay
         /// "2026-08-21" — the UTC date the current run belongs to.
         public string DailyLabel { get; private set; } = string.Empty;
 
-        /// When another run may start, and on which frame. Every way of asking for one - the tap
-        /// anywhere, the RUN AGAIN button - goes through it, so "a restart never begins on the
-        /// frame its own tap arrived" is one rule in one engine-free place rather than a habit
-        /// each call site has to remember. See RestartGate.
+        /// When another run may start, and on which frame. Both ways of asking for one - the
+        /// RUN AGAIN button and the camera hop (RestartGesture) - go through it, so "a restart
+        /// never begins while the input that asked for it is still in flight" is one rule in one
+        /// engine-free place rather than a habit each call site has to remember. See RestartGate.
         readonly RestartGate _restart = new RestartGate();
 
         /// The per-scheme best boards (engine-free; the PlayerPrefs adapter is the only Unity in
@@ -150,6 +161,7 @@ namespace MotionRunner.Gameplay
             Frozen = false;
             enabled = false;
             Input = null;
+            RestartGesture = null;
             _restart.Clear();
             _elapsed = 0f;
             Score.Reset();
@@ -219,6 +231,11 @@ namespace MotionRunner.Gameplay
             Runner.ResetState();
             Director.BeginRun(CurrentSeed);
 
+            // The run's song is a function of its seed (T-045): today's Daily Run sounds the same
+            // on every phone, a challenge rematch sounds like the run it rematches, and RUN AGAIN
+            // - same seed - resumes the track rather than restarting it (GameAudio.PlayMusic).
+            GameAudio.PlayRunMusic(CurrentSeed.RngState());
+
             if (Hud != null)
             {
                 Hud.HideResult();
@@ -249,20 +266,21 @@ namespace MotionRunner.Gameplay
 
             if (!IsRunning)
             {
-                // A restart never begins on the frame it was asked for, whether the ask was a tap
-                // anywhere or the RUN AGAIN button, and never at all while the main menu is up:
-                // the release that asks is the same TouchPhase.Ended that TouchTapInput reads as a
-                // jump and that the EventSystem turns into a click, so this frame's input has to be
-                // spent first. The gate holds that rule; this call site's job is that the run is
-                // started HERE - after Input.Tick above, and returning before Runner.Step - so the
-                // ask can never also be the new run's first jump.
+                // The result card. Only two things start the next run: the RUN AGAIN button
+                // (RequestRestart -> the gate's queue) and, in camera mode, a hop read from
+                // RestartGesture - never the composite Input, whose touch tap used to restart the
+                // run from anywhere on the card (retired 24 Sep). A restart never begins while
+                // the input that asked for it is still in flight, and never at all while the
+                // main menu is up. The gate holds that rule; this call site's job is that the run
+                // is started HERE - after Input.Tick above, and returning before Runner.Step - so
+                // the hop that asked can never also be the new run's first jump.
                 //
                 // The overlay used to be StorePanel, which opened ON TOP of the result screen (the
                 // 27 Aug store-tap bug). The store is a menu tab now, so the screen that owns the
                 // taps is the menu itself - and QuitToMenu disables this component in the same
                 // frame the button fires, which makes this the belt to that braces.
-                if (_restart.Tick(deltaTime, Input.IsJumpPressed() || Input.IsSpecialPressed(),
-                        MainMenu.IsOpen))
+                bool hop = RestartGesture != null && RestartGesture.IsJumpPressed();
+                if (_restart.Tick(deltaTime, hop, MainMenu.IsOpen))
                     StartRun();
                 return;
             }
@@ -303,6 +321,9 @@ namespace MotionRunner.Gameplay
                     if (!runner.Intersects(chunk.CoinBounds(i))) continue;
                     chunk.TakeCoin(i);
                     Score.CollectCoin();
+                    // Pitch climbs with the chain; ScoreState.Tick lets the combo lapse, which
+                    // is what drops it back. Identical cues are capped per frame in GameAudio.
+                    GameAudio.Coin(Score.Combo);
                 }
 
                 for (int i = 0; i < chunk.ObstacleCount; i++)
@@ -321,8 +342,14 @@ namespace MotionRunner.Gameplay
             if (!IsRunning) return;
             Runner.Visual?.Crash(crash);
             IsRunning = false;
-            // For as long as the crash pose plays and the card fades in: a tap during the pose
-            // used to restart the run before the card had ever been drawn.
+
+            // The impact, and the music out from under it - the card's jingle (RunHud) lands
+            // on a quiet bed once the crash pose has played. The track is faded and HELD, not
+            // dropped: RUN AGAIN asks for the same seed and gets the same song back mid-bar.
+            GameAudio.Play(Sfx.Crash);
+            GameAudio.StopMusic();
+            // For as long as the crash pose plays and the card fades in: a hop (or a RUN AGAIN
+            // click) during the pose must not restart the run before the card has been drawn.
             _restart.LockOut(RunHud.RevealSeconds);
 
             // The board owns which keys a scheme may touch (unit-tested there); this method only
@@ -364,9 +391,15 @@ namespace MotionRunner.Gameplay
                       " distance=" + (int)Score.Distance + "m chunks=" + Director.ChunksSpawned);
 
             if (Hud != null)
+            {
+                // Whether the card may say "HOP to run again": true only while the camera is
+                // still this run's steering (RunFlow clears the gesture when the camera is
+                // dropped, so a fallen-back camera run gets a button-only card).
+                Hud.HopRestartAvailable = RestartGesture != null;
                 Hud.ShowResult(new RunSummary(Mode, Scheme, score, Score.Coins, Score.BestCombo,
                     (int)Score.Distance, AllTimeBest, DailyBest, DailyLabel,
                     newAllTime, newDaily, crash, CurrentSeed), Runner.Visual!=null && Runner.Visual.HasCrashEffect);
+            }
         }
 
         /// Hands the finished run to the shared boards (T-009). Fire-and-forget from Crash:
@@ -413,9 +446,8 @@ namespace MotionRunner.Gameplay
         /// The RUN AGAIN button. QUEUED, not started: this runs inside the EventSystem's dispatch,
         /// and DefaultExecutionOrder(100) puts this component's own Update strictly AFTER that in
         /// the same frame - so starting the run here handed the click's own TouchPhase.Ended to a
-        /// freshly reset runner as a first-frame jump (PR #5 review). The tap-anywhere path has
-        /// always deferred, which is why only the button showed it. The gate's lockout covers the
-        /// click that arrives on the frame of the crash, exactly as it does for a tap.
+        /// freshly reset runner as a first-frame jump (PR #5 review). The gate's lockout covers
+        /// the click that arrives on the frame of the crash, exactly as it does for a hop.
         void RequestRestart()
         {
             if (IsRunning) return;

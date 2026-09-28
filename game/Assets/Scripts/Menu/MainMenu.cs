@@ -57,7 +57,7 @@ namespace MotionRunner.Menu
         public StoreCatalogView Catalog { get; private set; }
 
         /// The online profile seam, for the profile tab. May be a never-ready fake (no
-        /// backend configured) - pages must treat that as "boards are sample data".
+        /// backend configured) - pages must treat that as "no board to show".
         public IProfileService Profile { get; private set; }
         public SkinService Skins { get; private set; }
         public SeasonService Season => Skins.Season;
@@ -102,16 +102,25 @@ namespace MotionRunner.Menu
         {
             RuntimeUi.PortraitCanvas(gameObject, SortingOrder);
 
-            RuntimeUi.Panel("MenuBackdrop", transform, MenuTheme.Card);
-            BuildHeader();
+            // The backdrop runs edge to edge, under the status bar and any camera cutout; header,
+            // pages and tab bar live inside the safe area (RuntimeUi.SafeRoot), so the title is
+            // never cut by a teardrop notch and the tab bar never sits under a gesture bar. The
+            // strip the safe area leaves at the top and bottom shows the backdrop, which is the
+            // header's and the tab bar's own paper - the bars simply look taller.
+            // Opaque sage, the pages' own colour: the header sits on it too, so a tab reads as one
+            // surface from the top of the screen - through the strip a camera cutout leaves above
+            // the safe area - down to the tab bar, whose paper bleeds on down past the bottom inset.
+            RuntimeUi.Panel("MenuBackdrop", transform, MenuTheme.Page);
+            var safe = RuntimeUi.SafeRoot(transform);
+            BuildHeader(safe);
 #if VEYRO_COSMETIC_QA && DEVELOPMENT_BUILD
-            RuntimeUi.Label("QaFixture",transform,new Vector2(0,1),Vector2.one,
+            RuntimeUi.Label("QaFixture",safe,new Vector2(0,1),Vector2.one,
                 new Vector2(24,-200),new Vector2(-24,-172),20,TextAnchor.MiddleCenter,MenuTheme.Accent).text="ISOLATED QA · FAKE OWNERSHIP & 9 XP FIXTURE";
 #endif
 
             // The content area is what is left between the header and the tab bar. Pages fill it;
             // none of them knows how tall it is.
-            RuntimeUi.Element("Content", transform, out var content);
+            RuntimeUi.Element("Content", safe, out var content);
             _content=content;
             RuntimeUi.Stretch(content, Vector2.zero, Vector2.one,
                 new Vector2(0f, MenuTheme.TabBarHeight), new Vector2(0f, -MenuTheme.HeaderHeight));
@@ -126,7 +135,7 @@ namespace MotionRunner.Menu
             _seasonPage = DetailPage<SeasonPassPage>(content);
             _cosmeticsPage = DetailPage<CosmeticsPage>(content);
 
-            _bar = MenuTabBar.Create(transform);
+            _bar = MenuTabBar.Create(safe);
             _bar.Tapped += Show;
 
             Show(tab);
@@ -135,13 +144,13 @@ namespace MotionRunner.Menu
         /// Title block. The version line under it is DEVELOPMENT ONLY (BuildInfo): it is how the
         /// owner tells which build is on the phone, and it must never ship to Play, so the gate is
         /// Debug.isDebugBuild rather than a define somebody has to remember to clear.
-        void BuildHeader()
+        void BuildHeader(Transform parent)
         {
-            RuntimeUi.Element("Header", transform, out var header);
+            RuntimeUi.Element("Header", parent, out var header);
             _header=header.gameObject;
             RuntimeUi.Stretch(header, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(0f, -MenuTheme.HeaderHeight), Vector2.zero);
-            RuntimeUi.Panel("Backdrop", header, MenuTheme.Bar);
+            RuntimeUi.Panel("Backdrop", header, MenuTheme.Page);
 
             RuntimeUi.Label("Title", header,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),

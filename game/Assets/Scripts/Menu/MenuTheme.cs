@@ -16,6 +16,11 @@ namespace MotionRunner.Menu
         public static readonly Color Accent = Art.ParkTheme.Pink;
         public static readonly Color Gold = Art.ParkTheme.Hex(0xBD8423);
 
+        /// Second and third place on the leaderboard podium, next to Gold for first: a sage
+        /// silver and a clay bronze, pulled toward the park palette rather than metallic.
+        public static readonly Color Silver = Art.ParkTheme.Hex(0x8FA5A2);
+        public static readonly Color Bronze = Art.ParkTheme.Hex(0xB9744A);
+
         /// Text on top of an accent-filled button.
         public static readonly Color OnAccent = Art.ParkTheme.Paper;
 
@@ -57,6 +62,10 @@ namespace MotionRunner.Menu
         /// on device it very much was: the track was legible through both pages.
         public static readonly Color Scrim = new Color(0.91f, 0.93f, 0.86f, 0.98f);
 
+        /// The same sage, opaque: the menu's own backdrop and its header, so the title sits on the
+        /// page colour every tab uses instead of on a paper band of its own (owner, 28 Sep).
+        public static readonly Color Page = new Color(0.91f, 0.93f, 0.86f, 1f);
+
         // ---- layout (1080x1920 design space, RuntimeUi.ReferenceResolution) ----
 
         /// The title block at the top, shared by every tab.
@@ -73,5 +82,9 @@ namespace MotionRunner.Menu
 
         /// Margin inside a card, between its edge and its contents.
         public const float CardPadding = 28f;
+
+        /// Corner radius of a menu card (CosmeticUi.Card) - the home and profile cards, a step
+        /// under the 44 of the full-screen cards (result, guide, pause) that sit alone.
+        public const float CardRadius = 28f;
     }
 }

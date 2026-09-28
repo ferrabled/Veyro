@@ -1,4 +1,5 @@
 using System;
+using MotionRunner.Audio;
 using MotionRunner.CameraInput;
 using MotionRunner.Core;
 using MotionRunner.Track;
@@ -39,7 +40,8 @@ namespace MotionRunner.Gameplay
     public sealed class PauseMenu : MonoBehaviour
     {
         static readonly Color TextColor = Menu.MenuTheme.Text;
-        static readonly Color DimColor = new Color(0.04f, 0.05f, 0.09f, 0.82f);
+        /// The park's ink, like the result card's and the guide's scrims.
+        static readonly Color DimColor = new Color(Art.ParkTheme.Ink.r, Art.ParkTheme.Ink.g, Art.ParkTheme.Ink.b, 0.84f);
         static readonly Color PanelColor = Menu.MenuTheme.Card;
         static readonly Color AccentColor = Menu.MenuTheme.Accent;
         static readonly Color SecondaryColor = Menu.MenuTheme.Slot;
@@ -124,6 +126,17 @@ namespace MotionRunner.Gameplay
         float _faceUnseenFor;
         int _pendingFrame = -1;
 
+        /// The numeral last ticked for. The tick plays on each change of DisplayDigit (3, 2, 1)
+        /// and the go on the frame the count completes - so the sound and the drawn digit are
+        /// the same edge, never one frame apart.
+        int _tickedDigit;
+
+        /// The volume rows under QUIT: the space they take from the card's bottom edge to QUIT
+        /// (the rows' band, its margins and the gap), and the band itself.
+        const float SoundRowsHeight = 250f;
+        const float SoundRowsBand = 210f;
+        const float SoundLabelWidth = 160f;
+
         /// rig is null in tilt mode, and is dropped here when camera mode gives up.
         public static PauseMenu Show(FaceTrackingRig rig)
         {
@@ -201,7 +214,17 @@ namespace MotionRunner.Gameplay
             RuntimeUi.PortraitCanvas(gameObject, 150); // above the HUD, below the store
 
             _panel = RuntimeUi.FullScreenPanel("Panel", transform, DimColor);
-            var card = RuntimeUi.Card("Card", _panel.transform, new Vector2(760f, 900f), PanelColor);
+
+            // The two volume rows take the old 75 px toggle strip under QUIT plus `lift` more: the
+            // card grows by exactly `lift` and the buttons rise with its bottom edge, so every
+            // gap above them - status line to RESUME included - is what it always was. Rounded,
+            // like the result card and the guide, rather than the old square slab.
+            float lift = SoundRowsHeight - 75f;
+            RuntimeUi.Element("Card", _panel.transform, out var cardRect);
+            cardRect.anchorMin = cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.sizeDelta = new Vector2(760f, 900f + lift);
+            Menu.CosmeticUi.Surface(cardRect, PanelColor, 44f);
+            var card = cardRect.gameObject;
 
             RuntimeUi.Label("Title", card.transform,
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
@@ -214,22 +237,21 @@ namespace MotionRunner.Gameplay
                 34, TextAnchor.UpperCenter, StatusColor);
             _status.text = IdleHint;
 
-            _resumeButton = RuntimeUi.TextButton("Resume", card.transform,
-                new Vector2(0.5f, 0f), new Vector2(0f, 430f), new Vector2(520f, 140f),
+            _resumeButton = RoundButton("Resume", card.transform, 430f + lift, new Vector2(520f, 140f),
                 AccentColor, "RESUME", 52, Menu.MenuTheme.OnAccent,
                 () => Begin(Pending.Resume, ResumeOrigin.User));
 
-            _restartButton = RuntimeUi.TextButton("Restart", card.transform,
-                new Vector2(0.5f, 0f), new Vector2(0f, 270f), new Vector2(480f, 110f),
+            _restartButton = RoundButton("Restart", card.transform, 270f + lift, new Vector2(480f, 110f),
                 SecondaryColor, "RESTART RUN", 42, TextColor,
                 () => Begin(Pending.Restart, ResumeOrigin.User));
 
             // Quit never waits on the camera: getting out is the one thing that must always
             // work on the first tap.
-            RuntimeUi.TextButton("Quit", card.transform,
-                new Vector2(0.5f, 0f), new Vector2(0f, 130f), new Vector2(480f, 110f),
+            RoundButton("Quit", card.transform, 130f + lift, new Vector2(480f, 110f),
                 SecondaryColor, "QUIT TO MENU", 42, TextColor,
-                () => QuitRequested?.Invoke());
+                () => QuitRequested?.Invoke(), Sfx.UiBack);
+
+            BuildSoundRows(card.transform);
 
             // The 3-2-1 numeral, dead centre where no phone bezel or thumb hides it. A sibling of
             // the panel, NOT a child: the whole card steps aside for the count (owner call,
@@ -243,6 +265,62 @@ namespace MotionRunner.Gameplay
             countdownOutline.effectColor = Art.ParkTheme.Ink;
             countdownOutline.effectDistance = new Vector2(4f, -4f);
             _countdownDigits.gameObject.SetActive(false);
+        }
+
+        /// MUSIC and SOUNDS under QUIT: the same VolumeControl rows as the profile tab - drag or tap
+        /// a level, ON/OFF to mute - so a player who paused because the room went quiet (or
+        /// loud) sets it right here, without leaving the run. The pause is the one place a level
+        /// can be judged against the run's own music, which is playing, ducked, underneath.
+        /// Skipped entirely when there is no audio instance (tests, tooling).
+        void BuildSoundRows(Transform card)
+        {
+            if (GameAudio.Instance == null) return;
+            Func<SoundSettings> settings = () => GameAudio.Instance != null ? GameAudio.Instance.Settings : null;
+
+            RuntimeUi.Element("SoundRows", card, out var rows);
+            RuntimeUi.Stretch(rows, new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(0f, 16f), new Vector2(0f, 16f + SoundRowsBand));
+
+            var line = RuntimeUi.Element("Divider", rows, out var lineRect);
+            RuntimeUi.Stretch(lineRect, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(32f, 0f), new Vector2(-32f, 2f));
+            line.AddComponent<Image>().color = Menu.MenuTheme.Empty;
+
+            // Kept alive by their own scale's input handlers; nothing here needs them again.
+            new Menu.VolumeControl(Row(rows, "Music", 1), "MUSIC",
+                Menu.VolumeControl.Channel.Music, settings, SoundLabelWidth, 32f);
+            new Menu.VolumeControl(Row(rows, "Sounds", 0), "SOUNDS",
+                Menu.VolumeControl.Channel.Sounds, settings, SoundLabelWidth, 32f);
+        }
+
+        /// A rounded, filled button centred `y` px above the card's bottom edge - RunHud's
+        /// CardButton shape, so RESUME here and RUN AGAIN on the result card are one family.
+        static Button RoundButton(string name, Transform card, float y, Vector2 size, Color fill,
+            string label, int fontSize, Color labelColor, Action onTap, Sfx sound = Sfx.UiTap)
+        {
+            RuntimeUi.Element(name, card, out var rect);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = new Vector2(0f, y);
+            rect.sizeDelta = size;
+
+            var surface = Menu.CosmeticUi.Surface(rect, fill, size.y * 0.32f);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = surface;
+            button.onClick.AddListener(() => onTap());
+            RuntimeUi.TapSound(button, sound);
+
+            RuntimeUi.Label("Label", rect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
+                fontSize, TextAnchor.MiddleCenter, labelColor).text = label;
+            return button;
+        }
+
+        /// One of the two rows, stacked from the bottom: 0 is SOUNDS, 1 is MUSIC above it.
+        static RectTransform Row(RectTransform rows, string name, int index)
+        {
+            RuntimeUi.Element(name, rows, out var row);
+            RuntimeUi.Stretch(row, new Vector2(0f, index * 0.5f), new Vector2(1f, (index + 1) * 0.5f),
+                Vector2.zero, Vector2.zero);
+            return row;
         }
 
         /// A tap on RESUME or RESTART never acts on the frame it arrives: TouchTapInput reports a
@@ -462,6 +540,8 @@ namespace MotionRunner.Gameplay
             _panel.SetActive(false);
             _countdownDigits.text = _countdown.DisplayDigit.ToString();
             _countdownDigits.gameObject.SetActive(true);
+            _tickedDigit = _countdown.DisplayDigit;
+            GameAudio.Play(Sfx.CountdownTick); // "3"
         }
 
         void TickCountdown()
@@ -499,10 +579,17 @@ namespace MotionRunner.Gameplay
                 _countdownDigits.gameObject.SetActive(false);
                 _wait = Wait.None;
                 _pendingFrame = Time.frameCount;
+                GameAudio.Play(Sfx.CountdownGo);
                 return;
             }
 
-            _countdownDigits.text = _countdown.DisplayDigit.ToString();
+            int digit = _countdown.DisplayDigit;
+            if (digit != _tickedDigit)
+            {
+                _tickedDigit = digit;
+                GameAudio.Play(Sfx.CountdownTick); // "2", "1"
+            }
+            _countdownDigits.text = digit.ToString();
         }
 
         /// The camera is not coming back (CameraStaging.Stage.Failed is the rig's own terminal
