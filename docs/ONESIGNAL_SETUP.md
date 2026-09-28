@@ -134,6 +134,24 @@ PROFILE → NOTIFICATIONS → COPY NOTIFICATION SUPPORT ID supports manual delet
 Turning notifications off stops delivery; it does not delete the OneSignal record. This first
 increment does not link it to the online profile, so DELETE ONLINE PROFILE does not delete it.
 
+## iOS — owner dashboard setup (28 Sep, D19)
+
+Same OneSignal app and App ID as Android; iOS only adds an APNs credential. No Firebase involved.
+
+1. developer.apple.com → Certificates, IDs & Profiles → **Keys → +**. Name `OneSignal APNs`,
+   tick **Apple Push Notifications service (APNs)**, configure it for **Sandbox & Production**
+   (team-scoped) → Continue → Register. Download `AuthKey_XXXXXXXXXX.p8` (one download only;
+   keep it outside the repo) and note the **Key ID**.
+2. OneSignal → the Veyro app → Settings → Push & In-App → **Apple iOS (APNs)** → Activate →
+   **p8 Auth Key (Recommended)**: upload the `.p8`, Key ID, Team ID (Membership details) and
+   bundle ID `com.ferrabled.veyro.run` → Save.
+3. SDK choice screen: **Unity**. Ignore its generated code steps — the agent adds the
+   `com.onesignal.unity.ios` package, the Notification Service Extension and the App Group in the
+   iOS increment. Onboarding may show incomplete until an iOS build registers.
+4. Device check (later, TestFlight on a borrowed iPhone): same flow as the Android section below —
+   enable in PROFILE → NOTIFICATIONS, find the subscription under Audience → Subscriptions, mark it
+   a test subscription, **Send test**, tap it with the app backgrounded and closed.
+
 ## Remaining T-021 campaign increment
 
 The allowed, versioned Daily Run payload and safe menu routing are implemented. Verify cold/warm

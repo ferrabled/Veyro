@@ -143,8 +143,10 @@ iOS (owner, 28 Sep).
 **Next:** iOS code changes (App Store RevenueCat key + iOS build method, iOS player settings,
 iOS camera permission path, OneSignal iOS package, Layers on iOS without ATT, Android-only copy),
 Xcode export from Windows, then a Mac (rented or the friend's) to archive and upload to TestFlight.
-Not yet verified on any Apple hardware. D11 in DECISIONS.md still describes the friend's-account
-path — owner to update it.
+Not yet verified on any Apple hardware. Owner-approved D19 now records the own-account iOS path
+(D11's iOS clause marked superseded; PREREQUISITES P2/P10/H3 and LICENSING_REVENUE §4 updated).
+RevenueCat App Store app configured (IAP key, server notifications, `appl_` key, products attached
+to the existing entitlements/offering).
 
 ## 2026-09-28 — Guide illustrations integrated and rendered (feat-game-UI-improvement / guide-art-integration)
 
