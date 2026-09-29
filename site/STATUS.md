@@ -1,5 +1,22 @@
 # Website work log
 
+## 2026-09-29 — Store-review legal pass, deployed; PR #15 review fixes
+
+Before the first App Review submission (iPhone build 1.0.0 (1), uploaded and processed; not
+publicly available), the privacy policy gained the iPhone clauses from feat/iOS-implementation
+plus three sections the stores require: service providers with the equal-protection statement
+(Apple 5.1.1(i)), secure data handling (Google Play User Data policy), and legal bases/rights
+(GDPR, AEPD). The Layers IP sentence now matches Layers' data-protection page (stored, resolved
+to country/region/city, kept while the account is active). Support and terms cover App Store
+payments, refunds, restore and Apple's standard EULA. The owner committed and deployed it the
+same day; the live privacy, support and terms pages were checked afterwards.
+
+PR #15 Copilot review, same day: `docs/PRIVACY_POLICY.md` now carries the same text and date
+(it had the old "discards the raw IP" sentence); the footer and terms no longer claim iPhone
+availability ("Veyro Run" footer; terms: "for iPhone from its first App Store release"), and
+`README.md` records the iOS state; `docs/BACKLOG.md` T-037 records the superseded scope and
+completion. These footer/terms edits need one more `wrangler deploy`.
+
 ## 2026-09-28 — Deletion path verification
 
 Owner asked whether user deletion works. Verified the public support page still

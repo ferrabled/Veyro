@@ -148,6 +148,15 @@ no stale September release promise. The challenge page keeps its existing Play
 URL and fallback, using availability wording. No App Store URL or released-iOS
 claim was added.
 
+**29 September 2026 (store-review pass):** the iPhone build 1.0.0 (1) was uploaded and
+processed in App Store Connect and is being submitted to App Review; it is **not publicly
+available**. The privacy policy, support page and terms now cover the iPhone version in
+version-scoped "On iPhone…" clauses, because App Review reads the policy linked from App
+Store Connect before approval. Nothing on the site claims iPhone availability: the footer
+reads "Veyro Run" with the Apple and Google trademark lines, and the terms say "for iPhone
+from its first App Store release". Add an App Store URL or badge only after the listing is
+live (same rule as the Play CTA below).
+
 Once the owner verifies a public listing, update the homepage CTA using the real
 store URL. Do not infer availability from a registered bundle ID or an internal
 build. Coordinate policy publication with release owners as already required;
