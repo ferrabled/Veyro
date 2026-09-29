@@ -152,10 +152,13 @@ claim was added.
 processed in App Store Connect and is being submitted to App Review; it is **not publicly
 available**. The privacy policy, support page and terms now cover the iPhone version in
 version-scoped "On iPhone…" clauses, because App Review reads the policy linked from App
-Store Connect before approval. Nothing on the site claims iPhone availability: the footer
-reads "Veyro Run" with the Apple and Google trademark lines, and the terms say "for iPhone
-from its first App Store release". Add an App Store URL or badge only after the listing is
-live (same rule as the Play CTA below).
+Store Connect before approval. The footer reads "Veyro Run" with the Apple and Google
+trademark lines, and the terms say "for iPhone from its first App Store release". The home
+page's CTA note reads **"For iPhone and Android"** (owner decision, 29 Sep): App Store Connect
+lists this site as the app's marketing URL, and App Review flags metadata that names only
+another mobile platform (guideline 2.3.10). It names the platforms the game is built for; it
+links no store. Add an App Store URL or badge only after the listing is live (same rule as
+the Play CTA below).
 
 Once the owner verifies a public listing, update the homepage CTA using the real
 store URL. Do not infer availability from a registered bundle ID or an internal
