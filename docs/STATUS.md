@@ -1,5 +1,28 @@
 # Status journal (newest at top)
 
+## 2026-09-29 — T-037 website refresh and store-review legal pass, deployed (feat/update-website-ui, PR #15)
+
+**What changed** (all under `site/` and this branch's docs):
+- **T-037 website refresh:** the approved guide illustrations replace the capsule figures, and the pages carry the game palette, both control modes and the refreshed Daily Run and cosmetics sections. The owner's 28 Sep brief superseded T-037's original narrow acceptance criteria; BACKLOG records the new scope, and `site/STATUS.md` 28 Sep has the details.
+- **Legal pages before the first App Review submission:**
+  - The privacy policy gained the iPhone clauses from feat/iOS-implementation, plus sections on service providers with an equal-protection statement (Apple 5.1.1(i)), secure data handling (Google Play User Data policy), and legal bases and rights (GDPR, AEPD).
+  - The Layers IP sentence now matches Layers' data-protection page.
+  - Support and terms cover App Store payments, refunds, restore, Apple's standard EULA and the TestFlight sign-up.
+  - `docs/PRIVACY_POLICY.md` carries the same text, effective 29 Sep.
+- **No iPhone availability claim:** the footer reads "Veyro Run" with the trademark lines, and the terms say "for iPhone from its first App Store release". The home CTA note names both platforms ("For iPhone and Android", owner decision) because App Store Connect uses the site as the marketing URL, but it links no store.
+
+**Verified:** the owner ran `wrangler deploy` on 29 Sep. Live pages were fetched afterwards without the cache:
+- Every page has the new footer.
+- Privacy and terms show effective 29 Sep, and privacy has the three new sections, the corrected Layers sentence and no "discards the raw IP".
+- Support has Apple refunds and the deletion paths.
+- Unknown URLs return 404.
+
+PR #15's Copilot findings (canonical policy drift, premature iPhone wording, stale T-037) are fixed in this branch.
+
+**Next:**
+- Merge feat/update-website-ui into feat/iOS-implementation after that branch's pending work is committed. The two privacy files conflict; take this branch's version, which contains the iOS wording. STATUS.md needs both sides' top entries kept.
+- Add an App Store link or badge, and switch the home CTA from the closed-test email to the store links, only once the listings are live.
+
 ## 2026-09-28 — Settings sheets rounded, menu header on the page colour (feat-game-UI-improvement / profile-guide-polish, fourth pass)
 
 Owner: round the notifications and gameplay-analytics panels like the rest; the home title
