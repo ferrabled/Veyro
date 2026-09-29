@@ -64,13 +64,24 @@ permalink: /privacy/
      Keychain deferred — docs/PROFILE_LEADERBOARD_PLAN.md "iOS storage"); APNs delivers iPhone
      notifications; no tracking prompt on iPhone. Nothing new is collected. Deploy before the
      iOS build is submitted for App Review (App Store Connect links this page). The support
-     page, the terms and the site footer are still Android-only. -->
+     page, the terms and the site footer are still Android-only.
+     STORE-REVIEW PASS 29 Sep 2026 (feat/update-website-ui, before the first App Review
+     submission; deployed the same day): added "Service providers, and how they protect your
+     data" (Apple guideline 5.1.1(i) requires confirming that third parties give equal
+     protection), "How we protect your data" (Google Play User Data policy: secure data
+     handling) and "Legal bases, and your rights" (GDPR: controller, bases, rights, AEPD
+     complaint, transfers). Corrected the Layers IP sentence: Layers' data-protection page says
+     SDK-event IPs are stored in plaintext, resolved to country/region/city at ingest and kept
+     while the account is active; the earlier "then discards the raw IP" was never Layers' own
+     statement (APP_STORE_BROWSER_HANDOFF privacy audit, 28 Sep). Stated IMPORT PROFILE's
+     clipboard read. The support page, terms and every footer now carry iPhone wording too.
+     Nothing new is collected. Effective date moved to the revision date. -->
 
 
 
 # Veyro Run — Privacy Policy
 
-**Effective date:** 28 September 2026
+**Effective date:** 29 September 2026
 **App:** Veyro Run (`com.ferrabled.veyro.run`), published by Fernando Rabasco ("ferrabled")
 **Contact:** ferrabled+veyro@gmail.com
 
@@ -96,7 +107,7 @@ Tilt mode reads your device's gyroscope/accelerometer to steer. Sensor readings 
 
 Your local game data — best scores, daily streak, recent run history, your equipped cosmetic, and preferences such as your last-used control mode — is saved in the app's local storage on your device only. Uninstalling the app removes it from the device; note that Android's automatic backup service may restore app data when you reinstall, depending on your device's backup settings — that is Android behaviour, not something the game controls. On iPhone, deleting the app removes this data too. It comes back only if you restore the whole iPhone from an iCloud or computer backup made while the app was installed, and offloading the app (in the iPhone Storage settings) keeps it.
 
-In versions with online profiles, the device additionally stores the profile's session and a **recovery code**. The recovery code exists so that the same profile — name, progress, leaderboard entries — can come back after you reinstall: Android's backup carries it across, and on the next launch the game exchanges it for your profile. On iPhone, deleting the app deletes the code too. After a delete and reinstall the profile comes back only if you copied its code first (PROFILE → RECOVERY CODE → COPY) and use IMPORT PROFILE on the new install, or if you restore the whole iPhone from a backup that contains it. It is a random secret that unlocks only this game profile; the server keeps only a scrambled fingerprint of it, never the code itself.
+In versions with online profiles, the device additionally stores the profile's session and a **recovery code**. The recovery code exists so that the same profile — name, progress, leaderboard entries — can come back after you reinstall: Android's backup carries it across, and on the next launch the game exchanges it for your profile. On iPhone, deleting the app deletes the code too. After a delete and reinstall the profile comes back only if you copied its code first (PROFILE → RECOVERY CODE → COPY) and use IMPORT PROFILE on the new install, or if you restore the whole iPhone from a backup that contains it. It is a random secret that unlocks only this game profile; the server keeps only a scrambled fingerprint of it, never the code itself. The game reads your clipboard only when you tap IMPORT PROFILE, to paste a recovery code; on iPhone, iOS asks you to allow that paste first.
 
 The recovery code is written to the app's own storage folder, and on some Android versions and devices that folder — and therefore the code — **survives uninstalling the app**. That is what lets a profile come back on a reinstall even when device backup is off, but it also means uninstalling is not a reliable way to erase it. On iPhone the code does not survive: deleting the app deletes it from the device, although an iCloud or computer backup made earlier still contains it until that backup is replaced or deleted. To remove the code deliberately: use **PROFILE → DELETE ONLINE PROFILE** inside the game (which deletes the code along with the profile it unlocks), or clear the app's data from Android's app settings (on iPhone, delete the app). Treat the code like a password while it exists: anyone who has it can claim the profile. If automatic recovery cannot replace a profile you have already played, the older code is kept separately on this device for support, while the current profile receives its own code. Deleting the online profile or clearing app data (on iPhone, deleting the app) also removes these saved codes; removing a saved code does not delete the separate older profile.
 
@@ -149,13 +160,44 @@ We use Layers to understand how players use the game and whether a notification 
 
 - **Off until you choose.** The Layers SDK does not start or contact Layers until you enable PROFILE → GAMEPLAY ANALYTICS. Your choice is remembered between launches. Declining has no effect on gameplay, purchases, leaderboards or notification delivery.
 - **What is sent after enabling.** A random analytics support ID and SDK installation/device and session identifiers; app version and build type; device model, operating system, language, time zone and screen information; app visits; notification opens; and real run starts and results, including mode, control choice, track/day/version, score, coins, distance and duration. A notification may carry campaign and variant labels so we can connect that click to a later run. The SDK also reports delivery diagnostics, such as queued/delivered/dropped event counts, retry status, SDK version and consent state, and one measurement of how long the SDK took to start, to help detect delivery problems. We do not send the notification text or arbitrary notification payloads to Layers.
-- **Approximate location.** Network requests expose your IP address to Layers. Layers states that it derives country and region from the address and then discards the raw IP. This is approximate location processing; the game does not request GPS/location permission.
+- **Approximate location.** Network requests expose your IP address to Layers. Layers' documentation states that it stores the IP address with the analytics events it receives, resolves it to an approximate country, region and city, and keeps these records while our Layers account is active unless they are deleted (see "Retention, access and deletion" below). This is approximate location processing; the game does not request GPS/location permission.
 - **What is excluded.** We disable advertising-ID and install-referrer collection, advertising consent, and automatic application crash/error reports and gameplay performance traces in this integration. SDK delivery diagnostics described above remain enabled while analytics is on. No camera frames, motion-sensor readings, recovery codes, email addresses or phone numbers are sent. Choosing camera controls sends only the control-mode label, never what the camera sees. This version uses a separate analytics ID rather than your Supabase player ID. On iPhone the game never asks for tracking permission (App Tracking Transparency).
 - **Turning it off.** PROFILE → GAMEPLAY ANALYTICS → TURN ANALYTICS OFF withdraws consent and shuts the SDK down, so nothing further is sent. While enabled, up to 200 pending events may be stored in the app's own storage area on your device (an app-specific folder that other apps cannot read) for delivery when connected. Events still unsent when you turn analytics off stay on the device and can never be sent while analytics is off; they are deleted the next time you enable analytics, or when you clear the app's data (on iPhone, delete the app). Events already delivered cannot be recalled by the switch. The support ID remains on the device so you can request deletion of earlier records.
 - **Retention, access and deletion.** Previously delivered analytics remains with Layers until deleted under its retention arrangements or a verified deletion request; turning off or uninstalling does not itself delete provider records. Copy PROFILE → GAMEPLAY ANALYTICS → COPY ANALYTICS SUPPORT ID, then email ferrabled+veyro@gmail.com to request access or deletion. The ID locates records; we verify control before acting. Requests are handled within 30 days, normally sooner. DELETE ONLINE PROFILE does not delete this separate analytics record. Enable analytics again after deletion and new records can be created.
 - **Provider and international processing.** Layers processes analytics for us and states that its primary processing region is the United States. Its data-protection documentation describes its processing, international-transfer arrangements and deletion process. Contact us with questions about our use of the service.
 
 Provider information: [Layers data protection](https://layers.com/docs/api/operational/data-protection).
+
+## Service providers, and how they protect your data
+
+We share data only with the providers below, only for the purposes described in this policy, and only under terms that require them to protect it to at least the same standard as this policy and to use it only to provide their service to us. We do not sell your personal data, and we do not share it for advertising.
+
+- **Supabase**: database for player profiles, runs and leaderboards (our processor).
+- **RevenueCat**: purchase management and restore (our processor).
+- **OneSignal**: notification registration, delivery and engagement measurement (our processor), delivering through **Firebase Cloud Messaging** on Android and the **Apple Push Notification service** on iPhone.
+- **Layers**: optional gameplay analytics, only after you enable it (our processor).
+- **Google Play** and **Apple's App Store**: payments, under their own terms and privacy policies (linked in the Purchases section).
+- **Cloudflare** and **Google Fonts**: hosting and fonts for this website only (see "About this website").
+
+**International processing.** Some of these providers process data outside your country, including in the United States. Where the law requires it, those transfers rely on the provider's safeguards, such as the European Commission's Standard Contractual Clauses.
+
+## How we protect your data
+
+- Everything the game sends travels over encrypted HTTPS connections.
+- The server never stores your recovery code, only a scrambled fingerprint of it, and a Player ID alone is never enough to act on a profile.
+- Access to the provider accounts that hold your data is limited to the developer.
+- We collect the minimum each feature needs: no real names, emails, phone numbers, contacts, precise location or camera images.
+- No system is perfectly secure. If a breach affected your data, we would inform affected players and the authorities as the law requires.
+
+## Legal bases, and your rights
+
+The developer, Fernando Rabasco, based in Spain, is responsible for the processing described here. Contact: ferrabled+veyro@gmail.com.
+
+- **Providing the game you use** (profile, leaderboards, run uploads, purchases and restoring them): performance of our agreement with you.
+- **Optional gameplay analytics and receiving notifications:** your consent, which you can withdraw at any time in PROFILE (this does not affect processing before the withdrawal).
+- **Fair-play and security checks, and notification registration and delivery measurement:** our legitimate interest in an honest leaderboard and a working, reliable service.
+
+Depending on where you live, you have the right to access, correct, delete or export your data, to restrict or object to its processing, and to withdraw consent. Use the in-game controls above or email us; we reply within one month. You can also complain to a data protection authority: in Spain, the Agencia Española de Protección de Datos ([aepd.es](https://www.aepd.es)), or the authority where you live. No decision with legal or similarly significant effects is made about you automatically; the fair-play checks only keep implausible runs off the leaderboards.
 
 ## Children
 
@@ -184,7 +226,7 @@ The challenge page (veyro.ferrabled.com/challenge/) works the same way: it reads
 
 ## Changes
 
-The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. The Notifications section was added on 20 September 2026, ahead of the notification-enabled update. The optional Gameplay analytics section was added on 21 September 2026, ahead of the analytics-enabled update, and its description of turning analytics off was corrected the same day, before distribution. The "Sharing a run, and challenge links" section was added on 28 September 2026, ahead of the challenge update. iPhone-specific wording (App Store payments, clipboard sharing, what deleting the app does to the recovery code, APNs delivery) was added the same day, ahead of the first iPhone version; it adds no new data collection. Future collection changes will be described here before distribution and reflected in the store listing.
+The Purchases section was added on 29 August 2026 and revised on 15 September 2026, ahead of the first distributed version that includes the in-game shop. The Player profile and leaderboards section was added on 18 September 2026 and clarified on 19 September 2026, ahead of the leaderboard update. Closed-beta versions distributed before the shop update contain no purchases and collect nothing. The Notifications section was added on 20 September 2026, ahead of the notification-enabled update. The optional Gameplay analytics section was added on 21 September 2026, ahead of the analytics-enabled update, and its description of turning analytics off was corrected the same day, before distribution. The "Sharing a run, and challenge links" section was added on 28 September 2026, ahead of the challenge update. iPhone-specific wording (App Store payments, clipboard sharing, what deleting the app does to the recovery code, APNs delivery) was added the same day, ahead of the first iPhone version; it adds no new data collection. On 29 September 2026 the sections on service providers, how we protect your data, and legal bases and your rights were added, the description of how Layers handles IP addresses was corrected to match Layers' documentation, and the clipboard use of IMPORT PROFILE was stated; none of these changes adds data collection. Future collection changes will be described here before distribution and reflected in the store listing.
 
 ## Contact
 
