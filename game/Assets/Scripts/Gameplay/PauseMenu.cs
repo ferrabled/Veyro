@@ -55,7 +55,12 @@ namespace MotionRunner.Gameplay
         static readonly Color SecondaryColor = Menu.MenuTheme.Slot;
         static readonly Color StatusColor = Menu.MenuTheme.Dim;
 
+#if UNITY_IOS
+        // An iPhone has no back button; RESUME, right under this line, is the way back.
+        const string IdleHint = "tap RESUME to carry on";
+#else
         const string IdleHint = "back button resumes";
+#endif
         const string SettlePrompt = "stand still…\n— or tap RESUME";
         const string HopPrompt = "hop twice when ready\n— or tap RESUME";
         const string OneMoreHopPrompt = "one more hop…\n— or tap RESUME";

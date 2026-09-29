@@ -188,7 +188,12 @@ namespace MotionRunner.Track
                 {
                     new GuideRow("DAILY", "everyone runs today's track, so scores compare with a friend's"),
                     new GuideRow("COINS", "add to your score; a chain builds a combo, a miss resets it"),
+#if UNITY_IOS
+                    // An iPhone has no back button.
+                    new GuideRow("PAUSE", "II (bottom left): resume, restart or leave")
+#else
                     new GuideRow("PAUSE", "II (bottom left) or back: resume, restart or leave")
+#endif
                 },
                 null,
                 RunIllustration, 1, "coins, the combo and the pause button")

@@ -116,6 +116,9 @@ namespace MotionRunner.CameraInput
 
             _feed?.Dispose();
             _feed = null;
+#if UNITY_IOS && !UNITY_EDITOR
+            Screen.sleepTimeout = SleepTimeout.SystemSetting;
+#endif
             _probe = null;
             _orientationConfident = false;
             Latest = default;
@@ -195,6 +198,13 @@ namespace MotionRunner.CameraInput
 #endif
 
                 State = RigState.StartingCamera;
+#if UNITY_IOS && !UNITY_EDITOR
+                // Camera mode is hands-free - phone propped up, player stepped back - so no touch
+                // resets iOS's Auto-Lock (as short as 30 s, and 30 s in Low Power Mode), which
+                // would lock the phone mid-staging or mid-run. Awake while the rig holds the
+                // camera; Suspend and TearDown hand the timer back.
+                Screen.sleepTimeout = SleepTimeout.NeverSleep;
+#endif
                 for (int i = 0; i < 600 && !_feed.TryStart(); i++)
                 {
                     await Awaitable.NextFrameAsync();
@@ -375,6 +385,9 @@ namespace MotionRunner.CameraInput
             _feed?.Dispose();
             _detector = null;
             _feed = null;
+#if UNITY_IOS && !UNITY_EDITOR
+            Screen.sleepTimeout = SleepTimeout.SystemSetting;
+#endif
 
             // Unlike Suspend, this is the end of the rig: quitting to the menu or a failure both
             // land here, and whatever comes next re-does the whole staging, probe included.
