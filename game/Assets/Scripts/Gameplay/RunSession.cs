@@ -125,9 +125,16 @@ namespace MotionRunner.Gameplay
             _board.Migrate();
 
             // Free mode needs a run-to-run seed source. The seed source may be arbitrary; the
-            // generation it drives may not be (CLAUDE.md rule 4), which is why the tick count is
+            // generation it drives may not be (CLAUDE.md rule 4), which is why the salt is
             // sampled exactly once, here, and never inside the generator.
+#if UNITY_IOS
+            // iOS: a random GUID, not the tick count. The salt ends up in free-run challenge
+            // links, and the tick count is time since boot - which the privacy manifest's
+            // SystemBootTime reason 35F9.1 (IosPrivacyPostProcess) forbids sending off the device.
+            _sessionSalt = Guid.NewGuid().GetHashCode();
+#else
             _sessionSalt = Environment.TickCount;
+#endif
 
             if (Hud != null) Hud.RestartRequested += RequestRestart;
             StartRun();

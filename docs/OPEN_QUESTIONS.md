@@ -235,8 +235,12 @@ the question. Keep this file short; it is read every session.
     → `device_test`). Only transport-level 2xx receipt was observable, so (b) below narrows to the
     Layers **Events-screen** confirmation.
     **Still owner actions:** (a) confirm no advertising/CAPI destinations are connected in the
-    Layers dashboard; (b) confirm the events arrived on the Layers Events screen (the device side
-    of enable / off / relaunch / re-enable is now verified). **License question downgraded:** upstream still ships
+    Layers dashboard — **done 29 Sep:** the dashboard shows Ads 0 / 5 streams (Meta, TikTok,
+    Apple Search Ads, Google, ChatGPT all unconnected) and Measurement 1 / 4 (only the Layers SDK
+    stream "Veyro Run"; PostHog, RevenueCat and Stripe unconnected), so Layers' SKAdNetwork calls
+    are never armed on either platform; (b) confirm the events arrived on the Layers Events screen
+    (the device side of enable / off / relaunch / re-enable is now verified on Android; on iOS this
+    is device-checklist item 6 in `IOS_BUILD_RUNBOOK.md`). **License question downgraded:** upstream still ships
     no LICENSE or package license field, but we redistribute no modified SDK source any more, so
     asking Layers to add one is a courtesy request. *Recommended default: not a release gate;
     send the request, ship the stock SDK. SDK analytics only, advertising off, explicit opt-in,
@@ -268,3 +272,99 @@ the question. Keep this file short; it is read every session.
     upgrades the experience (the link stops bouncing through the browser). Owner action when
     ready: paste the fingerprint into `site/public/.well-known/assetlinks.json` (see
     `docs/PLAY_CONSOLE_SETUP.md` §F) and `npx wrangler deploy`.
+
+25. **Record in DECISIONS.md: OneSignal 5.4.0 with the location module off** (decided in the 28 Sep
+    planning session, IOS_HANDOFF decisions 5a/6 — for the owner to move to DECISIONS). Unity
+    core/android/ios 5.4.0 (native Android 5.10.2, iOS `OneSignalXCFramework` 5.7.0);
+    `ProjectSettings/OneSignalSettings.json` `{"disableLocation": true}`. Without it the SDK's
+    iOS post-processor writes `NSLocationWhenInUseUsageDescription`, which is an ITMS-90683 purpose
+    string for a feature the game does not have. Step A verified it on Android: permissions and
+    badging identical, +158,029 bytes, the subscription survived. **Still open (owner, Step A):
+    one Android test push, backgrounded and closed, before any Android release.** It does not
+    block iOS. *Recommended default: keep. The fallback (5.1.15) would mean accepting the iOS
+    location warning.*
+26. **Record in DECISIONS.md: "hop twice" replaces raise-hand, and BlazePose leaves the shipping
+    build** (decided in the 28 Sep planning session, decision 7; the owner approved it on the
+    OnePlus 6T the same evening — for the owner to move to DECISIONS). The confirm:
+    - stand still 1 s inside a ~5 cm / 6.4 cm / ±12 % box;
+    - a hop counts only when it lands within ~4.5 cm of the settled height after a peak of at
+      least ~3.2 cm, on the spot (±~7.5 cm) and at the same distance (±8 %);
+    - two take-offs at most 2 s apart confirm;
+    - straying ~10 cm / ±20 %, a crouch, an unlanded take-off (1 s) or the face gone for more than
+      0.5 s restarts it;
+    - RESUME by touch always works;
+    - the run's own steering is reset when the countdown starts.
+
+    The owner chose to keep the known behaviour where a head bob at desk distance (~40 cm) passes
+    as a hop. Release APK −11.92 MiB. This supersedes item 13's raise-hand bullets. The dials
+    are in `CAMERA_TUNING.md`. *Recommended default: record as is.*
+27. **Record in DECISIONS.md: the export strips two SDK sources and compiles C stubs in their
+    place** (decided in the 28 Sep planning session, decision 5b; the step counter was found in
+    Phase 0 and is the same class of problem — for the owner to move to DECISIONS).
+    `IosPrivacyPostProcess` (order 1100) deletes Layers' `LayersATTBridge.m` (ATT + IDFA) and the
+    Input System's `iOSStepCounter.mm` (CMPedometer) from every iOS export. It compiles header-free
+    C stubs exporting the same six `layers_att_*` / five `_iOSStepCounter*` symbols: no prompt,
+    status 0, NULL IDFA/IDFV, no pedometer. It fails the export if either SDK file changes or a
+    forbidden key or framework survives. `LayersAttStubTests` pins the stubs against the SDK
+    sources. So the build **never** carries `NSUserTrackingUsageDescription`,
+    `NSMotionUsageDescription` or any `NSLocation*` key, and Layers sends no Apple identifier on
+    iOS. Consequence: a future feature that needs tracking, a pedometer or location means lifting
+    this strip, adding the purpose string, and changing the App Privacy answers. *Recommended
+    default: record as is.*
+28. **Record in DECISIONS.md: the Keychain is deferred on iOS** (decided in the 28 Sep planning
+    session, decision 3 — for the owner to move to DECISIONS). The recovery key stays in the
+    plaintext `persistentDataPath/veyro-recovery.txt` (`userId:key`), as on Android.
+    - The difference on iOS: deleting the app deletes the file. Android's Auto Backup restores it
+      on reinstall; on iOS only a full-device iCloud/computer restore does.
+    - The player's way back: COPY on the recovery-code row, then IMPORT PROFILE (iOS shows its own
+      "Allow Paste" alert). Purchases return through RESTORE PURCHASES either way.
+    - The reason is in `PROFILE_LEADERBOARD_PLAN.md` "iOS storage"; the privacy wording is item 32.
+
+    *Recommended default: record; revisit after the hackathon (a Keychain item survives
+    deletion).*
+29. **Record in DECISIONS.md: SHARE copies to the clipboard on iOS, with a 2 s "COPIED" label, and
+    there is no native share sheet** (decided in the 28 Sep planning session, decision 4; the owner
+    did not object — for the owner to move to DECISIONS). `RunShare.Share` returns
+    `ShareSheet.Send`'s answer. Under `UNITY_IOS` the result card's SHARE label reads COPIED for 2 s
+    (`Track/CopiedFlash`, 8 tests). Without it, a silent copy reads as a dead button to App Review
+    (2.1). A `UIActivityViewController` would need a native plugin that could only be tested
+    through TestFlight. *Recommended default: record; a native sheet is a post-launch option.*
+30. **Confirm: the free-run challenge salt is a GUID on iOS** (Phase 3, 28 Sep — not a planning
+    session call; for the owner to confirm and move to DECISIONS). `RunSession.Start` sets
+    `_sessionSalt = Guid.NewGuid().GetHashCode()` under `#if UNITY_IOS`; Android keeps
+    `Environment.TickCount`, so the Android APK is unchanged. The reason: the salt reaches
+    free-run challenge links (the `s=` seed). `Environment.TickCount` is time since boot, and the
+    privacy manifest's SystemBootTime reason 35F9.1 forbids sending boot-derived values off the
+    device. Determinism is unaffected (CLAUDE.md rule 4): the salt is the seed *source*, sampled
+    once; generation still runs only from `RunSeed`, and `RunSeedTests` did not change.
+    *Recommended default: keep. Optionally use the GUID on Android too with its next release (no
+    store rule requires it).*
+31. **Website copy is still Android-only — reword before App Review?** App Store Connect links the
+    site (support + privacy URLs), and guideline 2.3.10 dislikes other platforms' names in
+    anything the review sees:
+    - `site/public/terms/index.html:50–52`: purchases "processed by **Google Play**", Google Play
+      refunds, unlocks "tied to your Google Play account";
+    - `site/public/support/index.html`: lines 44, 47, 50, 53, 59, 62, 68 and 71 name Google
+      Play / Android (purchases, restore, recovery via Android backup, "Android notifications");
+    - the footer on every page (`index.html:267`, `support/index.html:85`, …) reads "Veyro Run
+      for Android · Google Play is a trademark of Google LLC";
+    - the home page's CTA says "Coming to Google Play" (`index.html:51–53`).
+
+    *Recommended default: before submitting 1.0 for review, make the terms and support answers
+    platform-neutral ("the App Store or Google Play", "your store account"). Add an App Store line
+    to the footer once the app is live (the App Store button waits for a live URL, like
+    `challenge.js:114`). One `npx wrangler deploy`.* Owner call: agents didn't touch the site
+    beyond item 32.
+32. **Review and deploy the changed privacy wording before App Review.** Phase 2c edited
+    `docs/PRIVACY_POLICY.md` and `site/public/privacy/index.html` for iPhone. The changes:
+    - the recovery code does not survive deleting the app on iOS;
+    - App Store payments;
+    - clipboard share;
+    - APNs delivery;
+    - no tracking prompt.
+
+    App Store Connect links that page (`APP_STORE_LISTING.md` §3), so the live site must say it
+    before review. *Recommended default: owner reads the diff, then `npx wrangler deploy` from
+    `site/`.* Also still open for the iOS release: **item 22(a)**, confirming no advertising /
+    SKAdNetwork / CAPI destinations in the Layers dashboard. Layers' SKAN calls are armed only by
+    its remote config, and the App Privacy "no tracking" answer relies on that.

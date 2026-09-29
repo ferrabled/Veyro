@@ -1,5 +1,269 @@
 # Status journal (newest at top)
 
+## 2026-09-28 — iOS integration: first Xcode export verified end to end, runbook and device checklist (feat/iOS-implementation, Phase 3)
+
+Phases 0/1/2a/2b/2c integrated and compiled together for the first time. Both scratches synced
+(`robocopy /E`, 35 changed files SHA-256-matched, `diff -rq` Assets/Packages/ProjectSettings clean)
+before every trusted run. 2a/2b/2c compiled and passed with no fix; a define-aware Android text
+check then found two Phase 2c leaks into the Android player, fixed with the iOS code proven
+identical: `CopiedFlash` now sits under `#if UNITY_IOS || UNITY_EDITOR` (like `IosPushFlow`), and
+`RunShare.Share` is `bool` under `UNITY_IOS` only, HEAD's `void` elsewhere. Own change:
+`RunSession.Start` salts free runs with `Guid.NewGuid().GetHashCode()` under `UNITY_IOS` (the salt
+reaches challenge links; boot time may not leave the device under 35F9.1); Android keeps
+`Environment.TickCount`. No test pins the salt source.
+
+**Verified.** EditMode **661/661** in both scratches (633 + 4 Phase 1 + 11 `IosPushFlowTests` +
+8 `CopiedFlashTests` + 5 `LayersAttStubTests`), before and after the fixes. `BuildIOS` (build 1,
+224 s warm): `[iOS privacy] Verified: …`, manifest "4 API entries merged into 4 categories … 7
+collected data types", `Build OK`. New `docs/tools/inspect_ios_export.py` (stdlib, parses the
+pbxproj; reusable per release and on the Mac): **61/61 PASS** — forbidden keys absent from all
+three Info.plists, NSE version = app, three targets, stubs in UnityFramework Sources, AdServices +
+StoreKit weak, no ATT/AdSupport/CoreLocation, one PrivacyInfo per target, team 69J7W5URX7 +
+Automatic, iOS 15.0, iPhone only, entitlements, OneSignal 5.7.0 subspecs, Burst 1,814,304 B, icon
+RGB, manifest reasons, `clang -fsyntax-only` on both stubs, `llvm-nm -u` over 5 binaries clean.
+The export carries the iOS copy, not the Android copy, with the `appl_` key active. Zip
+(`docs/tools/zip_ios_export.py`, exec bits kept, Burst debug folder out):
+`builds/ios/VeyroRun-xcode-b1.zip` (scratch and worktree copies), 314,301,067 B, SHA-256
+`d3b67f9c…7f7724`. Android `BuildAndroid` vs Step B: 70,975,507 vs 70,975,411 B, permissions +
+badging identical, `libil2cpp.so` / `global-metadata.dat` / `classes.dex` / `libunity.so`
+CRC-identical. Left: two script records (`IosPushFlow.cs`, `CopiedFlash.cs`: Unity lists every
+file of a player assembly even when its content compiles out; +368 B in `globalgamemanagers*`) and
+the usual noise. Before the 2c fix: `libil2cpp` +608 B, metadata +424 B.
+
+**Docs.** `docs/IOS_BUILD_RUNBOOK.md`: Windows export, Mac (Xcode 26+, CocoaPods), `xattr`,
+`chmod`, `pod install --repo-update`, workspace, signing + capability-card check, GameAssembly,
+UnityRuntime CodeSignOnCopy, pre-upload `plutil` / `nm -u` / `otool -L` scan, upload, TestFlight
+"Friends", fix loop, kill switches (removing OneSignal's native side also needs
+`Assets/OneSignal/Editor/OneSignaliOSDependencies.xml` deleted, a new finding), the two one-line
+device fixes, and the device checklist last. BACKLOG T-032 🚧; OPEN_QUESTIONS 25–32 (six calls to
+move to DECISIONS, site copy, privacy-page deploy). Informational: the unused `goog_`/`test_`
+consts are in the iOS metadata (`ActiveKey` is `appl_`); with the OneSignal kill switch on, the
+NOTIFICATIONS row still opens an "unavailable" panel; the runbook's Xcode UI claims are unverified
+until the Mac. **Needs owner:** the runbook on the cloud Mac, TestFlight, the device checklist;
+OPEN_QUESTIONS 31–32 before App Review; Step A's Android test push; 22(a).
+
+## 2026-09-28 — Layers on iOS without ATT: bridge strip, privacy manifests, App Store privacy docs (feat/iOS-implementation, Phase 2b)
+
+IOS_HANDOFF decision 5b. `LayersAnalyticsService.Create()` is real on `!UNITY_EDITOR && (UNITY_ANDROID ||
+(UNITY_IOS && !VEYRO_NO_LAYERS))` (Android compiles to the same code), still off until the player
+opts in; the game never calls `RequestTrackingPermission`; no `LayersSettings` asset exists or is
+created (Layers' own post-processor stays inert). New `IosPrivacyPostProcess` (order 1100) on every
+iOS export: refuses a `LayersSettings` asset; deletes Layers' `LayersATTBridge.m` **and** — Phase 0's
+finding — the Input System's `iOSStepCounter.mm` (CMPedometer; Input System 1.20 has no supported
+switch, its `motionUsage` setting only *adds* `NSMotionUsageDescription`, and `iOSSupport.Initialize`
+calls `_iOSStepCounterIsAvailable` at every launch) from the project and disk, and compiles
+header-free C stubs (`IosNativeStubs`, `Libraries/VeyroPrivacyStubs/*.m`) exporting the same six
+`layers_att_*` / five `_iOSStepCounter*` symbols (no prompt, status 0, NULL IDFA/IDFV → Layers sends
+no Apple identifier; pedometer "restricted"); weak-links AdServices + StoreKit on `UnityFramework`;
+strips ATT/AdSupport/CoreLocation links and `NSUserTrackingUsageDescription` / `SKAdNetworkItems` /
+`NSAdvertisingAttributionReportEndpoint` / `NSMotionUsageDescription` / `NSLocation*` from all three
+Info.plists; rewrites `UnityFramework/PrivacyInfo.xcprivacy` (Unity's concatenation de-duplicated;
+tracking false, no domains; reasons CA92.1, C617.1 + 0A2A.1, 35F9.1, E174.1 — `UnityRuntime` is a
+static archive inside `UnityFramework` referencing NSUserDefaults / mach_absolute_time / statvfs that
+Unity's own manifest omits; 7 collected types = listing §3, dropped per kill switch; no third
+`PrivacyInfo.xcprivacy` under `Plugins/iOS`, Unity would only concatenate it); then re-reads
+everything and fails the export on any surviving key, framework, stripped source, purpose-string
+API in `Libraries/`, `UNITY_USES_IAD` / `UNITY_USES_LOCATION` ≠ 0, `OneSignalLocation` pod, or
+manifest collision. `LayersAttStubTests` (5) parse `ATTModule.cs` / `iOSStepCounter.cs` from the
+package cache and pin names + ABI shape, so SDK drift fails loudly. Docs: `APP_STORE_LISTING` §3
+(Tracking = No stated; Device ID rests on the RevenueCat/OneSignal/Layers installation IDs, no
+IDFV; Coarse Location is IP-derived) and §7 ("not in Info.plist, ever" table + the manifest),
+`STORE_COMPLIANCE` "iOS / App Store" register + flip table, `LAYERS_STOCK_SDK_REVIEW` iOS addendum.
+No App Store Connect answer changes.
+
+**Verified** (no Unity run in this phase): both stubs `clang --target=arm64-apple-ios15.0
+-fsyntax-only -ffreestanding` exit 0 (also `-Werror` strict, and as ObjC+ARC); symbols match
+IL2CPP's generated externs (`Layers.Unity.cpp:3760–3765`, `Unity.InputSystem__6.cpp:7342–7346`);
+`llvm-nm -u liblayers_core.a`: 0 ATTracking/ASIdentifier/CLLocation; the post-process regexes were
+dry-run against the real Phase 1 export. Compiled, tested and exported in Phase 3 (entry above).
+**Needs device:** Layers enable → events, disable, **no ATT prompt ever** (§9 item 6).
+**Found:** free-run challenge links carried an `Environment.TickCount` salt (boot-time-derived, reason
+35F9.1 forbids sending derived values off-device) — fixed in Phase 3 under `UNITY_IOS`; IMPORT
+PROFILE shows iOS's "Allow Paste" alert; `Documents` (Layers queue, recovery file) is in iCloud
+backups; `UnityRuntime.framework` is embedded with CodeSignOnCopy although its binary is an `ar`
+archive (Unity's stock layout — watch it at Mac archive validation); Layers' SKAN calls are armed
+only by its dashboard remote config (OPEN_QUESTIONS 22a stays relevant).
+
+## 2026-09-28 — Camera mode on iOS: permission flow and copy (feat/iOS-implementation, Phase 1)
+
+On the iOS player the rig now asks through `Application.RequestUserAuthorization(WebCam)` (after
+the speed gate, as before) and awaits the answer (`Awaitable.FromAsyncOperation`, cancelled by the
+rig's destroy token) instead of the Android 900-frame poll. Before this, `CameraFeed.HasPermission()`
+was `true` on iOS, the alert came up inside `WebCamTexture.Play()` and a denial surfaced ~10 s later
+as "camera delivered no frames". iOS asks once per install, so a denial, first or later, now fails
+at once with `camera access is off`, and the mode picker (iOS only) reads `camera access is off` /
+`— allow it in Settings, or play with tilt` with both buttons re-enabled (TILT one tap away). The
+iOS error line drops "see logcat". Android strings and behaviour are untouched: every change is
+under `#if UNITY_IOS` (proved by a define-aware preprocess diff,
+`C:\scratch\veyro-ios\p1_android_text_check.py`: Android player and editor text identical).
+Mirror twin corrected: in portrait (a quarter turn) `(r,!f)` is the left-right mirror of `(r,f)`
+and the probe's second candidate; `(r+180,!f)` is the twin only at 0/180 (upside down in
+portrait). Comments in `OrientationProbe`, `FaceTrackingRig`, `FrameOrientation` and the probe
+test fixed; the twin test now uses the real twin. A wrong reported flip in portrait is therefore
+kept by the probe; the fix is pre-staged as `CameraFeed.InvertReportedFlip` (iOS player only,
+`false`, a no-op until the device says otherwise; decision 2). Orientation, gate and steering
+behaviour unchanged. `docs/CAMERA_TUNING.md` gained an "iOS" section.
+
+**Verified** (iOS scratch, only the 8 owned files copied, SHA-256 matched): EditMode **637/637**
+(+4: three FrameOrientation twin-geometry pins, `AWrongReportedFlipInPortraitIsKept`). `BuildIOS`
+(build number 1) OK; the export's `global-metadata.dat` carries the iOS strings and none of the
+Android ones, and the IL2CPP output calls `Application_RequestUserAuthorization`.
+**Runbook one-liners:** camera steering inverted → `CameraFeed.InvertReportedFlip = true` (not
+`UseDeviceReportedOrientation()`: the rig and the probe fallback read `ReportedVerticallyMirrored`
+directly); tilt inverted → negate `raw` in `GyroTiltInput.Tick()` under `UNITY_IOS`.
+**Needs human device test** (IOS_HANDOFF §9 item 2): alert only after CAMERA and "checking device
+speed…"; Don't Allow → the two lines above at once, TILT works; re-tap → same lines, no alert;
+allow in Settings → CAMERA works without relaunch; **step left → lane left**.
+
+## 2026-09-28 — iOS platform copy, share feedback, deep links and profile storage notes (feat/iOS-implementation, Phase 2c)
+
+- Shop copy split for App Review 2.3.10 (`Menu/StoreCatalogView.cs`, `#if UNITY_IOS`): "opening the
+  App Store…" and "payment pending with Apple…"; Android strings unchanged. Sweep of every
+  user-visible "Android / Google / Play" string in `game/Assets/Scripts`: only those two were
+  unsplit (NotificationPanel is split by 2a, FaceTrackingRig's "see logcat" by Phase 1; the rest are
+  identifiers, comments, or "play" the verb). `GameLinks.PlayStoreUrl` is unused and left.
+- **SHARE feedback on iOS:** `RunShare.Share` now returns `ShareSheet.Send`'s bool; under
+  `#if UNITY_IOS` the result card's SHARE label reads "COPIED" for 2 s and reverts (`RunHud` + new
+  engine-free `Track/CopiedFlash`, 8 EditMode tests pin the timing). Without it the iPhone tap
+  looked dead (App Review 2.1 risk). Android text and behaviour unchanged.
+- Comments only: `ShareSheet` (iOS = clipboard, decision 4) and `SupabaseProfileService` (same
+  recovery file on iOS, Keychain deferred, decision 3).
+- Deep links: no code change. `DeepLinks` uses `absoluteURL` (cold) + `deepLinkActivated` (warm)
+  with no platform guard; the `veyro` scheme is set by `BuildIOS` and asserted by
+  `IosBuildPostProcess`. No Universal Links yet. iOS runs submit platform `"ios"`
+  (`RunSession.cs:431`), accepted by `validate.ts` and migration `0001`.
+- Docs: `PROFILE_LEADERBOARD_PLAN` "iOS storage" (why the Keychain is deferred; deleting the app
+  deletes the code; COPY → IMPORT PROFILE and RESTORE PURCHASES still work; IMPORT triggers iOS's
+  "Allow Paste" prompt). `SHARE_COMPLIANCE` §12 iOS addendum (no App Privacy row for a clipboard
+  write; `challenge.js:114` Play fallback deferred until an App Store URL exists; the 1.5 s timer
+  may jump to Play while Safari's "Open in Veyro Run?" prompt is up — device check).
+  `PRIVACY_POLICY.md` + `site/public/privacy/index.html`: iPhone wording (the recovery code does
+  not survive deleting the app; App Store payments; clipboard share; APNs; no tracking prompt).
+- Edit-only; compiled and tested in Phase 3 (entry above). **Needs owner:** review the privacy
+  wording, then `npx wrangler deploy` from `site/` before App Review (App Store Connect links the
+  page); decide on the still Android-only support page, `terms/index.html:52` and the site footer.
+  **Needs human device test:** §9 items 7–9 (veyro:// cold/warm; https link → page → OPEN; SHARE →
+  COPIED → paste; COPY recovery code → IMPORT PROFILE).
+
+## 2026-09-28 — OneSignal on iOS: permission flow, Settings routing, panel copy (feat/iOS-implementation, Phase 2a)
+
+`OneSignalPushService.Create()` is now real on `!UNITY_EDITOR && (UNITY_ANDROID || (UNITY_IOS &&
+!VEYRO_NO_ONESIGNAL))`; the kill switch keeps the Fake. On iOS an ENABLE tap goes through the new
+`RequestIosPermission()` (`#if UNITY_IOS && !UNITY_EDITOR`): already allowed → opt in; prompt still
+available → `RequestPermissionAsync(false)` (30 s bound, never OneSignal's own Settings alert);
+answered/denied → `Application.OpenURL("app-settings:")`. OneSignal makes the iOS request itself, so
+`CanRequestPermission` (native `!answeredPrompt`) is exact there and Android's USER_FIXED dead end
+does not carry over; a first "Don't Allow" never jumps to Settings, the panel switches to ALLOW IN
+SETTINGS and the next tap goes there. OptIn stays granted-only (on iOS it would re-request with
+`fallbackToSettings`). Foreground `PreventDefault` is unchanged and native on iOS. `NotificationPanel`
+takes its iOS body/label from the new engine-free `IosPushFlow` (`#if UNITY_IOS || UNITY_EDITOR`):
+"Settings" / "your iPhone", ALLOW IN SETTINGS, no platform names (guideline 2.3.10). Android's
+compiled text of both files is unchanged (comments/directives only); `IosPushFlow` never reaches the
+Android player. New `IosPushFlowTests` (11 cases). SDK members were checked against the 5.4.0
+package source (`iOSNotificationsManager.cs`, `OneSignalUnityBridgeNotifications.mm`). Edit-only:
+compiled, tested and exported in Phase 3 (entry above). Export facts for the scripted inspection:
+NSE target + bundle id, `aps-environment=production`, the app group on both targets,
+`UIBackgroundModes=[remote-notification]`, OneSignal 5.7.0 subspecs, NSE version = app version
+(ITMS-90473). The NSE's `TARGETED_DEVICE_FAMILY "1,2"` vs the app's `1` needs no fix (OneSignal's
+deliberate choice; Apple's same-family rule is App Clip-only). **Needs human device test:** the
+§9 item 5 sequence on a fresh install (iOS asks once): no prompt at launch → ENABLE → Don't Allow →
+Blocked copy → ALLOW IN SETTINGS opens Settings → allow → ENABLE → NOTIFICATIONS ON with no alert →
+test push backgrounded/closed opens the game → no foreground banner. Loose end: with the kill switch
+on, the PROFILE → NOTIFICATIONS row still opens an "unavailable" panel (`ProfileSettingsCard`).
+
+## 2026-09-28 — iOS build infrastructure: BuildIOS export, guards, icons, EDM4U (feat/iOS-implementation, Phase 0)
+
+`BuildScript.BuildIOS()` (needs `-buildTarget iOS`) exports a signed-ready, device-SDK Xcode project
+from Windows to `builds/ios/VeyroRun-xcode/` (wiped first), with every iOS player setting applied
+from code and restored in `finally`: bundle id `com.ferrabled.veyro.run`, version 1.0.0,
+`CFBundleVersion` from the **required** env `VEYRO_IOS_BUILD_NUMBER`, iPhone only, iOS 15.0, IL2CPP
+arm64, portrait, status bar hidden, full screen, team `69J7W5URX7` with automatic signing, the
+listing's exact camera string, the `veyro` scheme, no splash. iOS defines: `APP_UI_EDITOR_ONLY;VEYRO_STORE_BUILD`
+(+ `VEYRO_NO_ONESIGNAL` / `VEYRO_NO_LAYERS` from env `VEYRO_IOS_NO_ONESIGNAL=1` / `VEYRO_IOS_NO_LAYERS=1`;
+any other value fails). Release only; no Simulator or dev flavour (IOS_HANDOFF decision 1).
+`RevenueCatKeys.AppStoreKey` (`appl_…`) and its `ActiveKey` branch sit under `UNITY_IOS`, so the
+Android compiled output is unchanged. `StoreBuildGuard.CheckIos` (−1000) fails an iOS build without
+`VEYRO_STORE_BUILD`, with `VEYRO_DEV_STORE`, without an `appl_` key, as Development, with a wrong
+bundle id, an empty camera string or a non-positive build number, and refuses an editor not compiled
+for iOS. `ProjectSetup.EnsureAppIcon` also fills all 19 iOS icon slots (incl. the 1024 App Store
+icon) when compiled for iOS. New `IosBuildPostProcess` (order 1000, after RevenueCat's 999; Phase 2b
+goes at 1100) sets `ITSAppUsesNonExemptEncryption=false`, asserts the camera string and the scheme,
+sets `CODE_SIGN_STYLE=Automatic` + team on `Unity-iPhone` and the OneSignal NSE, and checks the
+App Store icon has no alpha (rewrites it as RGB if Unity ever emits RGBA). EDM4U
+(`GvhProjectSettings.xml`, keys verified against IOSResolver 1.2.188 source): CocoaPods with
+workspace integration, SPM off, no pod-tool install, pod install skipped on Windows.
+
+**Verified** (new iOS scratch `C:\scratch\veyro-ios`, `Library` seeded from the Android scratch;
+both scratches audited byte-identical to the worktree). EditMode **633/633** with `-buildTarget iOS`.
+`BuildIOS` with build number 1: OK (10.5 min cold, 1.5 min warm); without the env var: exit 1 with a
+clear message, `ProjectSettings.asset` byte-identical afterwards. Export (1.4 GB, 3,513 files):
+Info.plist 1.0.0 (1), exact camera string, `veyro` URL type, encryption false,
+`UIBackgroundModes=[remote-notification]`, portrait only, `UIRequiredDeviceCapabilities=[arm64, metal]`,
+**no** `NSLocation*` / `NSUserTrackingUsageDescription` / `SKAdNetworkItems`. Podfile: iOS 15.0,
+static frameworks, `PurchasesHybridCommon` 18.31.0 (+UI), `OneSignalXCFramework/OneSignal` +
+`/OneSignalInAppMessages` 5.7.0 on the app, `/OneSignalExtension` on the NSE, no `OneSignalLocation`,
+no SPM. Targets `Unity-iPhone`, `UnityFramework`, `OneSignalNotificationServiceExtension`,
+`GameAssembly`; `aps-environment=production` + app group `group.com.ferrabled.veyro.run.onesignal`
+on the app, the group on the NSE; `ONESIGNAL_DISABLE_LOCATION=1` on `UnityFramework`;
+`Libraries/lib_burst_generated.a` (1.8 MB, Inference Engine jobs referenced) present; all ten icons
+RGB without alpha. Android `BuildAndroid` vs the Step B reference: 70,975,415 vs 70,975,411 bytes,
+permissions + badging identical, `libil2cpp.so` / `global-metadata.dat` / `classes.dex` CRCs
+identical (only the known build-to-build noise).
+
+**Found for later phases:** Input System 1.20's `iOSStepCounter.mm` (CMPedometer) compiles into
+`UnityFramework` — a likely ITMS-90683 `NSMotionUsageDescription` warning, same class as the Layers
+ATT bridge (Phase 2b decides). The merged `UnityFramework/PrivacyInfo.xcprivacy` (Unity + Layers
+reasons) lacks `NSPrivacyTracking`/`NSPrivacyTrackingDomains`/`NSPrivacyCollectedDataTypes` and lists
+FileTimestamp twice. AdServices/StoreKit arrive by autolinking, not as pbxproj frameworks. OneSignal's
+NSE is `TARGETED_DEVICE_FAMILY 1,2` while the app is `1`; its pbxproj write drops the
+`SystemCapabilities` attributes (entitlement files are right) — check Signing & Capabilities on the
+Mac. After each `BuildIOS` the scratch's `ProjectSettings.asset` gains the iOS icon slots and a few
+explicit iPhone defaults (`appleEnableAutomaticSigning: 2`, an `applicationIdentifier` iPhone
+entry, backend/architecture/define entries): audit noise, never copied back. **Mac side:** `xattr -dr
+com.apple.quarantine`, `chmod +x` the il2cpp tools under `Il2CppOutputProject/IL2CPP/build/deploy_*`
+and the `*.sh`, `pod install --repo-update`, open `Unity-iPhone.xcworkspace` (exists only after
+`pod install`); the `GameAssembly` target compiles IL2CPP C++ inside Xcode.
+**Next:** Phase 1 (iOS camera) and Phase 2a/2b/2c in parallel, then Phase 3 integration.
+
+## 2026-09-28 — Hop-twice resume replaces raise-hand; BlazePose out of the shipping build (feat/iOS-implementation, Step B)
+
+Owner decision 7 (`docs/IOS_HANDOFF.md`). The camera pause-resume confirm is now "stand still,
+then hop twice" (`Pose/DoubleHopConfirm`, engine-free) instead of the BlazePose raise-right-hand
+probe. Deleted `PoseGestureProbe`, `RaisedHand` (+ `RaisedHandTests`) and the three pose assets
+from `CameraInput/Resources` (only `blaze_face_short_range.onnx` and `ImageTransform.compute`
+remain). `PauseMenu` gives the confirm its own `CameraFaceInput`; the confirm resets that steering
+at every stand-still (1 s, ~5 cm / 6.4 cm / ±12 % box) so the baseline is where the player now
+stands, counts a hop only when it lands back on the spot, needs two take-offs ≤ 2 s apart from the
+ground, and starts over on any stray, crouch, unlanded take-off or face loss > 0.5 s. The wait judges
+"still there" off that steering with a 0.75 s grace (`FaceGraceSeconds`), not the staging's strict
+Ready (hops blur frames). Prompts: "stand still…" → "hop twice when ready" → "one more hop…", each
+"— or tap RESUME"; overlay caption + ^ marks. Guide camera line: "…hop twice to come back."
+`PauseMenu.CountdownStarted` → `RunFlow.RecalibrateForResume` resets the run's own steering when
+the 3-2-1 starts, so the resumed run calibrates on the player standing still after the hops (before:
+calibrated on the walk-in, device nx 0.84 vs x 0.40 → side lane held; a pre-existing flaw of the
+raise-hand flow too). `CLAUDE.md`/`AGENTS.md` rule 3, `CAMERA_TUNING.md`, `GUIDE_ILLUSTRATIONS.md`,
+two other docs and OPEN_QUESTIONS 13 updated; the CV spike keeps its gitignored weights.
+
+**Verified** (scratch `C:\scratch\veyro-ios-android`, byte-identical before each run): EditMode
+**633/633** (637 − 22 RaisedHand + 18 DoubleHopConfirm; walk-in trajectories assert the bare jump
+rule fires ≥ 2× and the confirm still refuses; one test pins why the run steering must be reset at
+countdown start). Offline sweep through the real `FaceSteering`: 0/5,760 walk-ins, 0/576 armed
+walks, 0/2,250 single hops confirmed; 99.1 % of 13,500 double hops confirmed (misses: 16–22 cm hops
+back to back, where `FaceSteering` swallows the second jump; a third hop confirms). CV spike compiles
+with `VEYRO_CV_SPIKE` (define restored). Release APK 83,481,201 → **70,975,411** bytes (−11.92 MiB;
+SHA-256 `4fcc6ca2…c9f3` — the Phase 3 "no change" reference), permissions + badging identical to
+Step A, pose entries gone. Dev APK 86,583,015 (`84ec2521…e7ea`) on the OnePlus 6T (the dev build
+failed twice at Gradle `packageDebug` `IncrementalSplitterRunnable`; transient, the rerun passed).
+Owner's own device session (20:43–21:04): 6 auto-pauses, 4 double-hop confirms, 5× `[CAM] countdown
+started: run steering reset…`, resumed runs start with nx ≈ x (0.454/0.456, 0.399/0.409,
+0.517/0.482), a walk-back-in without settling never resumed (~2 min), no exceptions. **Owner
+approved as is** (the 10-minute check of IOS_HANDOFF §6 Step B).
+
+**Known:** at desk distance (~40 cm) a head bob satisfies the hop rule (one constant — ignore when
+the face box exceeds ~0.25 — would block it); owner chose to leave it. `globalgamemanagers.assets`
+carries +9 KB of script records (156 vs 90) since the spike-define recompile; stable across rebuilds.
+**Next:** Phase 0 (iOS build infrastructure) in a new scratch `C:\scratch\veyro-ios`.
+
 ## 2026-09-28 — OneSignal 5.1.15 → 5.4.0, location module off (feat/iOS-implementation, Step A)
 
 First step of `docs/IOS_HANDOFF.md` (owner decisions 5a/6). Upgraded OneSignal Unity core/android
@@ -24,9 +288,9 @@ no hang) all behave; permission restored afterwards; no managed exceptions. The 
 migration only re-serialised `build.gradle` line endings; `ic_stat_onesignal_default.xml` and
 `raw/notification.wav` survive.
 
-**Known:** `Sdk.Location.IsShared = false` now logs `[OneSignal] location module is not available`
-once per launch (caught inside the SDK; dev builds show it in the Development Console) — Phase 2a
-removes the line. The committed `mainTemplate.gradle` still shows the old `OneSignal:5.1.37`
+**Known:** `Sdk.Location.IsShared = false` logged `[OneSignal] location module is not available`
+once per launch (caught inside the SDK; dev builds showed it in the Development Console) — the line
+is removed in the same commit, the setter is a no-op without the module. The committed `mainTemplate.gradle` still shows the old `OneSignal:5.1.37`
 resolver line; EDM4U rewrites it on every build (`AutoResolveOnBuild`), so the APK is right, but a
 build that skipped resolution would pull the full 5.1.37 SDK. `com.unity.test-framework.performance`
 writes two small `Resources` files during every player build (pre-existing, ~3.4 KB in the APK).
