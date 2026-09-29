@@ -39,8 +39,10 @@ Select-String C:\scratch\veyro-ios\build-ios-bN.log -Pattern '\[iOS privacy\]|\[
 - A good log has the line `[iOS privacy] Verified: LayersATTBridge.m + iOSStepCounter.mm gone, …`
   and a `Build OK: …` line.
 - Timing: about 4 min with a warm `Library/` (build 1: 224 s) and about 10 min cold. The export
-  is ~1.4 GB (3,514 files). Its zip is ~300 MB and takes ~1.5 min. Build 1: 314,301,067 bytes,
-  SHA-256 `d3b67f9ce42115531331e03dafaec8aa6d5b06b031714170668edb655b7f7724`.
+  is ~1.4 GB (3,514 files). Its zip is ~300 MB and takes ~1.5 min. Build 1 (re-exported 29 Sep,
+  review pass): 314,304,408 bytes, SHA-256
+  `04907d5a0decb1c822e121b7fd100a2cd6294e41ccb039a8fed9dba4e3e398e2` (supersedes the 28 Sep
+  build-1 zip, `d3b67f9c…`).
 - `VEYRO_IOS_BUILD_NUMBER` is required and must be a positive integer. Without it the export
   stops before touching anything.
 - Every iOS player setting (bundle id `com.ferrabled.veyro.run`, 1.0.0, iPhone only, iOS 15.0,
@@ -69,14 +71,21 @@ to the Mac.
   Xcode since 28 Apr 2026. The export is a standard Unity 6000.5 project (`objectVersion = 46`,
   deployment target iOS 15.0). If the build misbehaves in a way that looks like the toolchain,
   check Unity 6000.5's release notes for the Xcode versions it was tested with.
-- **CocoaPods:** `brew install cocoapods` (or `sudo gem install cocoapods`). Check with `pod --version`.
+- **CocoaPods ≥ 1.12:** `brew install cocoapods`. Check with `pod --version`. Not
+  `sudo gem install cocoapods`: macOS's built-in Ruby 2.6 cannot install current CocoaPods.
 - **The owner's Apple ID** signed in: Xcode → Settings → Accounts, team `69J7W5URX7`.
-- About 6 GB free: the export is ~1.4 GB, and Pods plus DerivedData add more.
+- **At least one iPhone registered on the team** (developer.apple.com → Devices → +, name +
+  UDID). The export's Release configuration signs with Unity's stock development identity
+  (`iPhone Developer`), so the archive needs an iOS App Development profile, which Apple issues
+  only to a team with a registered device ("Your team has no devices from which to generate a
+  provisioning profile"). Distribution signing happens later, at Distribute App.
+- At least 20 GB free (plus ~8 GB if the iOS 26 platform still has to be downloaded): the export
+  is ~1.4 GB, and Pods plus DerivedData add several more.
 
 ## 3. Transfer and unpack
 
 ```sh
-cd ~/Desktop                                  # anywhere without spaces is simplest
+mkdir -p ~/veyro && cd ~/veyro                # no spaces; not ~/Desktop (folder-access prompt)
 shasum -a 256 VeyroRun-xcode-bN.zip           # must equal the SHA-256 printed on Windows
 unzip -q VeyroRun-xcode-bN.zip                # -> VeyroRun-xcode/
 xattr -dr com.apple.quarantine VeyroRun-xcode inspect_ios_export.py
@@ -149,8 +158,8 @@ open Unity-iPhone.xcworkspace
 ## 6. Archive
 
 1. Scheme **Unity-iPhone**, destination **Any iOS Device (arm64)**.
-2. Product → **Archive**. Archive always builds Release; the export also pins the scheme's Run
-   action to Release.
+2. Product → **Archive**. Archive always builds Release (the scheme's Run action uses Unity's
+   `ReleaseForRunning` configuration).
 3. When it finishes, the Organizer opens on the new archive. Don't distribute yet.
 
 ## 7. Pre-upload scan (stop on any hit; don't upload)
@@ -173,6 +182,8 @@ find "$APP" -type f | while read -r f; do
   file "$f" | grep -q 'Mach-O' || continue
   nm -u "$f" 2>/dev/null | grep -E 'ATTrackingManager|ASIdentifierManager|CLLocationManager|CMPedometer|CMMotionActivityManager' | sed "s|^|STOP nm: $f: |"
   otool -L "$f" | grep -E 'AppTrackingTransparency|AdSupport|CoreLocation' | sed "s|^|STOP otool: $f: |"
+  # 4. No bitcode left in a linked binary (liblayers_core.a embeds it; ITMS-90482 if it survives)
+  otool -l "$f" | grep -q 'segname __LLVM' && echo "STOP bitcode: $f"
 done
 echo "scan done"
 ```
@@ -184,11 +195,14 @@ Expected: three `clean:` lines, no `STOP` line, then `scan done`.
 
 ## 8. Upload
 
-Organizer → **Distribute App** → **App Store Connect** → **Upload**.
-- Keep automatic signing.
+Organizer → **Distribute App** → **Custom** → **App Store Connect** → **Upload**. (Not the
+one-click **App Store Connect** choice: since Xcode 15 it skips the options screen and uploads
+with "Manage Version and Build Number" on.)
 - **Untick "Manage Version and Build Number"**, so the upload keeps the `CFBundleVersion` =
   `VEYRO_IOS_BUILD_NUMBER` it was exported with.
 - Symbols upload on.
+- Automatically manage signing (this is where the Apple Distribution certificate and App Store
+  profiles are created).
 
 Export compliance is answered by `ITSAppUsesNonExemptEncryption = false` in Info.plist, so App
 Store Connect asks no encryption question.
@@ -311,7 +325,10 @@ next build number:
   - Unity's own `UnityRuntime.framework/PrivacyInfo.xcprivacy` present.
 - **Tools** (with `--clang` / `--nm`):
   - both stubs syntax-check as freestanding C for `arm64-apple-ios15.0`;
-  - `nm -u` over every `.a` and `UnityRuntime` shows no `ATTracking|ASIdentifier|CLLocation|CMPedometer`.
+  - `nm -u --no-llvm-bc` over every `.a` and `UnityRuntime` shows no
+    `ATTracking|ASIdentifier|CLLocation|CMPedometer|CMMotionActivity`, and any `nm` error fails the
+    check (`liblayers_core.a` embeds Rust/LLVM 22 bitcode that an older bitcode reader cannot parse;
+    without `--no-llvm-bc` 269 of its 463 objects went unscanned while the check still passed).
 
 ---
 
@@ -328,7 +345,10 @@ per item in STATUS; stop and report on the first failure of items 1–2 (one-lin
    - **Don't Allow** → at once (no 10 s wait) the picker reads `camera access is off` /
      `— allow it in Settings, or play with tilt`. Both buttons are enabled and TILT plays.
    - Tap CAMERA again → the same two lines, no alert.
-   - Settings → Veyro Run → Camera on → back → CAMERA works without a relaunch.
+   - Settings → Veyro Run → Camera on → back to the game → CAMERA works. iOS usually terminates an
+     app when one of its privacy permissions changes in Settings, so the game may cold-start
+     (menu, not the picker) on the way back: that is iOS, not a failure. CAMERA must then work
+     with no alert.
    - **Step left → lane left** (the mirror check; §13 if it is inverted). Hop → jump.
    - Face tracking holds in normal indoor light. The speed gate passes (no "too slow" failure).
    - No BETA or copy problems. No error line mentions logcat.

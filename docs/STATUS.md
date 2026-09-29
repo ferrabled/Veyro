@@ -1,5 +1,28 @@
 # Status journal (newest at top)
 
+## 2026-09-29 — iOS review pass before the Mac build; build 1 uploaded and submitted to App Review
+
+Read-and-verify pass over the iOS work (IOS_REVIEW_HANDOFF §3). No code blocker for archive,
+upload or runtime: the pbxproj stub swap is clean, stub ABIs match the SDKs' `[DllImport]`s, all
+234 plugin `__Internal` entry points have exactly one native definition, the privacy manifest
+uses Apple's identifiers, `BuildIOS` save/restore is symmetric, stripping is Minimal on both
+targets, `targetFrameRate` 60 everywhere. Fixed, iOS-only (Android token-identical, then a fresh
+`BuildAndroid` matched `stepB-final-release.apk`: permissions, badging, libil2cpp/global-metadata/
+classes.dex/libunity CRCs): `FaceTrackingRig` keeps the screen awake while it holds the camera
+(Auto-Lock locked hands-free runs); `PauseMenu`/`GuideState` no longer mention a back button on
+iPhone. `inspect_ios_export.py`: `nm` now runs with `--no-llvm-bc` and fails on any `nm` error
+(269/463 `liblayers_core.a` objects had been skipped silently); rescan clean. Mac docs: device
+registration is a required pre-step (Release signs with a development identity), plus signing
+stages, keychain, IPA fallback, Organizer Custom path, bitcode scan, CocoaPods via brew.
+Verified: EditMode 661/661 (iOS); `BuildIOS` b1 Build OK; inspection 61/61; zip 314,304,408 B,
+SHA-256 `04907d5a…e398e2`. The friend's Mac (Xcode 27.0, macOS 27.0) archived and uploaded build
+1.0.0 (1); it processed without warnings, ran on his iPhone and received a OneSignal push. App
+Store 1.0.0 + the three IAPs submitted to App Review 29 Sep (EU 27, Vietnam and China excluded;
+US included); external TestFlight group `Testers` in beta review. Open for the owner: camera
+staging has no on-screen cancel on iOS; the challenge page and home page still present Android
+only; Android NeverSleep; API key `423XT27S92` to revoke; the RevenueCat Season Pass paywall
+shows a fake discount (fix in the dashboard before review reaches it).
+
 ## 2026-09-28 — iOS integration: first Xcode export verified end to end, runbook and device checklist (feat/iOS-implementation, Phase 3)
 
 Phases 0/1/2a/2b/2c integrated and compiled together for the first time. Both scratches synced

@@ -56,7 +56,7 @@ FORBIDDEN_FRAMEWORK_TOKEN = re.compile(r"\b(AppTrackingTransparency|AdSupport|Co
 FORBIDDEN_NATIVE_API = re.compile(
     r"\b(ATTrackingManager|ASIdentifierManager|CLLocationManager|CMPedometer|CMMotionActivityManager)\b")
 NATIVE_SOURCE_EXTENSIONS = (".m", ".mm", ".c", ".cpp", ".h", ".swift")
-FORBIDDEN_SYMBOL = re.compile(r"ATTracking|ASIdentifier|CLLocation|CMPedometer")
+FORBIDDEN_SYMBOL = re.compile(r"ATTracking|ASIdentifier|CLLocation|CMPedometer|CMMotionActivity")
 
 MANIFEST = "UnityFramework/PrivacyInfo.xcprivacy"
 UNITY_RUNTIME_MANIFEST = "Frameworks/UnityRuntime.framework/PrivacyInfo.xcprivacy"
@@ -549,14 +549,18 @@ def check_tools(r, root, clang, nm):
     hits, errors = [], []
     for b in sorted(binaries):
         rel = os.path.relpath(b, root).replace("\\", "/")
-        code, out, err = run([nm, "-u", b])
-        if code != 0 and not out:
+        # --no-llvm-bc: read the Mach-O symbol tables, not the embedded bitcode. liblayers_core.a
+        # is Rust (LLVM 22) with bitcode embedded in every object; an older nm's bitcode reader
+        # fails on 269 of its 463 members, and those members were then silently not scanned.
+        # Any error is a failure: a partial scan must never read as "no forbidden symbols".
+        code, out, err = run([nm, "-u", "--no-llvm-bc", b])
+        if code != 0 or "error:" in err:
             errors.append(f"{rel}: exit {code} {err.strip()[:120]}")
             continue
         for line in out.splitlines():
             if FORBIDDEN_SYMBOL.search(line):
                 hits.append(f"{rel}: {line.strip()}")
-    r.check(area, f"nm -u: no ATTracking/ASIdentifier/CLLocation/CMPedometer ({len(binaries)} binaries)",
+    r.check(area, f"nm -u: no ATTracking/ASIdentifier/CLLocation/CMPedometer/CMMotionActivity ({len(binaries)} binaries)",
             not hits and not errors,
             "; ".join((hits + errors)[:6]) or ", ".join(os.path.basename(b) for b in sorted(binaries)))
 
