@@ -1,5 +1,8 @@
 # T-035 — Devpost submission answers (draft)
 
+> **Superseded 30 Sep 2026 by `DEVPOST_SUBMISSION.md`**, the final paste-ready copy. This draft is
+> kept for its sources and reasoning.
+
 Written 23 Aug 2026. **Draft for owner review — nothing is submitted by an agent.** Numbers marked
 `[N]` are placeholders that must be real at submission time; shipping a placeholder is worse than
 omitting the claim.

@@ -1,5 +1,34 @@
 # Status journal (newest at top)
 
+## 2026-09-30 — T-035 final Devpost pack and marketing assets (feat/iOS-implementation)
+
+**What changed:**
+- New `docs/submission/DEVPOST_SUBMISSION.md` replaces the 23 Aug draft in `DEVPOST_ANSWERS.md`. It has paste-ready copy for every Devpost field, including the story in Devpost's section headings, category answers, and judge access for both stores. It also has the category verdicts and the owner's dashboard steps for today's OneSignal campaign and Layers evidence, with the exact notification data the game's router expects. The Supabase queries for real numbers include T-041's top-N sanity check.
+- New `docs/submission/devpost_assets.py` writes the 1024 RGB icon and a 3:2 gallery cover into `builds/submission/`. It also converts any capture to exactly 1179×2556 and checks the size.
+
+**Findings:**
+- Every existing screenshot is stale: the 1080×2400 captures from August show the greybox and the capsule runner. New captures are needed. TestFlight on an iPhone 14 Pro/15/15 Pro/16 gives 1179×2556 natively.
+- No OneSignal campaign has been deployed yet, and the game sets no OneSignal tags.
+- Layers events have not been confirmed in its dashboard.
+
+**Verified:**
+- The elevator pitch is 182 of 200 characters.
+- The icon is 1024×1024 RGB. The script's 1179×2556 conversion was tested on a sample capture.
+- Nothing was submitted and no dashboard was touched.
+
+**Same day, second pass (owner request):**
+- The pack is rewritten in the owner's voice and follows the real Devpost form field by field.
+- The entry is iOS-only. Grand Prize and #BuildInPublic are dropped.
+- Judge access is three Apple custom offer codes redeemed by link (`SHIPATONPASS`, `SHIPATONEMBER`, `SHIPATONFROST`), with a manual RevenueCat grant by Player ID as the fallback.
+- Eight of the friend's iPhone screenshots are converted to 1179×2556 in `builds/submission/screenshots/`, in upload order with captions.
+- Found: the shipped guide and home screen advertise sliding (crouch / swipe down), but `RunnerController` still has no slide mechanic. The judges' note discloses it.
+- Found: both notification screenshots contain third parties' messages and a phone number, so they must never be uploaded.
+
+**Next (owner):**
+- Create the three custom offer codes and check their redemption links (`DEVPOST_SUBMISSION.md`).
+- Fill the `[BRACKETS]` from the OneSignal report, and from Layers if that category is entered.
+- Upload the video and submit.
+
 ## 2026-09-30 — Submission video: director's pack, shot list and ffmpeg assembly (feat/iOS-implementation, T-035)
 
 **What changed:** `docs/submission/SHOOT_GUIDE.md` — the shoot-day plan for the <2 min Devpost
