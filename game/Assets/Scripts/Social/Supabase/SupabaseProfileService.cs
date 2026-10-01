@@ -33,8 +33,15 @@ namespace MotionRunner.Social.Supabase
     ///
     /// The key file is plaintext BY DESIGN: it must survive reinstall via device backup, and
     /// Android Keystore-backed encryption keys do NOT survive reinstall. A local attacker who
-    /// can read it can also read the PlayerPrefs session — same privilege level. iOS moves the
-    /// key into the Keychain with T-032.
+    /// can read it can also read the PlayerPrefs session — same privilege level.
+    ///
+    /// iOS keeps the SAME file; the Keychain is deferred (owner decision 3, 28 Sep — reason in
+    /// docs/PROFILE_LEADERBOARD_PLAN.md "iOS storage"). The file sits in the app container's
+    /// Documents folder, so deleting the app deletes it with the PlayerPrefs session: a plain
+    /// delete + reinstall starts a fresh profile. The player's way back is COPY on the recovery
+    /// code row, then IMPORT PROFILE on the new install; a full-device restore from an
+    /// iCloud/computer backup also brings the file back. Purchases return through RESTORE
+    /// PURCHASES either way.
     public sealed class SupabaseProfileService : MonoBehaviour, IProfileService
     {
         const string RefreshTokenKey = "veyro.sb.refresh";
@@ -809,7 +816,8 @@ namespace MotionRunner.Social.Supabase
         // A file under persistentDataPath: covered by Android Auto Backup (the mechanism that
         // demonstrably restores this app's data across reinstall — STATUS 29 Aug). Format
         // "<userId>:<hexKey>" so a stale key is recognized. Plaintext by design — see the
-        // class comment. iOS: Keychain with T-032.
+        // class comment. iOS: the same file under Documents — removed when the app is deleted,
+        // included in device backups; the Keychain is deferred (class comment).
 
         internal readonly struct StoredKey
         {

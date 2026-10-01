@@ -1,0 +1,9 @@
+{
+  "name": "veyro-reel",
+  "private": true,
+  "description": "20 s motion reel for the Shipaton submission, rendered frame by frame from reel.html",
+  "type": "module",
+  "dependencies": {
+    "puppeteer-core": "25.12.0"
+  }
+}

@@ -37,14 +37,19 @@ text go out together (§8).
   - Android: a small file under `Application.persistentDataPath` covered by **Auto Backup**
     (proven live in this app — STATUS 29 Aug caught Auto Backup resurrecting the RevenueCat
     anonymous ID; PlayerPrefs/files restore on reinstall when the user has Google backup on).
-  - iOS (T-032 era): Keychain, which persists across uninstall (de facto, not contractually).
+  - iOS: **the same plaintext file**, in the app container's `Documents/`. The Keychain is
+    **deferred** (owner decision, 28 Sep; reason and consequences in "iOS storage" at the end).
+    Deleting the app deletes the file, so on iPhone the rescue is COPY the recovery code →
+    IMPORT PROFILE, and purchases come back through RESTORE PURCHASES.
   - Boot order: valid session → use it; else recovery key present → `recover-session` Edge
     Function → same profile/XP; else → new anonymous profile. Purchases restore in the same
     boot (receipts + LogIn). **Why not persist the refresh token:** rotation makes a
     backup-restored token stale, and reuse detection can revoke the whole session family; the
     recovery key never rotates.
   - Honest caveat for policy/support copy: backup off, or a new device with no backup restore →
-    the anonymous profile is unrecoverable. Phase 2 fixes this properly.
+    the anonymous profile is unrecoverable. On iOS a plain delete + reinstall is enough to lose
+    it, whatever the backup settings, unless the player copied the code first. Phase 2 fixes
+    this properly.
 - **Phase 2 (later release, designed-in now):** optional Google + Sign in with Apple linking
   onto the same user (`linkIdentity`). Apple guideline 4.8 (offer SIWA if Google login exists)
   triggers only then, and only on iOS. No schema change needed.
@@ -208,7 +213,8 @@ key must survive reinstall via device backup, and Android Keystore-backed encryp
 exists for. A local attacker who can read the key file can equally read the PlayerPrefs session,
 which is the same privilege level. The key file is tagged `<userId>:<key>` so stale keys
 (rotated away, pre-claim leftovers, lost responses) are detected and replaced by
-`rotate_recovery_key` on the next boot. iOS moves the key into the Keychain with T-032.
+`rotate_recovery_key` on the next boot. iOS keeps the same file for now; the Keychain is
+deferred (see "iOS storage" at the end).
 
 ## 6. Unity seam (mirrors Commerce exactly)
 
@@ -338,3 +344,49 @@ A relaunch never retries an archived claim; failed current-code issuance still r
 Deleting the current online profile removes both local code files, but does not delete the
 separate older profile represented by an archived code. Purchases/restore still need the
 licensed device check in §10; iOS run submissions now select the `ios` tag at compile time.
+
+### iOS storage (28 Sep): the Keychain is deferred
+
+**Decision** (owner, 28 Sep planning session; `docs/IOS_HANDOFF.md` decision 3, still to be
+moved to DECISIONS.md by the owner): the iOS build stores the recovery key exactly as Android
+does, in `Application.persistentDataPath/veyro-recovery.txt` (`<userId>:<key>`, plus
+`veyro-recovery-support.txt` for archived codes). The refresh token and the pending-run queue
+stay in PlayerPrefs. No Keychain code is written for v1.0.
+
+**Why it is deferred:**
+- **The deadline.** The Shipaton submission closes 30 Sep. Keychain storage needs a native plugin
+  over `SecItem*` and a new storage seam; today `SupabaseProfileService` reads and writes the
+  file directly.
+- **It cannot be verified from here.** There is no Mac and no iPhone. Every native fix costs a
+  Windows re-export, a cloud-Mac archive and a TestFlight round trip.
+- **The riskiest invariant depends on the file.** Review R1 derives the pending-claim state from
+  the key file itself ("the file IS the state"). A second backend needs a migration that keeps
+  that invariant, and that is the most delicate logic in this system.
+- **The benefit is soft.** A Keychain item outliving an app deletion is de facto behaviour, not
+  a documented contract.
+- **The rescue paths already exist:** COPY on the RECOVERY CODE row → IMPORT PROFILE on the new
+  install, and RESTORE PURCHASES from App Store receipts.
+
+**What an iPhone player actually gets:**
+
+| Event | Recovery file + PlayerPrefs session | Next launch |
+|---|---|---|
+| Delete the app, reinstall | Deleted with the app container | Fresh anonymous profile. IMPORT PROFILE with a copied code brings the old one back, provided the fresh profile is still untouched: no run played (`destination_not_empty`, §5) |
+| Offload App (Settings → iPhone Storage), reinstall | Kept: offloading keeps documents and data | Same profile |
+| New or reset iPhone restored from an iCloud/computer backup | Restored: `Documents/` and PlayerPrefs are in the backup, and the game sets no exclude-from-backup flag | Same profile through the §1 boot order (a stale refresh token falls through to the key), unless the code was rotated after that backup |
+| Purchases, in every row | Held by the App Store, not the device | RESTORE PURCHASES; RevenueCat moves them to the current app user ID |
+
+- IMPORT PROFILE reads the clipboard in code (`ProfilePage.ImportTapped`). On iOS 16+, reading
+  text that was copied in another app (Notes, Messages) shows Apple's "Allow Paste" prompt,
+  unless the player set Settings → Veyro Run → Paste from Other Apps to Allow. "Don't Allow"
+  reads as empty, and the row shows "import failed: a recovery code is 64 characters". This is
+  harmless, but the device pass (IOS_HANDOFF §9 item 9) should expect the prompt.
+- **Policy wording:** the privacy policy's "survives uninstalling the app" paragraph is true only
+  of Android. The iPhone wording was added to `docs/PRIVACY_POLICY.md` ("Data stored on your
+  device") and mirrored into `site/public/privacy/index.html` on 28 Sep. **The owner still has
+  to deploy it.** The support page's "Will my profile survive a reinstall?" answer is still
+  Android-only (see STATUS 28 Sep, Phase 2c).
+- **If this is revisited (post-Shipaton):** add the storage seam first (the decision logic is
+  already engine-free in `RecoveryGate`). Then add a Keychain adapter behind `#if UNITY_IOS`,
+  with a one-time file → Keychain migration that never deletes the file before the Keychain write
+  is confirmed (R1). Phase 2 identity linking (Sign in with Apple) may make it unnecessary.

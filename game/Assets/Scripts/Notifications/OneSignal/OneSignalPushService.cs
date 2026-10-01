@@ -21,9 +21,11 @@ namespace MotionRunner.Notifications.OneSignal
         bool _requesting;
         int _requestVersion;
 
+        /// Real on Android and iOS players. VEYRO_NO_ONESIGNAL (BuildScript.BuildIOS, env
+        /// VEYRO_IOS_NO_ONESIGNAL=1) is the iOS kill switch: the Fake, so the SDK never starts.
         public static IPushService Create()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
+#if !UNITY_EDITOR && (UNITY_ANDROID || (UNITY_IOS && !VEYRO_NO_ONESIGNAL))
             var host = new GameObject("Notifications");
             DontDestroyOnLoad(host);
             return host.AddComponent<OneSignalPushService>();
@@ -45,7 +47,9 @@ namespace MotionRunner.Notifications.OneSignal
                 _initialized = true;
 
                 // On Android <=32 OS permission alone is not the player's choice. Never call
-                // OptIn at boot: it can itself prompt on Android 13 after permission revocation.
+                // OptIn at boot: it can itself prompt on Android 13 after permission revocation,
+                // and on iOS it always requests permission (with OneSignal's own Settings alert
+                // once denied). Nothing here asks at boot; only the panel's ENABLE does.
                 if (!enabled) Sdk.User.PushSubscription.OptOut();
 
                 // Instance methods keep observers alive; detach when this owner is destroyed.
@@ -53,7 +57,6 @@ namespace MotionRunner.Notifications.OneSignal
                 Sdk.Notifications.PermissionChanged += OnPermissionChanged;
                 Sdk.Notifications.ForegroundWillDisplay += OnForegroundNotification;
                 Sdk.Notifications.Clicked += OnNotificationClicked;
-                Sdk.Location.IsShared = false;
                 // Campaign UI must never cover a run or the camera staging screen.
                 Sdk.InAppMessages.Paused = true;
 
@@ -75,7 +78,12 @@ namespace MotionRunner.Notifications.OneSignal
             try
             {
                 bool granted = Sdk.Notifications.Permission ||
+#if UNITY_IOS && !UNITY_EDITOR
+                    await RequestIosPermission();
+#else
                     await RequestAndroidPermission();
+#endif
+                // Only once granted: on iOS OptIn itself requests permission with fallbackToSettings.
                 if (granted && requestVersion == _requestVersion) Sdk.User.PushSubscription.OptIn();
                 Refresh();
                 return granted && requestVersion == _requestVersion;
@@ -90,7 +98,7 @@ namespace MotionRunner.Notifications.OneSignal
 
         public void Disable()
         {
-            ++_requestVersion; // invalidate any permission result still owned by Android
+            ++_requestVersion; // invalidate any permission result still owned by the OS prompt
             WithSdk(() => { Sdk.User.PushSubscription.OptOut(); Refresh(); });
         }
 
@@ -140,6 +148,30 @@ namespace MotionRunner.Notifications.OneSignal
 #endif
         }
 
+#if UNITY_IOS && !UNITY_EDITOR
+        /// iOS asks once, and OneSignal asks (not Unity), so CanRequestPermission is exact here;
+        /// IosPushFlow has the whole rule. A tap on ALLOW IN SETTINGS opens the app's own page in
+        /// Settings; OnApplicationFocus and PermissionChanged refresh on the way back, and the next
+        /// ENABLE opts in (Permission is true by then), as on Android.
+        async Task<bool> RequestIosPermission()
+        {
+            switch (IosPushFlow.ForTap(Sdk.Notifications.Permission, Sdk.Notifications.CanRequestPermission))
+            {
+                case IosPushStep.AlreadyAllowed:
+                    return true;
+                case IosPushStep.OpenSettings:
+                    Application.OpenURL("app-settings:"); // UIApplicationOpenSettingsURLString
+                    return false;
+                default:
+                    // fallbackToSettings false: OneSignal's own "Open Settings" alert never shows;
+                    // the panel's button is the one way there. Bounded like the Android wait.
+                    Task<bool> request = Sdk.Notifications.RequestPermissionAsync(false);
+                    var finished = await Task.WhenAny(request, Task.Delay(30000));
+                    return finished == request && await request;
+            }
+        }
+#endif
+
         // Reserved wrapper operations for the next campaign increment. No Supabase linking,
         // email or SMS collection is enabled by this initial, anonymous-device integration.
         public void Login(string externalId) => WithSdk(() => Sdk.Login(externalId));
@@ -160,7 +192,8 @@ namespace MotionRunner.Notifications.OneSignal
 
         void OnSubscriptionChanged(object sender, PushSubscriptionChangedEventArgs args) => WithSdk(Refresh);
         void OnPermissionChanged(object sender, NotificationPermissionChangedEventArgs args) => WithSdk(Refresh);
-        // A reminder should not interrupt the game the player is already using.
+        // A reminder should not interrupt the game the player is already using. On iOS the SDK
+        // raises this synchronously and its args forward PreventDefault natively: no banner either.
         void OnForegroundNotification(object sender, NotificationWillDisplayEventArgs args) => args.PreventDefault();
         void OnNotificationClicked(object sender, NotificationClickEventArgs args) =>
             Opened?.Invoke(new NotificationOpen(args.Notification.NotificationId, args.Notification.AdditionalData));

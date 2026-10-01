@@ -1,9 +1,10 @@
-# Store compliance register — Google Play
+# Store compliance register — Google Play (App Store: see "iOS / App Store" at the end)
 
 The invariant this file protects: **every release is one atomic story — binary ↔ Console
 declarations ↔ privacy policy ↔ store listing all describe the same build.** Mismatches
 between any two of these are the #1 cause of Play rejections/removals. Update this file in
-the same change that ships a feature listed below.
+the same change that ships a feature listed below. The same invariant binds the App Store build
+(binary ↔ App Store Connect answers ↔ policy ↔ listing); its register is the last section.
 
 ## Declared state (Console, as of 25 Aug 2026 — versionCode 1/2, no SDKs)
 
@@ -334,3 +335,82 @@ profile-scoped; recovered XP allows re-collection on a new install. Keep the UI 
 copy clear about that distinction. Test-speed thresholds are development-only and cannot ship
 through the release build guard until the production curve is approved. A separate Cosmetic QA
 package uses a labelled fake profile/store and never generates RevenueCat revenue or server runs.
+
+## iOS / App Store (register opened 28 Sep 2026, feat/iOS-implementation)
+
+Field values the owner types into App Store Connect: `docs/store-kit/APP_STORE_LISTING.md`. The
+build: `BuildScript.BuildIOS` → Xcode export → cloud Mac (`docs/IOS_BUILD_RUNBOOK.md`). Nothing has
+been submitted; the state below is what the **first** submission (1.0.0, build 1) declares.
+Owner decision behind it: IOS_HANDOFF decision 5 — no ITMS-90683 purpose-string warnings, no
+rejection risk, the Layers package itself unmodified.
+
+### Declared state (first submission)
+
+| Declaration | Answer | True because |
+|---|---|---|
+| App Privacy → data collected | **Yes** — the seven rows of the listing §3, every one linked to the user, none used for tracking | RevenueCat (purchases, anonymous app user ID at launch), Supabase (player ID, leaderboard runs), OneSignal (subscription ID, sessions, at launch), Layers after opt-in (installation + support ID, events, IP-derived region, delivery health). Camera frames never leave the phone → not collected |
+| App Privacy → tracking | **No** | no ATT prompt, no IDFA, no IDFV from Layers, no ad network or data broker; enforced at export (next table) |
+| App Tracking Transparency | not used | `NSUserTrackingUsageDescription` absent and forbidden; Layers' ATT bridge replaced by a stub; the game never calls `LayersSDK.RequestTrackingPermission` |
+| Purpose strings | only `NSCameraUsageDescription`, exact text in the listing §7 | asked only when the player picks CAMERA; denial falls back to tilt |
+| Privacy manifest | `UnityFramework/PrivacyInfo.xcprivacy`, rewritten on each export | tracking false, no tracking domains, collected types = §3, reasons CA92.1 / C617.1 (+0A2A.1) / 35F9.1 / E174.1; RevenueCat and OneSignal pods bring their own (checked on the Mac) |
+| Export compliance | `ITSAppUsesNonExemptEncryption = false` | HTTPS through the OS only; no own cryptography beyond hashing |
+| Age rating | 4+ (listing §1 answers) | no UGC (server-generated handles), no chance mechanics, no ads |
+| Account deletion (guideline 5.1.1(v)) | in app: PROFILE → DELETE ONLINE PROFILE; on the web: `/support/#delete` | the anonymous profile is created without a sign-up, and deletion is in the app as Apple requires |
+| Sign in with Apple (4.8) | not applicable | no third-party or social login exists (Phase 2 linking would change this) |
+| Other platforms named (2.3.10) | none in the iOS build's copy | Android/Google strings are split under `#if UNITY_IOS` |
+| Privacy policy URL | `https://veyro.ferrabled.com/privacy/` | same URL as Play and as `GameLinks.PrivacyPolicyUrl` (URL coupling rule above) |
+
+### What every export enforces (`IosPrivacyPostProcess`, callback order 1100)
+
+Each item is a **build failure**, not a warning, so a regression is found on Windows before a Mac
+cycle. The post-process runs after every SDK post-processor (EDM4U 40/50, OneSignal 45, Layers 100,
+RevenueCat 999, `IosBuildPostProcess` 1000).
+
+- No `LayersSettings` asset in any Resources folder (Layers' own post-build step would add the
+  tracking string, SKAdNetwork keys and the tracking frameworks).
+- Layers' `LayersATTBridge.m` and the Input System's `iOSStepCounter.mm` are deleted from the
+  project and the disk and replaced by `Libraries/VeyroPrivacyStubs/VeyroLayersAttStub.m` and
+  `VeyroStepCounterStub.m` in UnityFramework (pure-C no-ops; `LayersAttStubTests` pins them to the
+  SDKs' `DllImport` declarations). If either SDK file is missing or duplicated, the SDK changed:
+  the export stops.
+- `AdServices.framework` and `StoreKit.framework` linked (weak) on UnityFramework for the Layers
+  bridges that remain; no target links `AppTrackingTransparency`, `AdSupport` or `CoreLocation`.
+- No `NSUserTrackingUsageDescription`, `SKAdNetworkItems`, `NSAdvertisingAttributionReportEndpoint`,
+  `NSMotionUsageDescription`, `NSLocation*` key or `location` background mode in any Info.plist.
+- No native plugin source under `Libraries/` references `ATTrackingManager`, `ASIdentifierManager`,
+  `CLLocationManager`, `CMPedometer` or `CMMotionActivityManager`.
+- Unity's trampoline switches `UNITY_USES_IAD` and `UNITY_USES_LOCATION` are 0 (C# reading the
+  advertising identifier or `Input.location` turns them on).
+- The Podfile has no `OneSignalLocation`.
+- The privacy manifest is de-duplicated, declares the reasons above, and is bundled exactly once in
+  UnityFramework, with no second `PrivacyInfo.xcprivacy` in any target.
+
+What Windows cannot check, the runbook's pre-upload scan does on the archived `.app` (`plutil`,
+`nm -u`, `otool -L`), including the CocoaPods frameworks.
+
+### iOS flip table (do every flip in the same submission as the change)
+
+| Change | Flip |
+|---|---|
+| Kill switch `VEYRO_IOS_NO_LAYERS=1` | drop Coarse Location and Other Diagnostic Data (Product Interaction stays for OneSignal); the manifest drops them by itself. Device ID / User ID stay (RevenueCat) |
+| Kill switch `VEYRO_IOS_NO_ONESIGNAL=1` | Product Interaction stays only if Layers is on; push copy leaves the listing/review notes |
+| ATT, IDFA or IDFV ever wanted (ads, attribution, cross-app analytics) | owner decision first. Needs `NSUserTrackingUsageDescription`, a prompt, App Privacy "tracking: Yes" on the affected rows, policy rewrite, the ATT stub removed and the export rule relaxed — all in one release |
+| Layers dashboard: SKAN or any advertising/CAPI destination switched on | not without an App Privacy review (OPEN_QUESTIONS 22a). SKAN conversion updates are driven by Layers' remote config and are not stubbed; the export still forbids `SKAdNetworkItems`/`NSAdvertisingAttributionReportEndpoint` |
+| C# starts using `Input.location` or the advertising identifier | the export fails (`UNITY_USES_LOCATION`/`UNITY_USES_IAD`). Shipping it needs the purpose string, a Location or tracking App Privacy answer and a policy change |
+| New SDK, UPM package or native plugin | re-export; the post-process fails if its sources use a purpose-string API (strip and stub it, or drop it). Add its data to §3 and to `IosPrivacyPostProcess.CollectedData` together; check its pod manifest on the Mac |
+| Our C# gains a required-reason API (e.g. showing free disk space → DiskSpace 85F4.1; showing file dates → FileTimestamp DDA9.1) | add the reason to `IosPrivacyPostProcess.RequiredReasons` in the same change |
+| New data collected (free-text name, email, crash reports, …) | App Privacy row + `CollectedData` + policy + (for free text) the age-rating UGC answer |
+| Input System step counter / motion usage turned on | forbidden today; would need `NSMotionUsageDescription`, the step-counter stub removed and a Fitness/motion answer |
+| Camera data ever leaves the device | as the Play rule above: App Privacy (Photos or Videos), camera string, listing, policy — all together |
+| Universal links, Keychain recovery, native share sheet (deferred) | no App Privacy change; universal links add the associated-domains entitlement and the site's `apple-app-site-association`; Keychain changes the policy's "uninstall deletes the recovery file" wording |
+
+### iOS standing rules (every submission)
+
+1. `CFBundleVersion` strictly increments (`VEYRO_IOS_BUILD_NUMBER`); `CFBundleShortVersionString`
+   equals the App Store Connect version (`BuildScript.IosVersion`).
+2. Any SDK, package, define or native change → re-export and read the `[iOS privacy]` and
+   `[iOS export]` log lines; run the runbook's pre-upload scan on the archive. If an ITMS email
+   arrives anyway, record its exact text here.
+3. Policy text changes → Play standing rule 4 (one policy serves both stores).
+4. The listing and review notes describe shipped features only and name no other platform.
+5. TestFlight builds use the sandbox: no real purchases, no revenue (LICENSING_REVENUE §5).

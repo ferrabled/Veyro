@@ -17,8 +17,9 @@
     }
   ],
   "dependencies": {
-    "com.onesignal.unity.core": "5.1.15",
-    "com.onesignal.unity.android": "5.1.15",
+    "com.onesignal.unity.core": "5.4.0",
+    "com.onesignal.unity.android": "5.4.0",
+    "com.onesignal.unity.ios": "5.4.0",
     "com.google.external-dependency-manager": "1.2.188",
     "com.revenuecat.purchases-unity": "9.8.1",
     "com.revenuecat.purchases-ui-unity": "9.8.1",

@@ -95,8 +95,31 @@ build before submission.
 | Location → Coarse Location | Layers (region derived from IP) | Analytics |
 | Diagnostics → Other Diagnostic Data | Layers SDK delivery health | Analytics |
 
-Camera frames are **not** declared: processed on-device, never transmitted. No ATT prompt; the
-Layers post-build step must not leave `NSUserTrackingUsageDescription` in Info.plist.
+Camera frames are **not** declared: processed on-device, never transmitted.
+
+**Tracking: No** ("Do you or your third-party partners use data for tracking?" → No), and there is
+no App Tracking Transparency prompt. The export enforces this rather than trusting it:
+`IosPrivacyPostProcess` removes the Layers SDK's ATT/IDFA bridge from every iOS export and
+compiles a no-op stub in its place, then fails the export if `NSUserTrackingUsageDescription`,
+`SKAdNetworkItems`, `NSAdvertisingAttributionReportEndpoint` or an AppTrackingTransparency /
+AdSupport link survives (§7, `STORE_COMPLIANCE.md` "iOS / App Store").
+
+**Rows re-checked against the iOS build (28 Sep, Phase 2b); no answer changes:**
+
+- *Device ID* stays true without any Apple identifier. On iOS, Layers now sends **no IDFV** (and
+  never an IDFA): its bridge returns none. The row is carried by the random installation IDs each
+  SDK generates and stores itself: RevenueCat's anonymous app user ID (every install, at launch),
+  OneSignal's subscription ID (every install, at launch), and Layers' SDK device ID + the game's
+  `veyro-…` support ID (only after the analytics opt-in).
+- *Coarse Location* stays true for Layers, derived by the provider from the connection's IP
+  address. The app uses no location API, carries no `NSLocation*` key, and OneSignal's location
+  module is not in the build.
+- *Product Interaction* stays true through OneSignal alone if Layers is switched off; it drops
+  only if both are off.
+- The build's privacy manifest (`UnityFramework/PrivacyInfo.xcprivacy`) declares the same seven
+  types, linked, not tracking, with the same purposes (`IosPrivacyPostProcess.CollectedData`,
+  kept row-for-row with this table: change both together). With a kill switch on, the export
+  drops that SDK's rows from the manifest by itself; drop them here too.
 
 ## 4. Version 1.0
 
@@ -159,13 +182,14 @@ Veyro Run is made by one developer, in public. If something feels wrong, tell us
 | Screenshots | iPhone 6.9" **1290×2796** (or 1320×2868), 3–10, RGB, no alpha. iPhone-only build ⇒ no iPad set |
 | Build + IAPs | Chosen on the version page at submission; the three IAPs are attached there (first IAPs must ship with a version) |
 
-**App Review notes:**
+**App Review notes** (corrected 30 Sep: the first version claimed touch alone could play the game,
+but touch only jumps (`TouchTapInput`); steering is tilt or camera):
 
 ```
 Veyro Run is a motion-controlled endless runner. No account or login is required.
 
 HOW TO PLAY
-Hold the phone upright (portrait). Tilt left/right to change lanes and tap the screen to jump. Swipe and tap controls work alongside tilt, so the game is fully playable without tilting.
+Hold the phone upright (portrait). Tilt left/right to change lanes and tap the screen to jump. Steering needs tilt (or camera mode); touch jumps.
 
 CAMERA MODE (BETA, optional)
 Choose CAMERA (the button tagged BETA) in the mode picker. The front camera is used on-device only to follow the player; no images are stored or transmitted. The camera permission is requested only when the player picks this mode. Tilt remains available if permission is declined.
@@ -229,3 +253,33 @@ TestFlight purchases run in the sandbox and cost nothing; no sandbox tester acco
 | `NSCameraUsageDescription` | `Camera mode uses the front camera to follow your movements. Images are processed on your iPhone and never leave it.` |
 | `ITSAppUsesNonExemptEncryption` | `false` (HTTPS only) |
 | URL scheme | `veyro` (challenge links) |
+
+`NSCameraUsageDescription` is the **only** purpose string in the build. The other system dialogs a
+player can meet need none: the notification prompt (PROFILE → NOTIFICATIONS) and iOS's own "Allow
+Paste" confirmation when IMPORT PROFILE reads a pasted recovery code (iOS 16+). Both
+`BuildScript.BuildIOS` (sets it) and `IosBuildPostProcess` (fails the export unless it is exactly the
+text above) pin it.
+
+**Not in Info.plist, ever** (`IosPrivacyPostProcess` removes each one from the app's, UnityFramework's
+and the OneSignal extension's Info.plist and fails the export if one survives — each would either
+show the player a prompt for something the game does not do, or make App Store Connect expect one,
+ITMS-90683):
+
+| Key | Why it is absent |
+|---|---|
+| `NSUserTrackingUsageDescription` | no App Tracking Transparency: Layers' ATT/IDFA bridge is replaced by a stub at export, and the App Privacy answer is "no tracking" |
+| `SKAdNetworkItems`, `NSAdvertisingAttributionReportEndpoint` | no ad-network attribution; Layers' own post-build step stays inert (no `LayersSettings` asset, and the export fails if one appears) |
+| `NSLocationWhenInUseUsageDescription` and every other `NSLocation*` key; `location` in `UIBackgroundModes` | no location API: OneSignal's location module is off (`OneSignalSettings.json`), Unity's `UNITY_USES_LOCATION` must stay 0 |
+| `NSMotionUsageDescription` | no pedometer: the Input System's `iOSStepCounter.mm` is replaced by a stub at export. Tilt reads the accelerometer, which needs no purpose string |
+
+Likewise no target links `AppTrackingTransparency.framework`, `AdSupport.framework` or
+`CoreLocation.framework`, and no native plugin source may reference `ATTrackingManager`,
+`ASIdentifierManager`, `CLLocationManager`, `CMPedometer` or `CMMotionActivityManager`.
+
+**Privacy manifest** (`UnityFramework/PrivacyInfo.xcprivacy`, rewritten on every export):
+`NSPrivacyTracking` false, `NSPrivacyTrackingDomains` empty, `NSPrivacyCollectedDataTypes` = the §3
+rows, required-reason APIs UserDefaults `CA92.1` (PlayerPrefs), FileTimestamp `C617.1` (+ Unity's
+own `0A2A.1`), SystemBootTime `35F9.1` (Stopwatch, engine timing; the free-run challenge salt is
+a GUID on iOS, not `Environment.TickCount`, because 35F9.1 forbids sending boot time off-device) and
+DiskSpace `E174.1` (engine free-space checks). RevenueCat's and OneSignal's manifests arrive with
+their pods on the Mac.

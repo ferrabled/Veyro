@@ -33,6 +33,17 @@ namespace MotionRunner.CameraInput
 
         public RigState State { get; private set; } = RigState.Idle;
         public string FailReason { get; private set; } = string.Empty;
+
+#if UNITY_IOS
+        /// What a denied camera fails with on iOS. iOS asks once per install and answers every
+        /// later request itself, so tapping CAMERA again cannot undo it - only Settings can, which
+        /// is the advice the mode picker gives for this one failure (ModePickerCard.Tick).
+        public const string PermissionDeniedReason = "camera access is off";
+
+        public bool PermissionDenied =>
+            State == RigState.Failed && FailReason == PermissionDeniedReason;
+#endif
+
         public double GateMedianMs { get; private set; }
         public FaceObservation Latest { get; private set; }
 
@@ -51,13 +62,10 @@ namespace MotionRunner.CameraInput
         /// right floor.
         public float DetectorScore => _detector != null ? _detector.LastScore : 0f;
 
-        /// The raised-hand confirm for the pause-resume flow, alive only between
-        /// BeginGestureProbe and EndGestureProbe — which in practice means only while the game
-        /// is frozen and a resume is waiting on the player (the probe itself asserts that; see
-        /// PoseGestureProbe.TickLifecycle). Owned here because the probe reads this rig's
-        /// upright texture and rule 2 keeps sensors and models out of gameplay code: PauseMenu
-        /// only ever polls the published Confirmed/HandRaisedNow state.
-        public PoseGestureProbe GestureProbe { get; private set; }
+        // The pause-resume confirm needs nothing beyond State, Latest and LatestAgeSeconds above:
+        // it is two hops read off a FaceSteering fed through CameraFaceInput, exactly like the
+        // run's steering (PauseMenu, DoubleHopConfirm). There is no second model on this rig any
+        // more — the BlazePose raise-hand probe it used to own went with that gesture (28 Sep).
 
         CameraFeed _feed;
         FaceDetector _detector;
@@ -106,12 +114,11 @@ namespace MotionRunner.CameraInput
             _running = false;
             _generation++;
 
-            // Before the feed goes: the probe holds a provider onto the feed's texture, and a
-            // suspended camera is by definition not a resume wait.
-            EndGestureProbe();
-
             _feed?.Dispose();
             _feed = null;
+#if UNITY_IOS && !UNITY_EDITOR
+            Screen.sleepTimeout = SleepTimeout.SystemSetting;
+#endif
             _probe = null;
             _orientationConfident = false;
             Latest = default;
@@ -152,6 +159,26 @@ namespace MotionRunner.CameraInput
                 // ---- 2. Permission + camera ----
                 State = RigState.RequestingPermission;
                 _feed = new CameraFeed();
+#if UNITY_IOS && !UNITY_EDITOR
+                // iOS hands back an answer rather than a dialog to poll through: the request
+                // completes on Allow / Don't Allow, and instantly on every later ask (iOS prompts
+                // once per install). So a denial, the first or the tenth, fails right here instead
+                // of timing out - and without this step at all the alert would come up inside
+                // WebCamTexture.Play() and a denial would read as "no frames" ten seconds later.
+                // A rig destroyed mid-wait ends it in the OperationCanceledException catch below.
+                if (!CameraFeed.HasPermission())
+                {
+                    await Awaitable.FromAsyncOperation(CameraFeed.RequestPermissionAsync(),
+                        destroyCancellationToken);
+                    if (Stale()) return;
+                }
+
+                if (!CameraFeed.HasPermission())
+                {
+                    Fail(PermissionDeniedReason);
+                    return;
+                }
+#else
                 if (!CameraFeed.HasPermission())
                 {
                     CameraFeed.RequestPermission();
@@ -168,8 +195,16 @@ namespace MotionRunner.CameraInput
                     Fail("camera permission denied");
                     return;
                 }
+#endif
 
                 State = RigState.StartingCamera;
+#if UNITY_IOS && !UNITY_EDITOR
+                // Camera mode is hands-free - phone propped up, player stepped back - so no touch
+                // resets iOS's Auto-Lock (as short as 30 s, and 30 s in Low Power Mode), which
+                // would lock the phone mid-staging or mid-run. Awake while the rig holds the
+                // camera; Suspend and TearDown hand the timer back.
+                Screen.sleepTimeout = SleepTimeout.NeverSleep;
+#endif
                 for (int i = 0; i < 600 && !_feed.TryStart(); i++)
                 {
                     await Awaitable.NextFrameAsync();
@@ -249,7 +284,11 @@ namespace MotionRunner.CameraInput
                 // camera that broke, and must not surface as a failure the player reads.
                 if (Stale()) return;
                 Debug.LogError("[CAM] rig failed: " + e);
+#if UNITY_IOS
+                Fail("camera mode hit an error");
+#else
                 Fail("camera mode hit an error — see logcat");
+#endif
             }
         }
 
@@ -301,15 +340,17 @@ namespace MotionRunner.CameraInput
         /// probing again.
         ///
         /// Re-probing on resume is what made the second half of a run steer backwards. Every
-        /// candidate has a twin at (rotation + 180, !flip) that is upright but horizontally
-        /// MIRRORED, and BlazeFace scores a face and its mirror within noise of each other. The
-        /// launch probe runs under the conditions the staging text asks for — phone propped up,
-        /// player stepped back — so the true candidate clears GoodEnoughScore and the probe stops
-        /// on the device's own report before the twin is ever tried. A resume probe runs with the
-        /// player leaning over the phone they just tapped RESUME on: every candidate lands in the
-        /// contested band, all eight get compared, and the twin wins about half the time. x is
-        /// then inverted for the rest of the run while y survives, so jump and slide keep working
-        /// — which is exactly how it was reported from the device.
+        /// candidate has a twin that is upright but horizontally MIRRORED - at the quarter turn a
+        /// portrait phone's camera sits at, (rotation, !flip), the very next candidate the probe
+        /// tries (FrameOrientationTests pins the geometry) - and BlazeFace scores a face and its
+        /// mirror within noise of each other. The launch probe runs under the conditions the
+        /// staging text asks for — phone propped up, player stepped back — so the true candidate
+        /// clears GoodEnoughScore and the probe stops on the device's own report before the twin
+        /// is ever tried. A resume probe runs with the player leaning over the phone they just
+        /// tapped RESUME on: every candidate lands in the contested band, all eight get compared,
+        /// and the twin wins about half the time. x is then inverted for the rest of the run while
+        /// y survives, so jump and slide keep working — which is exactly how it was reported from
+        /// the device.
         ///
         /// Keeping the answer across a pause is safe because the only input to it that could
         /// move is the device-reported rotation, and the app is portrait-locked (BuildScript
@@ -336,72 +377,17 @@ namespace MotionRunner.CameraInput
             TearDown();
         }
 
-        /// Loads BlazePose and starts sampling for the raised-hand confirm. Only meaningful once
-        /// the camera is delivering frames — a rig that is still staging has nothing to sample —
-        /// and false is a normal answer (assets missing, model failed): the caller's touch path
-        /// carries the resume regardless (rule 3: gestures augment, never gate).
-        ///
-        /// This runs inside PauseMenu.Update while the pause card's buttons are disabled, and the
-        /// caller re-enables them off the branch this bool picks — so a throw escaping here would
-        /// leave the player frozen behind a card they cannot use (PR #6 review). Load() already
-        /// owns that contract for itself; the belt to its braces is here, covering the rest of
-        /// the method too, because "false is the only failure" has to be true of the whole entry
-        /// point and not just of the part that happens to be careful today.
-        public bool BeginGestureProbe()
-        {
-            if (GestureProbe != null) return true;
-            if (State != RigState.Tracking || _feed == null || _feed.UprightTexture == null)
-                return false;
-
-            PoseGestureProbe probe = null;
-            try
-            {
-                probe = new PoseGestureProbe();
-                if (!probe.Load())
-                {
-                    probe.Dispose();
-                    return false;
-                }
-
-                GestureProbe = probe;
-                // The provider re-reads the feed each cycle: a Suspend between two samples nulls
-                // it, and the probe idles rather than sampling a destroyed texture.
-                probe.Run(() => _feed?.UprightTexture, _feed.IsSelfieMirrored);
-                Debug.Log("[CAM] pose probe up (raise-hand confirm, lite landmarker, CPU)");
-                return true;
-            }
-            catch (Exception e)
-            {
-                // Published or not, the probe goes: GestureProbe must never name one that is not
-                // running, or the pause menu waits on a gesture nothing is sampling for.
-                Debug.LogError("[CAM] pose probe would not start: " + e +
-                               " — raise-hand confirm disabled, touch resume unaffected.");
-                GestureProbe = null;
-                probe?.Dispose();
-                return false;
-            }
-        }
-
-        /// Idempotent, and called from every way the wait can end: the countdown starting, the
-        /// resume being cancelled, the rig suspending, the rig dying. The probe must never
-        /// outlive the frozen state it is affordable in.
-        public void EndGestureProbe()
-        {
-            if (GestureProbe == null) return;
-            GestureProbe.Dispose();
-            GestureProbe = null;
-            Debug.Log("[CAM] pose probe down");
-        }
-
         void TearDown()
         {
             _running = false;
             _generation++;
-            EndGestureProbe();
             _detector?.Dispose();
             _feed?.Dispose();
             _detector = null;
             _feed = null;
+#if UNITY_IOS && !UNITY_EDITOR
+            Screen.sleepTimeout = SleepTimeout.SystemSetting;
+#endif
 
             // Unlike Suspend, this is the end of the rig: quitting to the menu or a failure both
             // land here, and whatever comes next re-does the whole staging, probe included.

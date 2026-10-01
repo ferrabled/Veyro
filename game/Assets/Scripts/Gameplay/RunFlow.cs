@@ -250,6 +250,7 @@ namespace MotionRunner.Gameplay
             _pauseMenu.RestartRequested += RestartRun;
             _pauseMenu.QuitRequested += QuitToMenu;
             _pauseMenu.CameraGaveUp += DropCameraMode;
+            _pauseMenu.CountdownStarted += RecalibrateForResume;
 
             // The countdown losing the face cancels through the same door the back button uses:
             // RequestPause walks Resuming back to Paused via ApplyPhase (the one timeScale
@@ -262,13 +263,30 @@ namespace MotionRunner.Gameplay
         ///
         /// The old face calibration goes with it: a player who walked away and stood back down
         /// is somewhere else now, and FaceSteering's neutral is where they were standing when
-        /// they paused. It re-calibrates during the "stand where the phone can see you" wait, so
-        /// the run resumes already aimed straight rather than leaning into a wall.
+        /// they paused. That reset alone is not the one that aims the run, though - see
+        /// RecalibrateForResume.
         void BeginResume()
         {
             if (!_pause.BeginResume()) return;
             _faceInput?.Steering.Reset();
             ApplyPhase();
+        }
+
+        /// The 3-2-1 has started, so the player has just confirmed - usually with two hops, on
+        /// the spot they mean to play from. The run's steering is reset HERE, again, because the
+        /// calibration BeginResume's reset started has long since completed: FaceSteering takes
+        /// its neutral from the first dozen confident frames, and those were the player walking
+        /// back into shot. Its drift cannot repair that - NeutralX only drifts while the axis is
+        /// small, and a neutral a metre off is the opposite of small - so a resumed run held a
+        /// side lane with the player standing in the middle (device, 28 Sep). Reset now, it
+        /// calibrates on the countdown's three seconds of standing still, which is what the
+        /// countdown was for. RunSession keeps ticking the input while frozen, so the samples
+        /// arrive; nothing reads the axis until the count is over.
+        void RecalibrateForResume()
+        {
+            if (_faceInput == null) return;
+            _faceInput.Steering.Reset();
+            Debug.Log("[CAM] countdown started: run steering reset, recalibrating on the player standing still");
         }
 
         /// FinishResume is asked, not told: if the phase moved on under a late callback the menu
@@ -535,7 +553,7 @@ namespace MotionRunner.Gameplay
             // Straight back into the resume staging, reason on top: the player is away from the
             // phone (that is what the outage means), so the framing overlay goes up and the
             // camera starts looking for them without anyone touching anything — walk back in,
-            // raise your hand, 3-2-1 (acceptance criterion 1). A rig that is terminally Failed
+            // stand still, hop twice, 3-2-1 (acceptance criterion 1). A rig that is terminally Failed
             // fails that staging immediately and drops the run to tilt through the existing
             // CameraGaveUp path, which is the fastest honest recovery for that case too.
             if (_pauseMenu != null)

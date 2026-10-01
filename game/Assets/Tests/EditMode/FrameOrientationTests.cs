@@ -135,6 +135,76 @@ namespace MotionRunner.Tests
             AssertMaps(r, 0.3f, 0.8f, 0.3f, 0.8f, "interior point");
         }
 
+        static readonly (float u, float v)[] Probes =
+            { (0f, 0f), (1f, 0f), (0f, 1f), (1f, 1f), (0.3f, 0.8f), (0.9f, 0.15f) };
+
+        /// Asserts that `twin` shows the same picture as `of`, flipped: what `twin` puts at
+        /// (u, v), `of` puts at (1-u, v) for a left-right mirror, or at (u, 1-v) upside down.
+        static void AssertIsFlipOf(in FrameOrientation.Result twin, in FrameOrientation.Result of,
+            bool leftRight, string what)
+        {
+            foreach ((float u, float v) in Probes)
+            {
+                PosePoint t = twin.SourceUvFromUpright.Apply(u, v);
+                PosePoint o = leftRight
+                    ? of.SourceUvFromUpright.Apply(1f - u, v)
+                    : of.SourceUvFromUpright.Apply(u, 1f - v);
+                Assert.AreEqual(o.X, t.X, Tol, what + " u at " + u + "," + v);
+                Assert.AreEqual(o.Y, t.Y, Tol, what + " v at " + u + "," + v);
+            }
+        }
+
+        [Test]
+        public void AtAQuarterTurnTheOtherFlipIsTheLeftRightMirror()
+        {
+            // The iOS risk in one assertion (IOS_HANDOFF §4, decision 2). A portrait phone's
+            // camera sits a quarter turn off, and there a wrong vertical-flip flag does not turn
+            // the picture upside down - it mirrors it left-right, which a face detector scores the
+            // same and steering reads as inverted. The orientation probe cannot tell the two
+            // apart, so "step left -> lane left" on the device is the only check that the
+            // reported flag is right. Holds with and without the selfie mirror on top.
+            foreach (int rotation in new[] { 90, 270 })
+            foreach (bool flipped in new[] { false, true })
+            foreach (bool selfie in new[] { false, true })
+            {
+                var reported = FrameOrientation.ForCamera(640, 480, rotation, flipped, selfie);
+                var otherFlip = FrameOrientation.ForCamera(640, 480, rotation, !flipped, selfie);
+                AssertIsFlipOf(otherFlip, reported, true, rotation + "/" + flipped + "/" + selfie);
+            }
+        }
+
+        [Test]
+        public void AtAQuarterTurnHalfATurnAwayWithTheOtherFlipIsUpsideDown()
+        {
+            // (rotation + 180, !flip) is the mirror twin only with the camera level (next test).
+            // At a quarter turn it is the upside-down picture instead, which scores like any
+            // other wrong orientation and which the probe therefore does discard.
+            foreach (int rotation in new[] { 90, 270 })
+            foreach (bool flipped in new[] { false, true })
+            foreach (bool selfie in new[] { false, true })
+            {
+                var reported = FrameOrientation.ForCamera(640, 480, rotation, flipped, selfie);
+                var halfTurn = FrameOrientation.ForCamera(640, 480, rotation + 180, !flipped, selfie);
+                AssertIsFlipOf(halfTurn, reported, false, rotation + "/" + flipped + "/" + selfie);
+            }
+        }
+
+        [Test]
+        public void AtNoOrAHalfTurnTheMirrorTwinIsHalfATurnAway()
+        {
+            // The other half of the rule OrientationProbe.ChallengerMargin states: with the
+            // camera level (a landscape frame shown as-is), the left-right mirror is
+            // (rotation + 180, !flip).
+            foreach (int rotation in new[] { 0, 180 })
+            foreach (bool flipped in new[] { false, true })
+            foreach (bool selfie in new[] { false, true })
+            {
+                var reported = FrameOrientation.ForCamera(640, 480, rotation, flipped, selfie);
+                var twin = FrameOrientation.ForCamera(640, 480, rotation + 180, !flipped, selfie);
+                AssertIsFlipOf(twin, reported, true, rotation + "/" + flipped + "/" + selfie);
+            }
+        }
+
         [Test]
         public void EveryOrientationIsCornerToCorner()
         {

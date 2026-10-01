@@ -26,8 +26,9 @@ namespace MotionRunner.EditorTools
 
         /// Points PlayerSettings at the icon art under Assets/Art/Icon/ (see AppIcon for the
         /// layers): the flat icon as the default for every platform, and on Android the adaptive
-        /// pair (background, foreground) plus the flat icon for the round and legacy kinds. Idempotent,
-        /// and re-run before every Android build, so a fresh checkout built headlessly carries the
+        /// pair (background, foreground) plus the flat icon for the round and legacy kinds; with iOS
+        /// as the active target also every iOS kind (SetIosIcons). Idempotent,
+        /// and re-run before every Android and iOS build, so a fresh checkout built headlessly carries the
         /// icon without anyone ever having clicked it into the inspector. A missing texture logs a
         /// warning and leaves that kind as it was - the icon must never fail a build.
         /// Returns false when nothing could be applied because the flat art is missing.
@@ -54,8 +55,41 @@ namespace MotionRunner.EditorTools
             SetAndroidIcons(AndroidPlatformIconKind.Legacy, flat);
             Debug.Log($"[AppIcon] Applied {AppIcon.SourcePath} as default/round/legacy icon" +
                       (background != null && foreground != null ? " and the adaptive layers." : "."));
+#if UNITY_IOS
+            SetIosIcons(flat);
+#endif
             return true;
         }
+
+#if UNITY_IOS
+        /// iOS takes the flat art in every slot of every kind the platform reports (application,
+        /// spotlight, settings, notification, and the 1024 px App Store "marketing" icon Xcode
+        /// refuses to archive without). iOS applies its own rounded mask, so there are no layers.
+        /// Only compiled with iOS as the active target (BuildIOS, or ApplyAppIcon run with
+        /// -buildTarget iOS), so an Android build never writes iOS icon slots into
+        /// ProjectSettings.asset. App Store Connect rejects a marketing icon with an alpha channel
+        /// (ITMS-90717); the source has none (1024 px indexed colour, no tRNS) and
+        /// IosBuildPostProcess re-checks the PNG Unity actually exported.
+        static void SetIosIcons(Texture2D flat)
+        {
+            var kinds = PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.iOS);
+            int slots = 0;
+            foreach (var kind in kinds)
+            {
+                var icons = PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, kind);
+                if (icons == null || icons.Length == 0)
+                {
+                    Debug.LogWarning($"[AppIcon] No iOS icon slots reported for kind {kind}; skipped.");
+                    continue;
+                }
+                foreach (var icon in icons) icon.SetTextures(flat);
+                PlayerSettings.SetPlatformIcons(NamedBuildTarget.iOS, kind, icons);
+                slots += icons.Length;
+            }
+            Debug.Log($"[AppIcon] Applied {AppIcon.SourcePath} to {slots} iOS icon slots " +
+                      $"({string.Join(", ", Array.ConvertAll(kinds, k => k.ToString()))}).");
+        }
+#endif
 
         /// Layers are positional: for the adaptive kind Unity takes [0] as background, [1] as
         /// foreground; the single-layer kinds read only [0].

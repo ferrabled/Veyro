@@ -47,10 +47,10 @@ namespace MotionRunner.CameraInput
         public bool MirrorForSelfie { get; set; } = true;
 
         /// Whether the upright frame actually carries the selfie mirror — MirrorForSelfie only
-        /// applies to a front-facing camera (see EnsureTarget). Consumers that read anatomy off
-        /// the frame need this: BlazePose labels left/right as if the image were unmirrored, so
-        /// which wrist is "the player's right hand" depends on exactly this flag
-        /// (RaisedHand.WristFor). An Editor webcam usually reports front=false and lands on the
+        /// applies to a front-facing camera (see EnsureTarget). Only a consumer that reads
+        /// ANATOMY off the frame needs this (a pose model labels left/right as if the image were
+        /// unmirrored); nothing in the shipping build does since the raise-hand confirm went
+        /// (28 Sep 2026). An Editor webcam usually reports front=false and lands on the
         /// unmirrored side.
         public bool IsSelfieMirrored => MirrorForSelfie && IsFrontFacing;
 
@@ -62,7 +62,22 @@ namespace MotionRunner.CameraInput
         public int SourceWidth => _webcam != null ? _webcam.width : 0;
         public int SourceHeight => _webcam != null ? _webcam.height : 0;
         public int ReportedRotation => _webcam != null ? _webcam.videoRotationAngle : 0;
+#if UNITY_IOS && !UNITY_EDITOR
+        /// Decision 2 (IOS_HANDOFF, 28 Sep): believe what iOS reports and test on the device
+        /// first. If "step left -> lane left" comes out as lane RIGHT on the iPhone, set this to
+        /// true: that is the whole fix. It has to live on the reported flag rather than in
+        /// UseDeviceReportedOrientation, because the orientation probe and its unconfident
+        /// fallback both start from ReportedVerticallyMirrored too - and the probe cannot catch
+        /// the mistake itself: in portrait (a quarter turn) the other flip is the same picture
+        /// mirrored left-right, which the face detector scores the same
+        /// (OrientationProbe.ChallengerMargin).
+        const bool InvertReportedFlip = false;
+
+        public bool ReportedVerticallyMirrored =>
+            _webcam != null && _webcam.videoVerticallyMirrored != InvertReportedFlip;
+#else
         public bool ReportedVerticallyMirrored => _webcam != null && _webcam.videoVerticallyMirrored;
+#endif
 
         public int Rotation => _rotation;
         public bool VerticallyFlipped => _flip;
@@ -71,6 +86,8 @@ namespace MotionRunner.CameraInput
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             return Permission.HasUserAuthorizedPermission(Permission.Camera);
+#elif UNITY_IOS && !UNITY_EDITOR
+            return Application.HasUserAuthorization(UserAuthorization.WebCam);
 #else
             return true;
 #endif
@@ -81,8 +98,19 @@ namespace MotionRunner.CameraInput
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
                 Permission.RequestUserPermission(Permission.Camera);
+#elif UNITY_IOS && !UNITY_EDITOR
+            RequestPermissionAsync();
 #endif
         }
+
+#if UNITY_IOS && !UNITY_EDITOR
+        /// iOS answers a camera request itself: the operation completes when the player taps
+        /// Allow or Don't Allow, and at once - with no alert - on every later request, because
+        /// iOS asks once per install and after that only Settings can change the answer. Await
+        /// it, then read HasPermission; unlike Android there is no dialog to poll through.
+        public static AsyncOperation RequestPermissionAsync() =>
+            Application.RequestUserAuthorization(UserAuthorization.WebCam);
+#endif
 
         /// Starts the front camera, falling back to whatever camera exists. Returns false when the
         /// device reports no cameras at all, which on Android also happens while the permission

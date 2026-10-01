@@ -37,42 +37,68 @@ Overlay (`FaceOverlay`): zones drawn to scale (57.5 / 21.25 / 21.25 of deflectio
 deflection with **no flip of its own** — `CameraFeed.MirrorForSelfie` already mirrors once
 upstream; placement params live at the two creation sites (RunFlow / menus).
 
-## Resume gesture (raise your right hand) — 2026-09-01
+## Resume gesture (hop twice) — 2026-09-28
 
-Pause-resume in camera mode: camera back → face held 0.5 s (`CameraStaging`) → raise your RIGHT
-hand → 3-2-1 → run. A camera-outage auto-pause begins this staging BY ITSELF (reason line on
-top) so the loop is touch-free end to end; manual and app-background pauses wait on the idle
-card. Touch RESUME and back work at every step (rule 3 — the gesture augments). The card HIDES
-during the count (owner call, 2 Sep device session): what's on screen is the frozen run, the
-framing overlay and the numeral; back and the HUD pause button cancel back to the card.
-BlazePose (detector + lite landmarker, CPU) runs ONLY while `timeScale == 0`: `PoseGestureProbe`
-logs `[CAM] pose probe up/down`, self-stops with an error if it ever finds the world unfrozen,
-and is disposed the moment the countdown starts. A full cycle is ~334 ms on the Nord 2 (T-010),
-so the probe answers at ~3 Hz; a floor of 0.25 s/sample keeps Editor rates honest.
+Pause-resume in camera mode: camera back → face held 0.5 s (`CameraStaging`) → **stand still**
+(recalibration) → **hop twice** → 3-2-1 → run. It replaced the 1 Sep raise-your-right-hand
+confirm (owner call, `docs/IOS_HANDOFF.md` decision 7): that needed BlazePose (~12 MiB of APK, a
+second model to verify on iOS, and it errored on the OnePlus 6T); a hop is read by the same
+`FaceSteering` jump rule the run steers with, so there is no model to load and nothing to fail.
+A camera-outage auto-pause begins this staging BY ITSELF (reason line on top) so the loop is
+touch-free end to end; manual and app-background pauses wait on the idle card. Touch RESUME and
+back work at every step (rule 3 — the gesture augments). The card HIDES during the count (owner
+call, 2 Sep device session): what's on screen is the frozen run, the framing overlay and the
+numeral; back and the HUD pause button cancel back to the card.
+
+Prompts (card / overlay caption): `stand still…` / `stand still` → `hop twice when ready` /
+`hop twice` (+ an up-chevron either side of the glyph's head) → after one hop `one more hop…` /
+`one more hop`, each card line followed by `— or tap RESUME`.
+
+How it is built: `PauseMenu` gives the confirm its **own** `CameraFaceInput` (so its own
+`FaceSteering`, which it may reset — the run's and the overlay's are never touched) and ticks
+`Pose/DoubleHopConfirm` after it each frame. The confirm owns that steering's calibration: it
+`Reset()`s it whenever a settle starts, so the baseline is where the player stands NOW, not where
+they walked in. Phases: **Settling → Armed → Confirmed**; every stray throws it back to Settling.
+
+**Why the stand-still is the whole design:** the bare jump rule fires on a player WALKING BACK
+IN. Walking towards a lens below face height moves the face *up* the frame, and the head bob
+rides on top — in the EditMode walk-in trajectories the run's own steering fires 2+ jumps. So:
+(1) nothing counts until the player has stood still on a fresh calibration for 1 s; (2) a hop
+counts only when it *lands* back on the settled spot; (3) two of them, take-offs ≤ 2 s apart,
+feet back on the ground in between. A scripted sweep (outside the repo, 28 Sep) confirmed 0 of
+5,760 walk-in variants (speed 0.4–1.4 m/s, lens −0.3…+0.9 m vs face, bob ±1–4 cm, 30/60/90 Hz,
+observations held 1–3 frames), 0 of 576 armed-then-walk variants and 0 of 2,250 single hops,
+while 99.1 % of 13,500 real double hops (7–22 cm, 0.15–0.45 s ascent, blur, 3 cm drift, 0.9–3 m)
+confirmed. The misses are 16–22 cm hops done back-to-back: FaceSteering's own echo refractory
+eats the second jump edge (the run would miss it too) — a third hop confirms.
 
 | constant | value | means | move it when |
 |---|---|---|---|
-| `RaisedHand.HeadUnitsAboveNose` | 0.5 | wrist must clear the crown (~10–12 cm above the nose); head unit = nose→shoulder-line span | hair-pushback/wave false-confirms (raise) / real raises missed (lower) |
-| `RaisedHand` wrist gate | visibility ≥ 0.5 only | an overhead wrist rides the crop edge: presence collapses while visibility holds (2 Sep device), so presence is NOT required for the wrist | overhead false-confirms appear (re-add presence + rely on the elbow) |
-| `RaisedHand` elbow fallback | elbow strictly above nose, full `IsTracked` | vouches when the hand left the frame entirely; no near-face fidget puts an elbow overhead | |
-| `RaisedHandConfirm.RequiredSamples` | 3 | ~1 s hold at 3 Hz; NET evidence — a miss winds back one sample, alternating noise never confirms (a hard reset flip-flopped the prompt against a held arm, 2 Sep) | hold feels laggy / twitchy |
-| `PoseGestureProbe.MinSampleIntervalSeconds` | 0.25 s | sample cadence floor, device-independent hold | |
-| `PauseMenu.CountdownFaceGraceSeconds` | 0.75 s | staging may lose the face this long mid-count before cancelling to the paused card | countdown cancels on blur (raise) |
-| `ResumeCountdown.DefaultDurationSeconds` | 3 s | numerals + still-player window for `FaceSteering` recalibration | owner call (OPEN_QUESTIONS 13) |
+| `DoubleHopConfirm.SettleSeconds` | 1 s | stand still this long (confident frames) on a fresh calibration before hops count — the walk-in defence | prompt feels slow (lower, carefully) / walk-ins confirm (raise) |
+| `StillDeflection` / `StillLift` / `StillSizeRatio` | 0.30 / 0.50 / 12 % | the settle band: ~5 cm sideways, ~6.4 cm up/down (sway is mostly vertical; tests stress ±3 cm), ±12 % box (~25 cm at 2 m) | honest standers never arm (widen) |
+| `RequiredHops` / `HopWindowSeconds` | 2 / 2 s | two landed hops, take-offs ≤ 2 s apart (the 0.5 s jump refractory is the floor) | |
+| `StrayDeflection` / `StraySizeRatio` | 0.60 / 20 % | while armed: ~10 cm sideways or ±20 % box → back to Settling (vertical is left to the hop rule) | |
+| `LandLift` / `LandDrop` / `MinPeakLift` | 0.35 / 0.15 / 0.25 | landed = back within ~4.5 cm of the baseline, ≥ ~2 cm down from a peak that reached ~3.2 cm | small hops not counted (lower `MinPeakLift`) |
+| `LandDeflection` / `LandSizeRatio` | 0.45 / 8 % | a landing must be on the settled spot (~7.5 cm) at the same distance (vs the box width at arming, not `CalibratedSize` — the size low-pass lags a player who just stopped) | forward-drifting hops rejected (raise) |
+| `GroundLift` | 0.15 | a take-off counts only if the face is up (> ~2 cm) and, after a landing, has been back down — FaceSteering can fire twice on one big hop | |
+| `LandTimeoutSeconds` / `LossGraceSeconds` | 1 s / 0.5 s | a take-off that never lands, or a face gone > 0.5 s, starts over | |
+| `PauseMenu.FaceGraceSeconds` | 0.75 s | the confirm wait AND the countdown may lose the face this long (confirm: `HasPosition`, not staging `Ready` — a hop blurs frames under the staging's strict bar) | waits cancel on blur (raise) |
+| `ResumeCountdown.DefaultDurationSeconds` | 3 s | numerals + still-player window: `RunFlow.RecalibrateForResume` resets the run's `FaceSteering` when the count starts (`PauseMenu.CountdownStarted`, logs `[CAM] countdown started: run steering reset…`), so it calibrates on the player standing after the hops — the reset at `BeginResume` alone calibrated on the walk-in and a resumed run held a side lane (device, 28 Sep) | owner call (OPEN_QUESTIONS 13) |
 
-**Mirror rule (pinned in `RaisedHandTests`):** the upright frame is selfie-mirrored once, and
-BlazePose labels anatomy as if it never was — so the player's right hand is `PoseJoint.LeftWrist`
-on the mirrored frame (`RaisedHand.WristFor`). The overlay's raised-arm hint draws on the glyph's
-screen-right, which is the same side; never flip either independently.
+Units are `FaceSteering`'s: `Deflection` in `HalfRangeX` (1.1 fw), `Lift` in `SlideDrop`
+(0.85 fw), sizes as the smoothed box — so every centimetre above holds at every distance.
 
 **Mid-run pause gesture:** deliberately none — leaving the frame *is* the gesture (auto-pause,
-`CameraOutage`, 1.75 s). Pose during gameplay stays abandoned (118 ms vs 30 ms budget, T-010).
+`CameraOutage`, 1.75 s). BlazePose is out of the shipping build entirely (steering: 118 ms vs
+30 ms budget, T-010; resume: replaced by hop-twice, 28 Sep).
 
 ## Telemetry
 
 ~1 Hz + on lane change, tag Unity: `[CAM] telemetry why= ctx= size= x= nx= defl= lift= axis= lane=
 score= raw= track= pos= toofar=`. `raw` = pre-threshold detector score; `size` = smoothed **box**
 width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | grep telemetry`.
+The resume confirm logs one line per phase/hop change: `[CAM] hop confirm: Settling|Armed|Confirmed
+hops=N restarts=N` (`restarts` = times a stray sent it back to Settling).
 
 ## Calibration protocol (owner, in order)
 
@@ -88,6 +114,10 @@ width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | g
    step out of frame in a side lane → runner holds the lane.
 8. Pause/resume framing panel (never yet on screen) + handheld regression (~2–2.5× more movement
    than the pre-rework tuning, by design).
+9. Hop-twice resume: step out → auto-pause; walk back in and just stand — it must NEVER resume by
+   itself; `stand still…` → `hop twice when ready` → two hops → 3-2-1 → the run resumes aimed
+   straight (first `ctx=run` telemetry after the count: `nx` ≈ `x`). Read the
+   `[CAM] hop confirm:` lines: many `restarts` while standing = the settle band is too tight.
 
 ## Open owner decisions
 
@@ -101,8 +131,9 @@ width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | g
   HOP in camera mode (`RunSession.RestartGesture`), with a camera-only hint under the card.
 - Overlay placement (provisional; modular). On the camera result card it now sits above the
   card (`FaceOverlay.ResultPosition`) rather than being hidden — STATUS 25 Sep.
-- Raise-hand confirm at the picker's **initial** staging too, replacing the 0.5 s face hold — one
-  mechanic taught once, pairs with the Wii-style setup card (BACKLOG T-015).
+- Hop-twice confirm at the picker's **initial** staging too, replacing the 0.5 s face hold — one
+  mechanic taught once, pairs with the Wii-style setup card (BACKLOG T-015). (Was asked about the
+  raise-hand confirm; the question carries over to its replacement.)
 - Picker: show both schemes' boards, or only the selected one's?
 
 ## Live risks
@@ -111,6 +142,18 @@ width in frame widths; `defl` in `HalfRangeX` units. `adb logcat -d -s Unity | g
   inert); noise followable ≤ 0.3 s after leaving frame (next dial: per-frame continuity limit);
   `CompositeInput` takes the largest-magnitude axis camera-first, so a frozen full-deflection
   camera axis beats keyboard (Editor-only in practice); 2.5 cm dead zone vs box jitter at 2 m+.
+
+## iOS (2026-09-28, not yet run on an iPhone)
+
+- **Permission:** the rig asks through `Application.RequestUserAuthorization(WebCam)` after the
+  speed gate and awaits the answer (no poll). iOS asks once per install: a denial, first or
+  later, fails at once with `camera access is off`, and the picker reads
+  `camera access is off` / `— allow it in Settings, or play with tilt` with TILT & TOUCH
+  re-enabled. Android is unchanged (`camera permission denied` / `— pick a mode to play`).
+- **Mirror:** in portrait the other flip flag is the same picture mirrored left-right
+  (`FrameOrientationTests`), which the probe cannot tell from the truth. Decision 2: trust what
+  iOS reports. If the device shows step left → lane right, set
+  `CameraFeed.InvertReportedFlip = true` (iOS player only). That is the whole fix.
 
 ## Device-loop notes (Nord 2)
 

@@ -11,6 +11,12 @@ namespace MotionRunner.Core
     /// text goes to the app the user picks, in their own hands, which is also why this adds no
     /// Data-safety obligation (docs/STORE_COMPLIANCE.md, T-024 section).
     ///
+    /// iOS has no native sheet on purpose (owner decision 4, 28 Sep, docs/IOS_HANDOFF.md): SHARE
+    /// copies the same text to the clipboard - the #else branch below - and Send returns false.
+    /// A clipboard write is still no transmission, so it adds no App Privacy row either
+    /// (docs/SHARE_COMPLIANCE.md, iOS addendum). A UIActivityViewController would need a native
+    /// plugin, and could only be tested through TestFlight.
+    ///
     /// Everything here is wrapped: a share that fails is a log line and a copied string, never an
     /// exception thrown through a UI button's onClick.
     public static class ShareSheet
@@ -20,7 +26,7 @@ namespace MotionRunner.Core
         public const string DefaultSubject = "Veyro Run challenge";
 
         /// Returns true when the system share sheet was actually opened; false when the text was
-        /// copied to the clipboard instead (Editor, desktop, or a failed intent).
+        /// copied to the clipboard instead (Editor, desktop, iOS, or a failed intent).
         public static bool Send(string text, string subject = DefaultSubject)
         {
             if (string.IsNullOrEmpty(text)) return false;
@@ -67,8 +73,8 @@ namespace MotionRunner.Core
                 return false;
             }
 #else
-            // Editor and every non-Android platform: the clipboard is the honest equivalent, and
-            // it makes the text checkable in Play mode without a phone.
+            // Editor and every non-Android platform, iOS included (decision 4): the clipboard is
+            // the honest equivalent, and it makes the text checkable in Play mode without a phone.
             CopyToClipboard(text);
             return false;
 #endif

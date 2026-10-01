@@ -269,7 +269,16 @@ namespace MotionRunner.Menu
                     break;
 
                 case CameraStaging.Stage.Failed:
+#if UNITY_IOS
+                    // iOS never asks twice, so after a Don't Allow another CAMERA tap lands
+                    // straight back here: the one useful advice is where the switch is. TILT &
+                    // TOUCH is re-enabled below either way.
+                    _status.text = _staging.Status + (_rig.PermissionDenied
+                        ? "\n— allow it in Settings, or play with tilt"
+                        : "\n— pick a mode to play");
+#else
                     _status.text = _staging.Status + "\n— pick a mode to play";
+#endif
                     CleanupRig();
                     SetButtonsInteractable(true);
                     break;

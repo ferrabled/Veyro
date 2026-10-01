@@ -59,6 +59,12 @@ namespace MotionRunner.Menu
             var state = _push.Status;
             if (_verification)
                 _body.text = "You can now send Push Notifications & In-App Messages through OneSignal. Tap below to enable push notifications.";
+#if UNITY_IOS
+            // iOS copy names Settings and the iPhone, never another platform (App Review
+            // 2.3.10), and a denied state always reads ALLOW IN SETTINGS: iOS never asks twice.
+            else
+                _body.text = IosPushFlow.Body(state);
+#else
             else if (!state.Initialized)
                 _body.text = "Notifications are unavailable here. You can keep playing. On Android, reopen the game and try again.";
             else if (!state.Registered)
@@ -71,11 +77,16 @@ namespace MotionRunner.Menu
                 _body.text = "Permission is allowed; device registration is still finishing. Check your connection and try again later.";
             else
                 _body.text = "Enable notifications about Daily Runs. You can turn them off at any time. Android will ask for permission if needed; declining changes nothing about the game.";
+#endif
 
             _primary.interactable = !_busy && state.Initialized && state.Registered && (_verification || !state.ReadyForPush);
             _primaryLabel.text = _busy ? "PLEASE WAIT…" : _verification ? "Got it" :
+#if UNITY_IOS
+                IosPushFlow.Button(state);
+#else
                 state.ReadyForPush ? "NOTIFICATIONS ON" : !state.CanRequestPermission && !state.PermissionGranted
                     ? "ALLOW IN ANDROID SETTINGS" : "ENABLE NOTIFICATIONS";
+#endif
         }
 
         async void Enable()
@@ -87,7 +98,7 @@ namespace MotionRunner.Menu
             PlayerPrefs.Save();
             Refresh();
             await _push.EnableFromUserTapAsync();
-            // Closing the panel or turning notifications off while Android owns the screen
+            // Closing the panel or turning notifications off while the OS owns the screen
             // must not let a late permission result silently re-enable the subscription.
             if (_cancelled || PlayerPrefs.GetInt(PushPromptPolicy.EnabledKey, 0) == 0) _push.Disable();
             if (this == null) return;

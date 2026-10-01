@@ -1,0 +1,13 @@
+# kind	file	in	out	caption	card   (tab-separated; " · " = line break; times in seconds of the source file; card = number of the PNG in --captions DIR, phone shots use N.png, wide shots Nw.png)
+reel	../../../builds/reel/out/v2/veyro-run-reel-v2-noplatform.mp4
+wide	raw/H1.mp4	12.0	30.0	front camera only · camera images stay on the phone	1
+wide	raw/T1.mp4	3.0	13.0	tilt to steer · tap to jump	2
+phone	raw/S1.mp4	22.5	30.5	three lanes · one thumb-free run	3
+phone	raw/S2.mp4	4.0	9.0	crash · tap · you're back	4
+phone	raw/S3.mp4	2.0	9.0	DAILY · 2026-09-30 · same track for everyone	5
+phone	raw/S4.mp4	1.0	6.0	camera mode is opt-in · the phone is speed-tested first	6
+phone	raw/S5.mp4	5.0	17.0	RevenueCat · Paywall Builder · cosmetics only	7
+phone	raw/S5.mp4	17.0	23.0	no lives · no boosts · no ads	8
+phone	raw/S6.mp4	2.0	8.0	OneSignal · push notifications	9
+phone	raw/S7.mp4	1.0	7.0	challenge a friend · Layers-instrumented	10
+card	../../../builds/reel/out/cards/closing.png	3
