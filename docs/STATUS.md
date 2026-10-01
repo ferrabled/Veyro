@@ -1,5 +1,28 @@
 # Status journal (newest at top)
 
+## 2026-09-29 — 20 s motion reel for the Devpost description (feat/iOS-implementation)
+
+**What changed:** added `docs/submission/reel/`, a code-built 20-second motion-graphics teaser.
+- Picture: `reel.html` is a deterministic scene graph captured by `render.mjs` in headless Chrome. It renders 1080p60 with 4-sample motion blur.
+- Sound: `music.py` synthesizes an original 120 BPM score cut to the page's cue list, with the game's CC0 SFX as foley.
+- Build: `build.sh` rebuilds the MP4 into `out/`, which is gitignored. The README has the beat map, where each on-screen number comes from, and the licences.
+- It is a teaser, not the <2 min on-device demo in `VIDEO_SCRIPT.md`.
+
+**Verified:**
+- The JS port of `RunSeed.RngState` reproduces all three pinned `RunSeedTests` values.
+- The mix has no third-party music and is loudness-normalised to −14 LUFS / −1 dBTP.
+- The owner has not yet reviewed it.
+
+**Open for the owner:**
+- The end card says "iPhone & Android", matching the site's CTA note.
+- The camera section uses the AI-generated guide illustrations.
+
+**v2, same day, after owner review:**
+- Slowed to 90 BPM (26.7 s). A global timescale keeps picture and score locked.
+- The tilt is now a 3D turn of the phone about its vertical centre axis, matching `GyroTiltInput` and the guide art. The in-plane spin and the horizon roll are gone.
+- The camera section says STEP (sideways, one lane) instead of LEAN.
+- The v1 renders and source are kept under `builds/reel/out/v1/` and `builds/reel/v1-src/`.
+
 ## 2026-09-29 — T-037 website refresh and store-review legal pass, deployed (feat/update-website-ui, PR #15)
 
 **What changed** (all under `site/` and this branch's docs):
