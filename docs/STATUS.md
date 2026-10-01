@@ -1,5 +1,51 @@
 # Status journal (newest at top)
 
+## 2026-09-30 — Submission video: director's pack, shot list and ffmpeg assembly (feat/iOS-implementation, T-035)
+
+**What changed:** `docs/submission/SHOOT_GUIDE.md` — the shoot-day plan for the <2 min Devpost
+video, built with the reel pane: the 26.7 s reel v2 runs whole as the title sequence (the reel
+pane confirmed it has no clean early cut; its only resolution is the 24.0 s slam), live footage
+from 0:27, a 1:53 cut with per-segment captions, a two-phone shot list (H1 hook uncut, T1 tilt,
+S1–S7 screen recordings incl. pass paywall → Google sheet, OneSignal push, challenge link), the
+phone's built-in recorder as the capture path (`adb screenrecord` has no audio), and an hour-by-
+hour shoot timeline. `docs/submission/assemble/assemble.sh` + `edl.tsv`
+assemble the cut with ffmpeg alone (portrait clips centred on the reel's paper colour with
+drawtext or alpha-PNG captions, optional VO/music bed, loudnorm −14 LUFS, fails at ≥ 120 s).
+`VIDEO_SCRIPT.md` points to the guide; `CHECKLIST.md` B3 updated; OPEN_QUESTIONS **33** holds the
+five owner decisions. Requested from the reel pane: ten caption PNGs, a closing card, and an
+end-card variant without the "iPhone & Android" line (all under `builds/reel/out/cards/`).
+
+**Found:** both phones carry `BuildAndroidDev` builds (OnePlus 6T: `1.0.0-dev.20260929-0025`,
+sideloaded; Nord 2 per 28 Sep) — Development watermark and Test Store sheet, unusable in the
+judged video. The recommended fix is a signed internal-track upload of this branch (no review,
+not a public release); the fallback is the Play closed-track v5, which predates T-045 audio.
+Also: skins purchase on Google's sheet directly and only the Season 1 pass uses the RevenueCat
+paywall, so the "Paywall Builder" shot must be the pass; the pass paywall's fake discount (29 Sep)
+must be fixed before that shot.
+
+**Verified:** `assemble.sh` end to end on synthetic clips (portrait 1080×2340 30 fps with audio,
+landscape without audio, a still card) plus the real reel v2 → 1920×1080 60 fps H.264/AAC with the
+duration check; the reel pane's caption PNGs (`N.png` phone / `Nw.png` wide) and `closing.png`
+overlay correctly (frames inspected). Not verified: any real footage (nothing shot yet), the
+internal-track build.
+
+**Corrected after the reel pane's fact check:** the guide no longer shows a slide (the game has
+none — `IsSlidePressed` is unread; the in-game guide copy that mentions sliding is flagged in
+OPEN_QUESTIONS 33), the hook caption says "camera images stay on the phone" (the build does use
+the network for RevenueCat/OneSignal/Layers/leaderboard), and the OneSignal caption says "push
+notifications", not "daily reminder" (`LISTING.md` forbids that claim until the scheduled
+campaign ships).
+
+**1 Oct, owner update:** no iPhone is available for the shoot, so the video shoots on the Nord 2's dev build (`1.0.0-dev.20260929-0025`, screenshot-verified
+13:20: watermark is a 12 px label bottom-right, under the tab bar). Guide §0/§1 rewritten for
+that: `assemble.sh --cropbottom 36` removes the watermark rows; S5 shows the RevenueCat Test Store
+sheet; the mode card's "lean to steer … crouch to slide" copy is wrong (no slide exists —
+`IsSlidePressed` has no gameplay reader; the reel says STEP) and is proposed for a fix before
+shooting.
+
+**Next (owner):** answer OPEN_QUESTIONS 33 (a–f), shoot per §3, run `assemble.sh`, upload
+unlisted + embeddable, check logged out, paste the link into the form.
+
 ## 2026-09-29 — 20 s motion reel for the Devpost description (feat/iOS-implementation)
 
 **What changed:** added `docs/submission/reel/`, a code-built 20-second motion-graphics teaser.

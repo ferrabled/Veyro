@@ -368,3 +368,16 @@ the question. Keep this file short; it is read every session.
     `site/`.* Also still open for the iOS release: **item 22(a)**, confirming no advertising /
     SKAdNetwork / CAPI destinations in the Layers dashboard. Layers' SKAN calls are armed only by
     its remote config, and the App Privacy "no tracking" answer relies on that.
+33. **Demo video shoot-day decisions (`docs/submission/SHOOT_GUIDE.md` §0).** **Owner, 1 Oct:**
+    no iPhone is available, so the video is shot on the latest Android dev build. That settles the build question and the reel
+    end line (no-platform variant). Still open, all owner-only: (a) crop the Development
+    watermark in the edit (*default: yes, 36 px*); (b) fix the in-game copy that advertises a
+    slide and says "lean" before shooting (*default: yes, ~30 min dev rebuild*); (c) voice-over or
+    captions (subsumes item 11 — *default: captions + game audio*); (d) who is on camera for the
+    hook; (e) the category line on the closing card; (f) show the Test Store purchase in S5 or
+    stop at the paywall (*default: show it*). Also before S5: fix the Season Pass paywall's fake
+    discount in the RevenueCat dashboard (STATUS 29 Sep).
+    **Side finding (reel pane, 30 Sep):** the in-game guide (`GuideState.cs`) says "SWIPE DOWN
+    to slide" / "CROUCH to slide", but nothing in gameplay reads `IsSlidePressed` and
+    `LISTING.md` lists sliding as deliberately absent. Either the guide copy is wrong or the
+    action is missing — owner call, not for the video (which shows no slide).

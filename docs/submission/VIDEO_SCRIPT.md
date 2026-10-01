@@ -2,6 +2,11 @@
 
 Written 23 Aug 2026. **Script only — nothing shot, nothing recorded.**
 
+> **30 Sep 2026:** the shoot-day structure now lives in `SHOOT_GUIDE.md` — the 26.7 s motion reel
+> (`reel/`) opens the video as a title sequence and the live footage starts at 0:27. The rules in
+> this file (no fake hook, no architecture diagrams, no unlicensed music) still apply; the
+> timings below are superseded.
+
 ## The constraint
 
 Devpost requires a video **under two minutes**, publicly visible on YouTube or Vimeo, showing the app
