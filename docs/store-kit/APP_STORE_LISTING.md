@@ -182,13 +182,14 @@ Veyro Run is made by one developer, in public. If something feels wrong, tell us
 | Screenshots | iPhone 6.9" **1290×2796** (or 1320×2868), 3–10, RGB, no alpha. iPhone-only build ⇒ no iPad set |
 | Build + IAPs | Chosen on the version page at submission; the three IAPs are attached there (first IAPs must ship with a version) |
 
-**App Review notes:**
+**App Review notes** (corrected 30 Sep: the first version claimed touch alone could play the game,
+but touch only jumps (`TouchTapInput`); steering is tilt or camera):
 
 ```
 Veyro Run is a motion-controlled endless runner. No account or login is required.
 
 HOW TO PLAY
-Hold the phone upright (portrait). Tilt left/right to change lanes and tap the screen to jump. Swipe and tap controls work alongside tilt, so the game is fully playable without tilting.
+Hold the phone upright (portrait). Tilt left/right to change lanes and tap the screen to jump. Steering needs tilt (or camera mode); touch jumps.
 
 CAMERA MODE (BETA, optional)
 Choose CAMERA (the button tagged BETA) in the mode picker. The front camera is used on-device only to follow the player; no images are stored or transmitted. The camera permission is requested only when the player picks this mode. Tilt remains available if permission is declined.
